@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <style>
+        .exam-card {
+            transition: transform 0.2s;
+        }
+        .exam-card:hover {
+            transform: translateY(-5px);
+        }
+
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        body.dark-mode .navbar {
+            background-color: #1e1e1e !important;
+            border-bottom: 1px solid #333;
+        }
+
+        body.dark-mode .navbar-brand,
+        body.dark-mode .navbar-text,
+        body.dark-mode .nav-link {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .card {
+            background-color: #1e1e1e;
+            border-color: #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .modal-content {
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+
+        body.dark-mode .modal-header,
+        body.dark-mode .modal-footer {
+            border-color: #333;
+        }
+
+        body.dark-mode .dropdown-menu {
+            background-color: #1e1e1e;
+            border-color: #333;
+        }
+
+        body.dark-mode .dropdown-item {
+            color: #ffffff;
+        }
+
+        body.dark-mode .dropdown-item:hover {
+            background-color: #333;
+        }
+
+        body.dark-mode .alert {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+        <div class="container">
+            <a class="navbar-brand" href="#">Online Proctoring System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item me-3">
+                        <span class="navbar-text" id="userInfo">
+                            <strong id="userName"></strong><br>
+                            <small id="userEmail"></small>
+                        </span>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class='bx bx-menu'></i>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" id="profileBtn">
+                                <i class='bx bx-user'></i> Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" id="darkModeBtn">
+                                <i class='bx bx-moon'></i> <span id="darkModeText">Dark Mode</span>
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class='bx bx-log-out'></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <h2 class="mb-4">Available Exams</h2>
+        
+        <div class="row" id="examsList">
+            <!-- Exams will be loaded here dynamically -->
+        </div>
+    </div>
+
+    <!-- Proctoring Consent Modal -->
+    <div class="modal fade" id="proctoringModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Exam Monitoring Consent</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <h6>Before proceeding with the exam, please note:</h6>
+                        <ul>
+                            <li>Your webcam will be used to monitor the exam session</li>
+                            <li>Audio may be recorded during the exam</li>
+                            <li>Screen recording may be enabled</li>
+                            <li>All monitoring data will be automatically deleted after 14 days</li>
+                            <li>The data will only be used for exam integrity verification</li>
+                        </ul>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="consentCheck">
+                        <label class="form-check-label" for="consentCheck">
+                            I understand and agree to exam monitoring
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="startExamBtn" disabled>Start Exam</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let selectedExamId = null;
+
+        // Load available exams
+        async function loadExams() {
+            const response = await fetch('/select?collection=exams');
+            const exams = await response.json();
+            const userResponse = await fetch('/select?collection=users&id=' + sessionStorage.getItem('userId'));
+            const user = await userResponse.json();
+            
+            const examsList = document.getElementById('examsList');
+            examsList.innerHTML = '';
+            
+            exams.forEach(exam => {
+                // Check if user has already taken this exam
+                const taken = user.exams_taken && user.exams_taken.includes(exam.id);
+                
+                const card = `
+                    <div class="col-md-4 mb-4">
+                        <div class="card exam-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${exam.title}</h5>
+                                <p class="card-text">${exam.subject}</p>
+                                <p class="card-text">Duration: ${exam.duration} minutes</p>
+                                <p class="card-text">Questions: ${exam.questions.length}</p>
+                                ${taken ? 
+                                    '<button class="btn btn-secondary" disabled>Completed</button>' :
+                                    `<button class="btn btn-primary" onclick="showProctoring('${exam.id}')">Take Exam</button>`
+                                }
+                            </div>
+                        </div>
+                    </div>
+                `;
+                examsList.innerHTML += card;
+            });
+        }
+
+        // Show proctoring consent modal
+        function showProctoring(examId) {
+            selectedExamId = examId;
+            const modal = new bootstrap.Modal(document.getElementById('proctoringModal'));
+            modal.show();
+        }
+
+        // Handle consent checkbox
+        document.getElementById('consentCheck').addEventListener('change', function() {
+            document.getElementById('startExamBtn').disabled = !this.checked;
+        });
+
+        // Handle exam start
+        document.getElementById('startExamBtn').addEventListener('click', function() {
+            if (selectedExamId) {
+                window.location.href = `/take_exam/${selectedExamId}`;
+            }
+        });
+
+        // Add logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    // Clear session storage
+                    sessionStorage.clear();
+                    // Redirect to login page
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (err) {
+                console.error('Error during logout:', err);
+                alert('Error during logout');
+            }
+        });
+
+        // Check if user is logged in when page loads
+        function checkAuth() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) {
+                window.location.href = '/';
+                return false;
+            }
+
+            // Check if user is a student
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+            if (user.type !== 'student') {
+                window.location.href = '/';
+                return false;
+            }
+
+            // Load user info
+            loadUserInfo();
+
+            return true;
+        }
+
+        // Load user information
+        function loadUserInfo() {
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+            document.getElementById('userName').textContent = user.name || 'Student';
+            document.getElementById('userEmail').textContent = user.email || '';
+
+            // Load dark mode preference
+            const darkMode = localStorage.getItem('darkMode') === 'true';
+            if (darkMode) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('darkModeText').textContent = 'Light Mode';
+            }
+        }
+
+        // Profile button handler
+        document.getElementById('profileBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = '/profile';
+        });
+
+        // Dark mode toggle
+        document.getElementById('darkModeBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            document.getElementById('darkModeText').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+        });
+
+        // Load exams when page loads
+        loadExams();
+    </script>
+</body>
+</html>

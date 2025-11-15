@@ -1,0 +1,13 @@
+<script>
+window.addEventListener('load', () => {
+    if (!checkAuth()) return;
+    
+    const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+    if (!user.id) {
+        window.location.href = '/';
+        return;
+    }
+    
+    // Rest of exam initialization code
+});
+</script>

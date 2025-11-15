@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proctoring Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <style>
+        .stat-card {
+            border-radius: 15px;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .stat-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .mini-chart {
+            height: 300px;
+        }
+        .alert-type {
+            padding: 8px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+
+        .back-btn-mobile {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255,255,255,0.9);
+            border: 1px solid #dee2e6;
+            color: #495057;
+        }
+
+        .back-btn-mobile:hover {
+            background: #f8f9fa;
+            color: #212529;
+        }
+
+        /* Mobile responsive improvements */
+        @media (max-width: 768px) {
+            .container-fluid {
+                padding: 1rem !important;
+            }
+
+            .stat-card {
+                margin-bottom: 1rem;
+            }
+
+            .stat-card .card-body {
+                padding: 1rem;
+            }
+
+            .stat-card .h3 {
+                font-size: 1.5rem;
+            }
+
+            .stat-card .text-xs {
+                font-size: 0.75rem;
+            }
+
+            .stat-card .small {
+                font-size: 0.7rem;
+            }
+
+            .card-header h6 {
+                font-size: 0.9rem;
+            }
+
+            .table-responsive {
+                font-size: 0.8rem;
+            }
+
+            .table th,
+            .table td {
+                padding: 0.5rem;
+            }
+
+            .alert-type {
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+
+            .badge {
+                font-size: 0.7rem;
+            }
+
+            /* Stack cards vertically on mobile */
+            .row .col-xl-3,
+            .row .col-md-6 {
+                margin-bottom: 1rem;
+            }
+
+            /* Make tables more mobile-friendly */
+            .table-responsive {
+                border: none;
+            }
+
+            .table-responsive .table {
+                margin-bottom: 0;
+            }
+
+            /* Adjust top lists layout */
+            .col-xl-6 {
+                margin-bottom: 1rem;
+            }
+        }
+
+        /* Dark mode support */
+        body.dark-mode {
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        body.dark-mode .stat-card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .stat-card .text-muted {
+            color: #cccccc !important;
+        }
+
+        body.dark-mode .card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .card-header {
+            background-color: #2d2d2d;
+            border-bottom: 1px solid #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .table {
+            color: #ffffff;
+        }
+
+        body.dark-mode .table th {
+            background-color: #2d2d2d;
+            border-color: #444;
+            color: #ffffff;
+        }
+
+        body.dark-mode .table td {
+            background-color: #1e1e1e;
+            border-color: #333;
+        }
+
+        body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+            background-color: #252525;
+        }
+
+        body.dark-mode .table-striped tbody tr:nth-of-type(even) {
+            background-color: #1e1e1e;
+        }
+
+        body.dark-mode .alert-type {
+            background-color: #2d2d2d !important;
+            border: 1px solid #444;
+            color: #ffffff;
+        }
+
+        body.dark-mode .badge {
+            background-color: #6ee7b7 !important;
+            color: #032;
+        }
+
+        body.dark-mode .text-uppercase {
+            color: #ffffff;
+        }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+
+    <div class="main-content" id="main-content">
+        {% include 'navbar.html' %}
+
+        <div class="container-fluid p-4">
+            <h1 class="h3 mb-4">Analytics Dashboard</h1>
+            
+            <!-- Main Stats -->
+            <div class="row">
+                <!-- Users Stats -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-primary shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-primary fw-bold">Total Students</div>
+                                    <div class="h3 mb-0 fw-bold" id="totalStudents">0</div>
+                                    <div class="text-muted small">Active Users</div>
+                                </div>
+                                <div class="stat-icon bg-primary bg-opacity-10">
+                                    <i class='bx bxs-graduation text-primary fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Exams Stats -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-success shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-success fw-bold">Active Exams</div>
+                                    <div class="h3 mb-0 fw-bold" id="totalExams">0</div>
+                                    <div class="text-muted small">Available Tests</div>
+                                </div>
+                                <div class="stat-icon bg-success bg-opacity-10">
+                                    <i class='bx bxs-book-open text-success fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sessions Stats -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-info shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-info fw-bold">Total Sessions</div>
+                                    <div class="h3 mb-0 fw-bold" id="totalSessions">0</div>
+                                    <div class="text-muted small">Exam Attempts</div>
+                                </div>
+                                <div class="stat-icon bg-info bg-opacity-10">
+                                    <i class='bx bxs-time text-info fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alerts Stats -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-warning shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Total Alerts</div>
+                                    <div class="h3 mb-0 fw-bold" id="totalAlerts">0</div>
+                                    <div class="text-muted small">Detected Issues</div>
+                                </div>
+                                <div class="stat-icon bg-warning bg-opacity-10">
+                                    <i class='bx bxs-bell text-warning fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Stats -->
+            <div class="row">
+                <!-- Alert Types Distribution -->
+                <div class="col-xl-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 fw-bold">Alert Distribution</h6>
+                        </div>
+                        <div class="card-body">
+                            <div id="alertTypes">
+                                <!-- Alert types will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Sessions -->
+                <div class="col-xl-8 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 fw-bold">Recent Exam Sessions</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Student</th>
+                                            <th>Exam</th>
+                                            <th>Date</th>
+                                            <th>Duration</th>
+                                            <th>Alerts</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recentSessions">
+                                        <!-- Recent sessions will be inserted here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Stats Row -->
+            <div class="row">
+                <!-- Teachers Count -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-secondary shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-secondary fw-bold">Teachers</div>
+                                    <div class="h3 mb-0 fw-bold" id="totalTeachers">0</div>
+                                </div>
+                                <div class="stat-icon bg-secondary bg-opacity-10">
+                                    <i class='bx bxs-user text-secondary fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Average Session Duration -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-danger shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-danger fw-bold">Avg. Duration</div>
+                                    <div class="h3 mb-0 fw-bold" id="avgDuration">0 min</div>
+                                </div>
+                                <div class="stat-icon bg-danger bg-opacity-10">
+                                    <i class='bx bxs-timer text-danger fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Total Questions -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-primary shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-primary fw-bold">Questions</div>
+                                    <div class="h3 mb-0 fw-bold" id="totalQuestions">0</div>
+                                </div>
+                                <div class="stat-icon bg-primary bg-opacity-10">
+                                    <i class='bx bxs-help-circle text-primary fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alert Rate -->
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card border-left-warning shadow h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Alert Rate</div>
+                                    <div class="h3 mb-0 fw-bold" id="alertRate">0%</div>
+                                </div>
+                                <div class="stat-icon bg-warning bg-opacity-10">
+                                    <i class='bx bxs-error text-warning fs-3'></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+    
+            <!-- NEW: More statistics (10+) -->
+            <div class="row">
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Total Classes</div>
+                            <div class="h4 fw-bold" id="totalClasses">0</div>
+                            <div class="text-muted small">Course & Section</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Avg Exams per Class</div>
+                            <div class="h4 fw-bold" id="avgExamsPerClass">0</div>
+                            <div class="text-muted small">Distribution</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Completion Rate</div>
+                            <div class="h4 fw-bold" id="completionRate">0%</div>
+                            <div class="text-muted small">Sessions Completed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Avg Alerts / Session</div>
+                            <div class="h4 fw-bold" id="avgAlertsPerSession">0</div>
+                            <div class="text-muted small">Alert density</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- row 3: Top lists -->
+                <div class="col-xl-6 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 fw-bold">Top 5 Students by Alerts</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <thead><tr><th>Student</th><th>Alerts</th></tr></thead>
+                                <tbody id="topStudentsByAlerts"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-6 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 fw-bold">Top 5 Exams by Alert Rate</h6>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-sm">
+                                <thead><tr><th>Exam</th><th>Alerts / Session</th></tr></thead>
+                                <tbody id="topExamsByAlertRate"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Load dashboard data
+        async function loadDashboardData() {
+            try {
+                // Fetch all required data (include classes)
+                const [users, exams, sessions, classes, examResults] = await Promise.all([
+                    fetch('/select?collection=users').then(r => r.json()),
+                    fetch('/select?collection=exams').then(r => r.json()),
+                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
+                    fetch('/select?collection=classes').then(r => r.json()),
+                    fetch('/select?collection=exam_results').then(r => r.json())
+                ]);
+
+                // Normalize role/type accessor
+                const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
+
+                // Students: prefer explicit user records, otherwise infer from results/sessions
+                let studentUsers = users.filter(u => userRole(u) === 'student');
+                if (studentUsers.length === 0) {
+                    // fallback: unique user ids from exam_results and sessions
+                    const idsFromResults = (examResults || []).map(r => r.user_id).filter(Boolean);
+                    const idsFromSessions = (sessions || []).map(s => s.user_id).filter(Boolean);
+                    const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions]));
+                    studentUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+                }
+
+                // Proctors: combine explicit proctor users and any proctor_id referenced in classes
+                const proctorUsers = users.filter(u => userRole(u) === 'proctor');
+                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id).filter(Boolean)));
+                const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
+                const teachersCount = combinedProctorIds.size;
+
+                // Alerts aggregation
+                let totalAlerts = 0;
+                let alertTypes = {
+                    twofaces: 0,
+                    notlooking: 0,
+                    phone: 0,
+                    loudsound: 0,
+                    mvoices: 0
+                };
+                (sessions || []).forEach(session => {
+                    if (session.alerts) {
+                        Object.entries(session.alerts).forEach(([type, alerts]) => {
+                            if (Array.isArray(alerts)) {
+                                alertTypes[type] = (alertTypes[type] || 0) + alerts.length;
+                                totalAlerts += alerts.length;
+                            }
+                        });
+                    }
+                });
+
+                // Total questions (defensive)
+                const totalQuestions = (exams || []).reduce((sum, exam) => {
+                    const qlen = Array.isArray(exam.questions) ? exam.questions.length : 0;
+                    return sum + qlen;
+                }, 0);
+
+                // Avg session duration (defensive)
+                const durations = (sessions || []).map(s => {
+                    const start = new Date(s.start_time);
+                    const end = new Date(s.end_time);
+                    if (isNaN(start) || isNaN(end)) return 0;
+                    return (end - start) / (1000 * 60); // minutes
+                }).filter(d => d > 0);
+                const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b) / durations.length) : 0;
+
+                // Update UI
+                document.getElementById('totalStudents').textContent = studentUsers.length;
+                document.getElementById('totalTeachers').textContent = teachersCount;
+                document.getElementById('totalExams').textContent = (exams || []).length;
+                document.getElementById('totalSessions').textContent = (sessions || []).length;
+                document.getElementById('totalAlerts').textContent = totalAlerts;
+                document.getElementById('totalQuestions').textContent = totalQuestions;
+                document.getElementById('avgDuration').textContent = `${avgDuration} min`;
+                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (sessions || []).length))} per exam`;
+
+                // Update alert types distribution
+                const alertTypesHtml = Object.entries(alertTypes)
+                    .map(([type, count]) => `
+                        <div class="alert-type bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="text-capitalize">${type}</span>
+                                <span class="badge bg-primary">${count}</span>
+                            </div>
+                        </div>
+                    `).join('');
+                document.getElementById('alertTypes').innerHTML = alertTypesHtml;
+
+                // Update recent sessions table (defensive lookups)
+                const recentSessionsHtml = (sessions || [])
+                    .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+                    .slice(0, 5)
+                    .map(session => {
+                        const student = users.find(u => u.id === session.user_id) || { name: session.user_id || 'Unknown' };
+                        const exam = (exams || []).find(e => e.id === session.exam_id) || { title: session.exam_id || 'Unknown' };
+                        const alertCount = Object.values(session.alerts || {}).reduce((sum, alerts) => sum + ((alerts && alerts.length) || 0), 0);
+                        const duration = (() => {
+                            const start = new Date(session.start_time), end = new Date(session.end_time);
+                            if (isNaN(start) || isNaN(end)) return 'N/A';
+                            return `${Math.round((end - start) / (1000 * 60))} min`;
+                        })();
+
+                        return `
+                            <tr>
+                                <td>${student.name || 'Unknown'}</td>
+                                <td>${exam.title || 'Unknown'}</td>
+                                <td>${isNaN(new Date(session.start_time)) ? 'N/A' : new Date(session.start_time).toLocaleDateString()}</td>
+                                <td>${duration}</td>
+                                <td><span class="badge bg-warning">${alertCount}</span></td>
+                            </tr>
+                        `;
+                    }).join('');
+                document.getElementById('recentSessions').innerHTML = recentSessionsHtml;
+
+                // --- NEW metrics calculations ---
+
+                // Total classes
+                const totalClasses = (classes || []).length;
+                document.getElementById('totalClasses').textContent = totalClasses;
+
+                // Avg exams per class (map by class.course+section or count exams with exam.class_id if present)
+                // fallback: exams / classes
+                const avgExamsPerClass = totalClasses ? ((exams || []).length / totalClasses) : 0;
+                document.getElementById('avgExamsPerClass').textContent = avgExamsPerClass.toFixed(2);
+
+                // Completion rate: sessions with status === 'completed'
+                const completed = (sessions || []).filter(s => (s.status || '').toString().toLowerCase() === 'completed').length;
+                const completionRate = (sessions && sessions.length) ? Math.round((completed / sessions.length) * 100) : 0;
+                document.getElementById('completionRate').textContent = `${completionRate}%`;
+
+
+
+                // Top 5 students by total alerts across sessions
+                const studentAlertCounts = {};
+                (sessions || []).forEach(s => {
+                    const uid = s.user_id;
+                    const count = Object.values(s.alerts || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    if (!uid) return;
+                    studentAlertCounts[uid] = (studentAlertCounts[uid] || 0) + count;
+                });
+                const topStudents = Object.entries(studentAlertCounts)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 5)
+                    .map(([uid, count]) => {
+                        const u = users.find(x => x.id === uid) || { name: uid };
+                        return `<tr><td>${u.name}</td><td>${count}</td></tr>`;
+                    }).join('');
+                document.getElementById('topStudentsByAlerts').innerHTML = topStudents || '<tr><td colspan="2">No data</td></tr>';
+
+                // Top 5 exams by alerts per session
+                const examStats = {};
+                (sessions || []).forEach(s => {
+                    const eid = s.exam_id;
+                    if (!eid) return;
+                    const count = Object.values(s.alerts || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    if (!examStats[eid]) examStats[eid] = { alerts: 0, sessions: 0 };
+                    examStats[eid].alerts += count;
+                    examStats[eid].sessions += 1;
+                });
+                const topExams = Object.entries(examStats)
+                    .map(([eid, st]) => ({ eid, rate: st.alerts / Math.max(1, st.sessions) }))
+                    .sort((a, b) => b.rate - a.rate)
+                    .slice(0, 5)
+                    .map(x => {
+                        const ex = exams.find(e => e.id === x.eid) || { title: x.eid };
+                        return `<tr><td>${ex.title}</td><td>${x.rate.toFixed(2)}</td></tr>`;
+                    }).join('');
+                document.getElementById('topExamsByAlertRate').innerHTML = topExams || '<tr><td colspan="2">No data</td></tr>';
+
+                // (optional) Participation rate: users who appear in exam_results vs known students
+                const resultUserIds = new Set((examResults || []).map(r => r.user_id).filter(Boolean));
+                const participationRate = studentUsers.length ? Math.round((resultUserIds.size / studentUsers.length) * 100) : 0;
+                // set a tooltip or reuse element (here we set 'totalStudents' title)
+                document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
+
+                // done
+            } catch (err) {
+                console.error('Error loading dashboard data:', err);
+            }
+        }
+
+        // Load data when page loads
+        loadDashboardData();
+
+        (async function redirectUsers() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) return; // no client session, do nothing
+
+            try {
+                const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+                if (!res.ok) return;
+                const user = await res.json();
+                const role = (user.role || user.type || '').toString().toLowerCase();
+                if (role === 'proctor') {
+                    // redirect proctor to the proctor-scoped dashboard
+                    window.location.replace('/proctor_dashboard');
+                } else if (role === 'student') {
+                    // redirect student to student dashboard
+                    window.location.replace('/student_dashboard');
+                }
+            } catch (err) {
+                console.error('User redirect check failed', err);
+            }
+        })();
+    </script>
+</html>

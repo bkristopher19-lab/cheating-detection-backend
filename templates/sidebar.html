@@ -1,0 +1,122 @@
+<style>
+        /* Copy the same sidebar styles from dashboard.html */
+        :root {
+            --sidebar-width: 250px;
+        }
+        
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100vh;
+            position: fixed;
+            background-color: #2c3e50;
+            transition: all 0.3s;
+        }
+
+        .sidebar-collapsed {
+            margin-left: calc(-1 * var(--sidebar-width));
+        }
+
+        .main-content {
+            margin-left: var(--sidebar-width);
+            transition: all 0.3s;
+        }
+
+        .main-content-expanded {
+            margin-left: 0;
+        }
+
+
+
+        @media (max-width: 768px) {
+            .sidebar {
+                margin-left: calc(-1 * var(--sidebar-width));
+            }
+            
+            .main-content {
+                margin-left: 0;
+            }
+        }
+    </style>
+    
+    <div class="sidebar" id="sidebar">
+    <div class="d-flex flex-column flex-shrink-0 p-3">
+        <a href="/" class="d-flex align-items-center mb-3 mb-md-0 me-md-auto text-white text-decoration-none">
+            <span class="fs-4">Proctoring System</span>
+        </a>
+        <hr class="text-white">
+        {# determine role safely; templates may pass current_user for server-side rendering, but we also handle client-side sessionStorage #}
+        {% set role = current_user.role if current_user is defined and current_user.role is defined else (current_user.type if current_user is defined and current_user.type is defined else '') %}
+        <ul class="nav nav-pills flex-column mb-auto">
+            <li class="nav-item proctor-only">
+                <a href="/dashboard" class="nav-link {{ 'active' if active_page == 'dashboard' else 'text-white' }}">
+                    <i class='bx bxs-dashboard'></i>
+                    Dashboard
+                </a>
+            </li>
+
+            {# Users link — only visible to admins (hidden by default for client-side control) #}
+            <li class="admin-only" style="display: {% if role == 'admin' %}block{% else %}none{% endif %};">
+                <a href="/users" class="nav-link {{ 'active' if active_page == 'users' else 'text-white' }}">
+                    <i class='bx bxs-user-detail'></i>
+                    Users
+                </a>
+            </li>
+
+            <li class="proctor-only">
+                <a href="/exams" class="nav-link {{ 'active' if active_page == 'exams' else 'text-white' }}">
+                    <i class='bx bxs-book'></i>
+                    Exams
+                </a>
+            </li>
+
+            {# Classes link — admin only (hidden by default for client-side control) #}
+            <li class="admin-only" style="display: {% if role == 'admin' %}block{% else %}none{% endif %};">
+                <a href="/classes" class="nav-link {{ 'active' if active_page == 'classes' else 'text-white' }}">
+                    <i class='bx bxs-grid'></i>
+                    Classes
+                </a>
+            </li>
+
+            <li class="proctor-only">
+                <a href="/reports" class="nav-link {{ 'active' if active_page == 'reports' else 'text-white' }}">
+                    <i class='bx bxs-report'></i>
+                    Reports
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
+
+<script>
+    // Client-side check: read sessionStorage userId and fetch user record.
+    // Shows admin-only links only when user.role or user.type === 'admin'.
+    // Hides proctor-only links for students.
+    (async function applySidebarVisibility(){
+        try {
+            const userId = sessionStorage.getItem('userId');
+            // if no client session, skip (server-side rendering may have already shown appropriate links)
+            if (!userId) return;
+
+            const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+            if (!res.ok) return;
+            const user = await res.json();
+            const role = (user.role || user.type || '').toString().toLowerCase();
+
+            if (role === 'admin') {
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+            } else {
+                // ensure proctors cannot see admin-only links
+                document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            }
+
+            // Hide proctor-only items for students
+            if (role === 'student') {
+                document.querySelectorAll('.proctor-only').forEach(el => el.style.display = 'none');
+            } else {
+                document.querySelectorAll('.proctor-only').forEach(el => el.style.display = '');
+            }
+        } catch (err) {
+            console.error('Sidebar visibility error', err);
+        }
+    })();
+</script>

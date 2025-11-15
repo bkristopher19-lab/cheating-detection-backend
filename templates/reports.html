@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proctoring Reports</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <style>
+        .timeline {
+            border-left: 3px solid #dee2e6;
+            padding: 1rem 0;
+        }
+        .timeline-item {
+            position: relative;
+            padding-left: 2rem;
+            margin-bottom: 1rem;
+        }
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -9px;
+            top: 0;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #fff;
+            border: 3px solid #0d6efd;
+        }
+        .timeline-item.warning::before {
+            border-color: #ffc107;
+        }
+        .timeline-item.danger::before {
+            border-color: #dc3545;
+        }
+
+        .alert-badge {
+            font-size: 0.8rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 1rem;
+            margin-right: 0.5rem;
+        }
+
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    
+    <div class="main-content" id="main-content">
+        {% include 'navbar.html' %}
+
+        <div class="container-fluid p-4">
+            <h1 class="h3 mb-4">Proctoring Reports</h1>
+
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">Select Student</label>
+                            <select class="form-select" id="studentSelect">
+                                <option value="">Loading students...</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Select Exam</label>
+                            <select class="form-select" id="examSelect" disabled>
+                                <option value="">Select exam first</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Session Date</label>
+                            <select class="form-select" id="sessionSelect" disabled>
+                                <option value="">Select date</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Report Content -->
+            <div class="card">
+                <div class="card-body">
+                    <div id="reportContent" style="display: none;">
+                        <div class="row mb-4">
+                            <div class="col-md-6">
+                                <h4>Session Summary</h4>
+                                <table class="table">
+                                    <tr>
+                                        <th>Start Time:</th>
+                                        <td id="sessionStart"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>End Time:</th>
+                                        <td id="sessionEnd"></td>
+                                    </tr>
+                                    <tr>
+                                        <th>Duration:</th>
+                                        <td id="sessionDuration"></td>
+                                    </tr>
+                                </table>
+                            </div>
+
+                            <!-- FIXED ALERT STATISTICS -->
+                            <div class="col-md-6">
+                                <h4>Alert Statistics</h4>
+
+                                <!-- UPDATED: Bootstrap grid instead of d-flex -->
+                                <div id="alertStats" class="row g-3">
+                                </div>
+                            </div>
+                        </div>
+
+                        <h4>Detailed Timeline</h4>
+                        <div class="timeline" id="alertTimeline"></div>
+
+                        <div class="mt-3">
+                            <button type="button" class="btn btn-outline-primary btn-sm" onclick="shareReport()">
+                                <i class="fas fa-share-alt me-1"></i>Share Report
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="noDataMessage" class="text-center py-5">
+                        <i class='bx bx-data bx-lg text-muted'></i>
+                        <p class="mt-2">Select a student and exam to view the report</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Initialize variables
+        let students = [];
+        let exams = [];
+        let sessions = [];
+        let currentUser = null;
+        let allowedExamIds = [];
+
+        async function initReports() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) return;
+
+            try {
+                const ur = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+                if (ur.ok) currentUser = await ur.json();
+            } catch (err) {
+                console.error('Failed to load current user', err);
+            }
+
+            try {
+                const er = await fetch('/select?collection=exams');
+                exams = await er.json();
+                const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
+
+                if (role === 'proctor') {
+                    allowedExamIds = exams
+                        .filter(e => (e.proctor_id === currentUser.id) || (e.created_by === currentUser.id))
+                        .map(e => e.id);
+                } else {
+                    allowedExamIds = exams.map(e => e.id);
+                }
+            } catch (err) {
+                console.error('Failed to load exams', err);
+            }
+
+            await loadStudents();
+        }
+
+        async function loadStudents() {
+            const response = await fetch('/select?collection=exam_results');
+            const results = await response.json();
+            const filteredResults = results.filter(r => allowedExamIds.includes(r.exam_id));
+            const studentIds = [...new Set(filteredResults.map(r => r.user_id))];
+
+            const usersRes = await fetch('/select?collection=users');
+            const allUsers = await usersRes.json();
+            students = allUsers.filter(u => studentIds.includes(u.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+            const select = document.getElementById('studentSelect');
+            select.innerHTML = '<option value="">Select student</option>' +
+                students.map(s => `<option value="${s.id}">${s.name} (${s.email})</option>`).join('');
+        }
+
+        async function loadStudentExams(studentId) {
+            const response = await fetch(`/select?collection=exam_results`);
+            const results = await response.json();
+            const studentResults = results.filter(r => r.user_id === studentId && allowedExamIds.includes(r.exam_id));
+
+            const examIds = [...new Set(studentResults.map(r => r.exam_id))];
+            const select = document.getElementById('examSelect');
+
+            select.innerHTML = '<option value="">Select exam</option>' +
+                examIds.map(id => {
+                    const exam = exams.find(e => e.id === id);
+                    return `<option value="${id}">${exam?.title || 'Unknown Exam'}</option>`;
+                }).sort((a, b) => {
+                    const examA = exams.find(e => e.id === a.value);
+                    const examB = exams.find(e => e.id === b.value);
+                    const dateA = new Date(examA?.created_at || examA?.start_time || 0);
+                    const dateB = new Date(examB?.created_at || examB?.start_time || 0);
+                    return dateB - dateA; // Newest first
+                }).join('');
+            select.disabled = false;
+        }
+
+        async function loadExamSessions(studentId, examId) {
+            const response = await fetch('/select?collection=proctoring_sessions');
+            sessions = (await response.json())
+                .filter(s => s.user_id === studentId && s.exam_id === examId && allowedExamIds.includes(s.exam_id));
+
+            const select = document.getElementById('sessionSelect');
+            select.innerHTML = '<option value="">Select session</option>' +
+                sessions.map(s => {
+                    const date = new Date(s.start_time);
+                    return `<option value="${s.id}">${date.toLocaleString()}</option>`;
+                }).sort((a, b) => {
+                    const dateA = new Date(a.start_time);
+                    const dateB = new Date(b.start_time);
+                    return dateB - dateA; // Newest first
+                }).join('');
+            select.disabled = false;
+        }
+
+        function displayReport(session) {
+            document.getElementById('noDataMessage').style.display = 'none';
+            document.getElementById('reportContent').style.display = 'block';
+
+            document.getElementById('sessionStart').textContent = new Date(session.start_time).toLocaleString();
+            document.getElementById('sessionEnd').textContent = new Date(session.end_time).toLocaleString();
+            const duration = Math.round((new Date(session.end_time) - new Date(session.start_time)) / 60000);
+            document.getElementById('sessionDuration').textContent = `${duration} minutes`;
+
+            const stats = {
+                twofaces: 0,
+                notlooking: 0,
+                phone: 0,
+                loudsound: 0,
+                mvoices: 0,
+                captions: 0
+            };
+
+            Object.keys(session.alerts).forEach(type => {
+                stats[type] = session.alerts[type].length;
+            });
+
+            // FIXED — Alert Stats now wrap using Bootstrap grid
+            document.getElementById('alertStats').innerHTML = Object.entries(stats)
+                .map(([type, count]) => `
+                    <div class="col-4 col-md-3 col-lg-2 text-center">
+                        <div class="h4 mb-0">${count}</div>
+                        <small class="text-muted">${type}</small>
+                    </div>
+                `).join('');
+
+            const reportCard = document.getElementById('reportContent');
+
+            const timeline = document.getElementById('alertTimeline');
+            timeline.innerHTML = '';
+
+            const allAlerts = [];
+            Object.entries(session.alerts).forEach(([type, alerts]) => {
+                alerts.forEach(alert => {
+                    allAlerts.push({ ...alert, type });
+                });
+            });
+
+            allAlerts.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+            allAlerts.forEach(alert => {
+                const item = document.createElement('div');
+                item.className = `timeline-item ${getAlertClass(alert.type)}`;
+                item.innerHTML = `
+                    <span class="alert-badge ${getAlertBadgeClass(alert.type)}">${alert.type}</span>
+                    <span class="timestamp">${new Date(alert.timestamp).toLocaleString()}</span>
+                    <div class="mt-1">${alert.message}</div>
+                `;
+                timeline.appendChild(item);
+            });
+
+            // Add single clip video below session recording if clip_path exists
+            if (session.clip_path) {
+                const clipSection = document.createElement('div');
+                clipSection.className = 'mt-4';
+                clipSection.innerHTML = `
+                    <h5>Violation Clip</h5>
+                    <video id="violationClip" controls style="width:100%;max-height:300px;border-radius:8px;background:#000;">
+                        <source src="${session.clip_path}" type="video/webm">
+                        Your browser does not support the video tag.
+                    </video>
+                `;
+                reportCard.appendChild(clipSection);
+            }
+        }
+
+        function getAlertClass(type) {
+            switch(type) {
+                case 'twofaces':
+                case 'phone':
+                    return 'danger';
+                case 'notlooking':
+                case 'loudsound':
+                case 'mvoices':
+                    return 'warning';
+                default:
+                    return '';
+            }
+        }
+
+        function getAlertBadgeClass(type) {
+            switch(type) {
+                case 'twofaces':
+                case 'phone':
+                    return 'bg-danger text-white';
+                case 'notlooking':
+                case 'loudsound':
+                case 'mvoices':
+                    return 'bg-warning text-dark';
+                default:
+                    return 'bg-primary text-white';
+            }
+        }
+
+        document.getElementById('studentSelect').addEventListener('change', (e) => {
+            if (e.target.value) loadStudentExams(e.target.value);
+        });
+
+        document.getElementById('examSelect').addEventListener('change', (e) => {
+            if (e.target.value) {
+                const studentId = document.getElementById('studentSelect').value;
+                loadExamSessions(studentId, e.target.value);
+            }
+        });
+
+        document.getElementById('sessionSelect').addEventListener('change', (e) => {
+            if (e.target.value) {
+                const session = sessions.find(s => s.id === e.target.value);
+                if (session) displayReport(session);
+            }
+        });
+
+        async function shareReport() {
+            const studentId = document.getElementById('studentSelect').value;
+            const examId = document.getElementById('examSelect').value;
+            const sessionId = document.getElementById('sessionSelect').value;
+
+            if (!studentId || !examId || !sessionId) {
+                alert('Please select a student, exam, and session first.');
+                return;
+            }
+
+            try {
+                const response = await fetch('/share_report', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        student_id: studentId,
+                        exam_id: examId,
+                        session_id: sessionId
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Copy to clipboard
+                    navigator.clipboard.writeText(result.share_url).then(() => {
+                        alert(`Share link copied to clipboard!\n\n${result.share_url}`);
+                    }).catch(() => {
+                        alert(`Share link generated!\n\n${result.share_url}`);
+                    });
+                } else {
+                    alert('Failed to generate share link: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Share error:', error);
+                alert('Failed to share report. Please try again.');
+            }
+        }
+
+        initReports();
+
+        (async function redirectStudent() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) return; // no client session, do nothing
+
+            try {
+                const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+                if (!res.ok) return;
+                const user = await res.json();
+                const role = (user.role || user.type || '').toString().toLowerCase();
+                if (role === 'student') {
+                    // redirect student to student dashboard
+                    window.location.replace('/student_dashboard');
+                }
+            } catch (err) {
+                console.error('Student redirect check failed', err);
+            }
+        })();
+    </script>
+</body>
+</html>

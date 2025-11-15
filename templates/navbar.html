@@ -1,0 +1,598 @@
+<!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+            <div class="container-fluid">
+                <button class="btn btn-link d-lg-none" id="menu-toggle">
+                    <i class='bx bx-menu fs-4'></i>
+                </button>
+
+                <a class="navbar-brand" href="#">Online Proctoring System</a>
+
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Mobile Menu -->
+                <div id="mobile-menu" class="mobile-menu d-lg-none">
+                    <div class="mobile-menu-content">
+                        <div class="mobile-menu-header">
+                            <h5>Menu</h5>
+                            <button class="btn-close" onclick="document.getElementById('mobile-menu').classList.remove('show')"></button>
+                        </div>
+                        <div class="mobile-menu-body">
+                            <div class="mobile-menu-section">
+                                <a href="/dashboard" class="mobile-menu-item proctor-only">
+                                    <i class='bx bx-home'></i> Dashboard
+                                </a>
+                                <a href="/users" class="mobile-menu-item admin-only" style="display: none;">
+                                    <i class='bx bx-user-detail'></i> Users
+                                </a>
+                                <a href="/exams" class="mobile-menu-item proctor-only">
+                                    <i class='bx bx-book'></i> Exams
+                                </a>
+                                <a href="/classes" class="mobile-menu-item admin-only" style="display: none;">
+                                    <i class='bx bx-grid'></i> Classes
+                                </a>
+                                <a href="/reports" class="mobile-menu-item proctor-only">
+                                    <i class='bx bx-file'></i> Reports
+                                </a>
+                                <a href="/profile" class="mobile-menu-item">
+                                    <i class='bx bx-user'></i> Profile
+                                </a>
+                            </div>
+                            <div class="mobile-menu-section border-top">
+                                <button class="mobile-menu-item" id="mobileDarkModeToggle">
+                                    <i class='bx bx-moon'></i> Dark Mode
+                                </button>
+                                <button class="mobile-menu-item text-danger" id="mobileLogoutBtn">
+                                    <i class='bx bx-log-out'></i> Logout
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="collapse navbar-collapse" id="navbarSupportedContent">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item d-lg-none">
+                            <button class="btn btn-link nav-link back-btn-mobile" onclick="window.history.back()" title="Go Back">
+                                <i class='bx bx-arrow-back'></i> Back
+                            </button>
+                        </li>
+                        <li class="nav-item">
+                            <button class="btn btn-link nav-link" id="darkModeToggle" title="Toggle Dark Mode">
+                                <i class='bx bx-moon'></i>
+                            </button>
+                        </li>
+                        <li class="nav-item d-lg-none ms-auto">
+                            <span id="accountType" class="fw-bold text-primary"></span>
+                        </li>
+                        <li class="nav-item dropdown d-lg-block">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class='bx bxs-user'></i>
+                                <span id="userName">User</span>
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="/profile">
+                                        <i class='bx bxs-user-detail'></i> Profile
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="#" id="logoutBtn">
+                                        <i class='bx bx-log-out'></i> Logout
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </nav>
+
+    <style>
+        .navbar-brand {
+            font-weight: 600;
+        }
+
+        .back-btn-mobile {
+            color: #6c757d;
+            padding: 0.5rem;
+        }
+
+        .back-btn-mobile:hover {
+            color: #495057;
+        }
+
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        body.dark-mode .main-content {
+            background-color: #121212;
+        }
+
+        body.dark-mode .card {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .card-body {
+            color: #ffffff;
+        }
+
+        body.dark-mode .card-title {
+            color: #ffffff;
+        }
+
+        body.dark-mode .form-control {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: #ffffff;
+        }
+
+        body.dark-mode .form-control:focus {
+            background-color: #2d2d2d;
+            border-color: #6c757d;
+            color: #ffffff;
+        }
+
+        body.dark-mode .form-label {
+            color: #ffffff;
+        }
+
+        body.dark-mode .table {
+            color: #ffffff;
+            background-color: #1e1e1e;
+        }
+
+        body.dark-mode .table th {
+            background-color: #2d2d2d;
+            border-color: #444;
+            color: #ffffff;
+        }
+
+        body.dark-mode .table td {
+            background-color: #1e1e1e;
+            border-color: #333;
+        }
+
+        body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+            background-color: #252525;
+        }
+
+        body.dark-mode .table-striped tbody tr:nth-of-type(even) {
+            background-color: #1e1e1e;
+        }
+
+        body.dark-mode .table-hover tbody tr:hover {
+            background-color: #333333;
+        }
+
+        body.dark-mode .table tbody td {
+            color: #ffffff;
+        }
+
+        body.dark-mode .text-muted {
+            color: #cccccc !important;
+        }
+
+        body.dark-mode .btn-link {
+            color: #6c757d;
+        }
+
+        body.dark-mode .btn-link:hover {
+            color: #9ca3af;
+        }
+
+        body.dark-mode .navbar {
+            background-color: #1e1e1e !important;
+            border-bottom: 1px solid #333;
+        }
+
+        body.dark-mode .navbar-brand {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .nav-link {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .nav-link:hover {
+            color: #cccccc !important;
+        }
+
+        body.dark-mode .dropdown-menu {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+        }
+
+        body.dark-mode .dropdown-item {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .dropdown-item:hover {
+            background-color: #3d3d3d;
+        }
+
+        body.dark-mode .mobile-menu-content {
+            background: #1e1e1e;
+            border-right: 1px solid #333;
+        }
+
+        body.dark-mode .mobile-menu-item {
+            color: #ffffff;
+            border-bottom: 1px solid #333;
+        }
+
+        body.dark-mode .mobile-menu-item:hover {
+            background-color: #2d2d2d;
+        }
+
+        body.dark-mode .mobile-menu-item.text-danger {
+            color: #ff6b7d !important;
+        }
+
+        body.dark-mode .mobile-menu-item.text-danger:hover {
+            background-color: rgba(255, 107, 125, 0.1);
+            color: #ff6b7d !important;
+        }
+
+        body.dark-mode .mobile-menu-header {
+            border-bottom: 1px solid #333;
+            background: #2d2d2d;
+        }
+
+        body.dark-mode .mobile-menu-header h5 {
+            color: #ffffff;
+        }
+
+        body.dark-mode .mobile-menu-section.border-top {
+            border-top: 1px solid #333 !important;
+        }
+
+        body.dark-mode .btn-close {
+            filter: invert(1);
+        }
+
+        /* Keep specific colored elements */
+        body.dark-mode .btn-primary {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+        body.dark-mode .btn-primary:hover {
+            background-color: #0b5ed7;
+            border-color: #0a58ca;
+        }
+
+        body.dark-mode .btn-success {
+            background-color: #198754;
+            border-color: #198754;
+        }
+
+        body.dark-mode .btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+
+        body.dark-mode .alert-danger {
+            background-color: rgba(220, 53, 69, 0.1);
+            border-color: #dc3545;
+            color: #ff6b7d;
+        }
+
+        body.dark-mode .alert-warn {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-color: #ffc107;
+            color: #ffe066;
+        }
+
+        body.dark-mode .alert {
+            background-color: #2d2d2d;
+            border: 1px solid #444;
+            color: #ffffff;
+        }
+
+        body.dark-mode .small {
+            color: #cccccc;
+        }
+
+        body.dark-mode .container,
+        body.dark-mode .container-fluid {
+            background-color: #121212;
+        }
+
+        body.dark-mode .row {
+            background-color: transparent;
+        }
+
+        body.dark-mode .col-md-12,
+        body.dark-mode .col-md-6,
+        body.dark-mode .col-md-4,
+        body.dark-mode .col-md-3 {
+            background-color: transparent;
+        }
+
+        body.dark-mode .h1,
+        body.dark-mode .h2,
+        body.dark-mode .h3,
+        body.dark-mode .h4,
+        body.dark-mode .h5,
+        body.dark-mode .h6 {
+            color: #ffffff;
+        }
+
+        body.dark-mode p {
+            color: #ffffff;
+        }
+
+        body.dark-mode a {
+            color: #6c757d;
+        }
+
+        body.dark-mode a:hover {
+            color: #9ca3af;
+        }
+
+        body.dark-mode .alert-type {
+            background-color: #2d2d2d !important;
+            border: 1px solid #444;
+            color: #ffffff;
+        }
+
+        body.dark-mode .alert-type .badge {
+            background-color: #6ee7b7 !important;
+            color: #032;
+        }
+
+        /* Mobile Menu Styles */
+        .mobile-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1050;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .mobile-menu.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .mobile-menu-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 280px;
+            height: 100%;
+            background: #ffffff;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+
+        .mobile-menu.show .mobile-menu-content {
+            transform: translateX(0);
+        }
+
+        .mobile-menu-header {
+            padding: 1rem;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+        }
+
+        .mobile-menu-header h5 {
+            margin: 0;
+            font-weight: 600;
+            color: #212529;
+        }
+
+        .mobile-menu-body {
+            padding: 0;
+        }
+
+        .mobile-menu-item {
+            display: flex;
+            align-items: center;
+            padding: 0.875rem 1rem;
+            color: #495057;
+            text-decoration: none;
+            border-bottom: 1px solid #f1f3f4;
+            transition: background-color 0.2s ease;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .mobile-menu-item:hover {
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+
+        .mobile-menu-item i {
+            margin-right: 0.75rem;
+            font-size: 1.2rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .mobile-menu-item.text-danger {
+            color: #dc3545 !important;
+        }
+
+        .mobile-menu-item.text-danger:hover {
+            background-color: rgba(220, 53, 69, 0.1);
+            color: #dc3545 !important;
+        }
+
+        .mobile-menu-section {
+            padding: 0.5rem 0;
+        }
+
+        .mobile-menu-section.border-top {
+            border-top: 1px solid #e9ecef !important;
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+        }
+    </style>
+
+<script>
+// Menu toggle functionality
+document.getElementById('menu-toggle').addEventListener('click', function() {
+    // Check if mobile (screen width <= 768px)
+    const isMobile = window.innerWidth <= 768;
+
+    if (isMobile) {
+        // On mobile, show/hide mobile menu
+        const mobileMenu = document.getElementById('mobile-menu');
+        if (mobileMenu) {
+            mobileMenu.classList.toggle('show');
+        }
+    } else {
+        // On desktop, toggle sidebar
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('main-content');
+
+        if (sidebar) {
+            sidebar.classList.toggle('sidebar-collapsed');
+        }
+        if (mainContent) {
+            mainContent.classList.toggle('main-content-expanded');
+        }
+    }
+});
+
+
+
+// Load user name and account type when navbar loads
+async function loadUserName() {
+    const userId = sessionStorage.getItem('userId');
+    if (!userId) {
+        window.location.href = '/';
+        return;
+    }
+
+    try {
+        const response = await fetch(`/select?collection=users&id=${userId}`);
+        const user = await response.json();
+        document.getElementById('userName').textContent = user.name;
+
+        // Set account type for mobile view
+        const role = (user.role || user.type || 'student').toLowerCase();
+        const accountTypeElement = document.getElementById('accountType');
+        if (accountTypeElement) {
+            accountTypeElement.textContent = role.charAt(0).toUpperCase() + role.slice(1);
+        }
+    } catch (err) {
+        console.error('Error loading user:', err);
+    }
+}
+
+// Desktop logout
+document.getElementById('logoutBtn').addEventListener('click', async function(e) {
+    e.preventDefault();
+    await performLogout();
+});
+
+// Mobile logout
+document.getElementById('mobileLogoutBtn').addEventListener('click', async function(e) {
+    e.preventDefault();
+    await performLogout();
+    // Close mobile menu after logout
+    document.getElementById('mobile-menu').classList.remove('show');
+});
+
+async function performLogout() {
+    try {
+        const response = await fetch('/logout', {
+            method: 'POST'
+        });
+
+        if (response.ok) {
+            // Clear session storage
+            sessionStorage.removeItem('userId');
+            // Redirect to login page
+            window.location.href = '/';
+        } else {
+            alert('Logout failed');
+        }
+    } catch (err) {
+        console.error('Error during logout:', err);
+        alert('Error during logout');
+    }
+}
+
+// Dark mode toggle functionality
+document.getElementById('darkModeToggle').addEventListener('click', function() {
+    toggleDarkMode();
+});
+
+// Mobile dark mode toggle
+document.getElementById('mobileDarkModeToggle').addEventListener('click', function() {
+    toggleDarkMode();
+    // Close mobile menu after toggle
+    document.getElementById('mobile-menu').classList.remove('show');
+});
+
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const icons = document.querySelectorAll('#darkModeToggle i, #mobileDarkModeToggle i');
+    if (document.body.classList.contains('dark-mode')) {
+        icons.forEach(icon => icon.className = 'bx bx-sun');
+        localStorage.setItem('darkMode', 'enabled');
+    } else {
+        icons.forEach(icon => icon.className = 'bx bx-moon');
+        localStorage.setItem('darkMode', 'disabled');
+    }
+}
+
+// Call loadUserName when navbar loads
+loadUserName();
+
+// Load dark mode preference on page load
+if (localStorage.getItem('darkMode') === 'enabled') {
+    document.body.classList.add('dark-mode');
+    const icons = document.querySelectorAll('#darkModeToggle i, #mobileDarkModeToggle i');
+    icons.forEach(icon => icon.className = 'bx bx-sun');
+}
+
+// Client-side check for menu items visibility
+(async function applyMenuVisibility(){
+    try {
+        const userId = sessionStorage.getItem('userId');
+        if (!userId) return;
+
+        const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+        if (!res.ok) return;
+        const user = await res.json();
+        const role = (user.role || user.type || '').toString().toLowerCase();
+
+        // Hide admin-only items for non-admins
+        if (role === 'admin') {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+        } else {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        }
+
+        // Hide proctor-only items for students
+        if (role === 'student') {
+            document.querySelectorAll('.proctor-only').forEach(el => el.style.display = 'none');
+        } else {
+            document.querySelectorAll('.proctor-only').forEach(el => el.style.display = '');
+        }
+    } catch (err) {
+        console.error('Menu visibility error', err);
+    }
+})();
+</script>

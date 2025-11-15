@@ -1,0 +1,23 @@
+# 🔒 Firebase admin keys (never upload these)
+firebase_admin_key.json
+myapplication-0405566f-firebase-adminsdk-fbsvc-5ee3f6e18a.json
+*firebase-adminsdk*.json
+
+# 🐍 Python virtual environment
+venv/
+
+# 🧱 Flutter / Dart build stuff
+app/.dart_tool/
+app/.packages
+app/build/
+build/
+
+# 🎥 Recordings (too large)
+static/recordings/
+
+# 🐍 Python build outputs
+dist/
+__pycache__/
+
+# 🤖 Model weights
+*.pt

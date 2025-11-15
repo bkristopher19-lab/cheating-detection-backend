@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Exam Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+ 
+</head>
+<body>
+    <!-- Sidebar -->
+    {% include 'sidebar.html' %}
+    
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        {% include 'navbar.html' %}
+   
+
+        <!-- Page Content -->
+        <div class="container-fluid p-4">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="h3">Exam Management</h1>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#examModal">
+                    <i class='bx bx-plus'></i> Create New Exam
+                </button>
+            </div>
+
+            <!-- Exams Table -->
+            <div class="card">
+                <div class="card-body">
+                    <table id="examsTable" class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Exam Title</th>
+                                <th>Subject</th>
+                                <th>Duration</th>
+                                <th>Questions</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exam Modal -->
+    <div class="modal fade" id="examModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create/Edit Exam</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="examForm">
+                        <input type="hidden" id="examId">
+                        <div class="mb-3">
+                            <label class="form-label">Exam Title</label>
+                            <input type="text" class="form-control" id="examTitle" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Subject</label>
+                            <input type="text" class="form-control" id="examSubject" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Duration (minutes)</label>
+                            <input type="number" class="form-control" id="examDuration" required>
+                        </div>
+                        
+                        <!-- Dynamic Questions Section -->
+                        <div class="mb-3">
+                            <label class="form-label">Questions</label>
+                            <div id="questionsContainer">
+                                <!-- Questions will be added here dynamically -->
+                            </div>
+                            <button type="button" class="btn btn-outline-primary mt-2" id="addQuestion">
+                                <i class='bx bx-plus'></i> Add Question
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="saveExam">Save Exam</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
+    
+    <script>
+        // Toggle Sidebar
+        document.getElementById('menu-toggle').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
+            document.getElementById('main-content').classList.toggle('main-content-expanded');
+        });
+
+        // Initialize DataTable
+        let examTable = $('#examsTable').DataTable();
+
+        // Question Template (same as before)
+        function getQuestionTemplate(index) {
+            return `
+                <div class="card mb-2 question-item">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <h6>Question ${index + 1}</h6>
+                            <button type="button" class="btn btn-danger btn-sm remove-question">
+                                <i class='bx bx-trash'></i>
+                            </button>
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control question-text" placeholder="Enter question" required>
+                        </div>
+                        <div class="mb-2">
+                            <input type="text" class="form-control correct-answer" placeholder="Correct answer" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <input type="text" class="form-control wrong-answer" placeholder="Wrong answer 1" required>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <input type="text" class="form-control wrong-answer" placeholder="Wrong answer 2" required>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <input type="text" class="form-control wrong-answer" placeholder="Wrong answer 3" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Add / remove question handlers (unchanged)
+        $('#addQuestion').click(function() {
+            const questionCount = $('.question-item').length;
+            $('#questionsContainer').append(getQuestionTemplate(questionCount));
+        });
+        $(document).on('click', '.remove-question', function() {
+            $(this).closest('.question-item').remove();
+            $('.question-item').each((index, item) => {
+                $(item).find('h6').text(`Question ${index + 1}`);
+            });
+        });
+
+        // Load Exams (filtered for proctors)
+        async function loadExams() {
+            // get current user from sessionStorage
+            const userId = sessionStorage.getItem('userId');
+            let currentUser = null;
+            if (userId) {
+                try {
+                    const ur = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+                    if (ur.ok) currentUser = await ur.json();
+                } catch (err) {
+                    console.error('Failed to load current user', err);
+                }
+            }
+
+            const response = await fetch('/select?collection=exams');
+            let exams = await response.json() || [];
+
+            // if proctor, only show exams assigned to or created by this proctor
+            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
+            if (role === 'proctor') {
+                exams = exams.filter(e => (e.proctor_id && e.proctor_id === userId) || (e.created_by && e.created_by === userId));
+            }
+
+            examTable.clear();
+            exams.forEach(exam => {
+                examTable.row.add([
+                    exam.title,
+                    exam.subject,
+                    `${exam.duration} mins`,
+                    (exam.questions || []).length,
+                    `<button onclick="editExam('${exam.id}')" class="btn btn-sm btn-warning me-1">
+                        <i class='bx bx-edit'></i>
+                     </button>
+                     <button onclick="deleteExam('${exam.id}')" class="btn btn-sm btn-danger">
+                        <i class='bx bx-trash'></i>
+                     </button>`
+                ]);
+            });
+            examTable.draw();
+        }
+
+        // Save Exam (set created_by to current user when available)
+        $('#saveExam').click(async function() {
+            const userId = sessionStorage.getItem('userId') || null;
+            const examData = {
+                title: $('#examTitle').val(),
+                subject: $('#examSubject').val(),
+                duration: parseInt($('#examDuration').val()),
+                questions: []
+            };
+
+            // Collect questions
+            $('.question-item').each(function() {
+                const question = {
+                    text: $(this).find('.question-text').val(),
+                    correctAnswer: $(this).find('.correct-answer').val(),
+                    wrongAnswers: []
+                };
+                $(this).find('.wrong-answer').each(function() {
+                    if ($(this).val()) {
+                        question.wrongAnswers.push($(this).val());
+                    }
+                });
+                examData.questions.push(question);
+            });
+
+            if (userId) examData.created_by = userId;
+
+            const examId = $('#examId').val();
+            const url = examId ? `/edit/${examId}?collection=exams` : '/add?collection=exams';
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(examData)
+            });
+
+            if (response.ok) {
+                $('#examModal').modal('hide');
+                loadExams();
+            }
+        });
+
+        // Edit Exam (unchanged)
+        async function editExam(id) {
+            const response = await fetch(`/select?collection=exams&id=${id}`);
+            const exam = await response.json();
+
+            $('#examId').val(id);
+            $('#examTitle').val(exam.title);
+            $('#examSubject').val(exam.subject);
+            $('#examDuration').val(exam.duration);
+
+            $('#questionsContainer').empty();
+            (exam.questions || []).forEach((question, index) => {
+                $('#questionsContainer').append(getQuestionTemplate(index));
+                const $questionItem = $('.question-item').last();
+                $questionItem.find('.question-text').val(question.text);
+                $questionItem.find('.correct-answer').val(question.correctAnswer);
+                (question.wrongAnswers || []).forEach((answer, i) => {
+                    $questionItem.find('.wrong-answer').eq(i).val(answer);
+                });
+            });
+
+            $('#examModal').modal('show');
+        }
+
+        // Delete Exam (unchanged)
+        async function deleteExam(id) {
+            if (!confirm('Are you sure you want to delete this exam?')) return;
+
+            const response = await fetch(`/delete/${id}?collection=exams`, {
+                method: 'POST'
+            });
+
+            if (response.ok) {
+                loadExams();
+            }
+        }
+
+        // Clear form when modal is hidden
+        $('#examModal').on('hidden.bs.modal', function() {
+            $('#examForm')[0].reset();
+            $('#examId').val('');
+            $('#questionsContainer').empty();
+        });
+
+        // Load exams on page load
+        loadExams();
+
+        // Load user name (unchanged)
+        async function loadUserName() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) {
+                window.location.href = '/';
+                return;
+            }
+
+            try {
+                const response = await fetch(`/select?collection=users&id=${userId}`);
+                const user = await response.json();
+                document.getElementById('userName').textContent = user.name;
+            } catch (err) {
+                console.error('Error loading user:', err);
+            }
+        }
+
+        // Logout handler (unchanged)
+        document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST'
+                });
+                if (response.ok) {
+                    sessionStorage.removeItem('userId');
+                    window.location.href = '/';
+                }
+            } catch (err) {
+                console.error('Error during logout:', err);
+            }
+        });
+
+        loadUserName();
+    </script>
+</body>
+</html>

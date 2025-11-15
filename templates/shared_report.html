@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shared Proctoring Report</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .report-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+        .report-card {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+            overflow: hidden;
+        }
+        .timeline-item {
+            padding: 1rem;
+            border-left: 4px solid #007bff;
+            margin-bottom: 1rem;
+            background: #f8f9fa;
+            border-radius: 0 8px 8px 0;
+        }
+        .timeline-item.warning {
+            border-left-color: #ffc107;
+        }
+        .timeline-item.danger {
+            border-left-color: #dc3545;
+        }
+        .timeline-item.success {
+            border-left-color: #28a745;
+        }
+        .alert-badge {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+            border-radius: 4px;
+            margin-bottom: 0.5rem;
+        }
+        .alert-badge.phone { background-color: #dc3545; color: white; }
+        .alert-badge.twofaces { background-color: #fd7e14; color: white; }
+        .alert-badge.notlooking { background-color: #ffc107; color: black; }
+        .alert-badge.loudsound { background-color: #20c997; color: white; }
+        .alert-badge.mvoices { background-color: #e83e8c; color: white; }
+        .alert-badge.noface { background-color: #6f42c1; color: white; }
+        .alert-badge.proctoring_toggle { background-color: #17a2b8; color: white; }
+        .timestamp {
+            color: #6c757d;
+            font-size: 0.875rem;
+            margin-bottom: 0.5rem;
+        }
+        .video-container {
+            margin-top: 2rem;
+        }
+        .video-container video {
+            width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <div class="container">
+            <div class="row">
+                <div class="col-12 text-center">
+                    <h1><i class="fas fa-chart-line me-2"></i>Proctoring Report</h1>
+                    <p class="mb-0">Shared Report - Private Access</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="report-card">
+            <div class="card-body">
+                <h4 class="card-title mb-4">
+                    <i class="fas fa-user-graduate me-2"></i>
+                    Student: {{ student.name }} ({{ student.email }})
+                </h4>
+
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-file-alt me-2"></i>Exam Details</h5>
+                        <p><strong>Title:</strong> {{ exam.title }}</p>
+                        <p><strong>Description:</strong> {{ exam.description or 'N/A' }}</p>
+                        <p><strong>Duration:</strong> {{ exam.duration }} minutes</p>
+                        <p><strong>Start Time:</strong> {{ exam.start_time }}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-clock me-2"></i>Session Details</h5>
+                        <p><strong>Session ID:</strong> {{ session.id[:8] }}...</p>
+                        <p><strong>Start Time:</strong> {{ session.start_time }}</p>
+                        <p><strong>End Time:</strong> {{ session.end_time or 'Ongoing' }}</p>
+                        <p><strong>Status:</strong>
+                            <span class="badge bg-{{ 'success' if session.status == 'completed' else 'warning' }}">
+                                {{ session.status.title() }}
+                            </span>
+                        </p>
+                    </div>
+                </div>
+
+                <h5 class="mb-3"><i class="fas fa-exclamation-triangle me-2"></i>Violation Timeline</h5>
+                <div id="alertTimeline">
+                    <!-- Timeline will be populated by JavaScript -->
+                </div>
+
+                <div class="video-container" id="videoSection" style="display: none;">
+                    <h5><i class="fas fa-video me-2"></i>Violation Clip</h5>
+                    <video id="violationClip" controls>
+                        <source id="clipSource" src="" type="video/webm">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Session data passed from Flask
+        const sessionData = {{ session|tojson }};
+
+        function displayReport() {
+            const timeline = document.getElementById('alertTimeline');
+
+            // Process alerts from session flags
+            const allAlerts = [];
+            if (sessionData.flags) {
+                Object.entries(sessionData.flags).forEach(([type, alerts]) => {
+                    alerts.forEach(alert => {
+                        allAlerts.push({
+                            type: type,
+                            timestamp: alert.timestamp,
+                            message: alert.message
+                        });
+                    });
+                });
+            }
+
+            // Sort alerts by timestamp (newest first)
+            allAlerts.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            if (allAlerts.length === 0) {
+                timeline.innerHTML = '<div class="alert alert-success"><i class="fas fa-check-circle me-2"></i>No violations detected during this session.</div>';
+                return;
+            }
+
+            allAlerts.forEach(alert => {
+                const item = document.createElement('div');
+                item.className = `timeline-item ${getAlertClass(alert.type)}`;
+                item.innerHTML = `
+                    <span class="alert-badge ${getAlertBadgeClass(alert.type)}">${alert.type.replace('_', ' ')}</span>
+                    <span class="timestamp">${new Date(alert.timestamp).toLocaleString()}</span>
+                    <div class="mt-1">${alert.message}</div>
+                `;
+                timeline.appendChild(item);
+            });
+
+            // Add violation clip if available
+            if (sessionData.clip_path) {
+                const videoSection = document.getElementById('videoSection');
+                const clipSource = document.getElementById('clipSource');
+                clipSource.src = sessionData.clip_path;
+                videoSection.style.display = 'block';
+            }
+        }
+
+        function getAlertClass(type) {
+            switch(type) {
+                case 'phone':
+                case 'twofaces':
+                case 'noface':
+                    return 'danger';
+                case 'notlooking':
+                    return 'warning';
+                case 'loudsound':
+                case 'mvoices':
+                case 'proctoring_toggle':
+                    return 'success';
+                default:
+                    return '';
+            }
+        }
+
+        function getAlertBadgeClass(type) {
+            return type;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', displayReport);
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
