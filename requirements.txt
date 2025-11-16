@@ -4,8 +4,9 @@ Werkzeug==3.0.3
 firebase-admin==6.4.0
 google-cloud-firestore==2.16.0
 
-opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 mediapipe==0.10.21
+
 numpy==1.26.4
 
 librosa==0.10.2.post1
@@ -13,7 +14,7 @@ soundfile==0.12.1
 audioread==3.0.1
 
 pydub==0.25.1
-apscheduler==3.10.4
+APScheduler==3.10.4
 
 gunicorn==21.2.0
 requests==2.31.0
