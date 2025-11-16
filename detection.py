@@ -470,7 +470,7 @@ def predict():
             # Add object detection flags
             for obj in detected_objects:
                 if obj['name'] in ['cell phone', 'laptop', 'book', 'remote', 'keyboard']:
-                    flag_key = f'object_detected_{obj['name'].replace(' ', '_')}'
+                    flag_key = f'object_detected_{obj["name"].replace(" ", "_")}'
                     flags[flag_key] = [{
                         'timestamp': datetime.utcnow().isoformat(),
                         'message': f'{obj["name"]} detected with confidence {obj["confidence"]:.2f}'
