@@ -115,7 +115,7 @@
             }
         }
 
-        /* Dark mode support */
+        /* Dark mode support - Optimized for all devices */
         body.dark-mode {
             background-color: #121212;
             color: #ffffff;
@@ -125,21 +125,36 @@
             background-color: #1e1e1e;
             border: 1px solid #333;
             color: #ffffff;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.4) !important;
+        }
+
+        body.dark-mode .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5) !important;
         }
 
         body.dark-mode .stat-card .text-muted {
             color: #cccccc !important;
         }
 
+        body.dark-mode .stat-card .stat-icon {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
         body.dark-mode .card {
             background-color: #1e1e1e;
             border: 1px solid #333;
             color: #ffffff;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.4) !important;
         }
 
         body.dark-mode .card-header {
             background-color: #2d2d2d;
             border-bottom: 1px solid #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .card-header h6 {
             color: #ffffff;
         }
 
@@ -151,11 +166,13 @@
             background-color: #2d2d2d;
             border-color: #444;
             color: #ffffff;
+            font-weight: 600;
         }
 
         body.dark-mode .table td {
             background-color: #1e1e1e;
             border-color: #333;
+            color: #ffffff;
         }
 
         body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
@@ -164,6 +181,11 @@
 
         body.dark-mode .table-striped tbody tr:nth-of-type(even) {
             background-color: #1e1e1e;
+        }
+
+        body.dark-mode .table-hover tbody tr:hover {
+            background-color: #333333;
+            color: #ffffff;
         }
 
         body.dark-mode .alert-type {
@@ -175,10 +197,67 @@
         body.dark-mode .badge {
             background-color: #6ee7b7 !important;
             color: #032;
+            font-weight: 500;
         }
 
         body.dark-mode .text-uppercase {
             color: #ffffff;
+        }
+
+        body.dark-mode h1, body.dark-mode h3, body.dark-mode h4, body.dark-mode h6 {
+            color: #ffffff;
+        }
+
+        body.dark-mode .text-primary { color: #4dabf7 !important; }
+        body.dark-mode .text-success { color: #51cf66 !important; }
+        body.dark-mode .text-info { color: #74c0fc !important; }
+        body.dark-mode .text-warning { color: #ffd43b !important; }
+        body.dark-mode .text-danger { color: #ff6b6b !important; }
+        body.dark-mode .text-secondary { color: #868e96 !important; }
+
+        body.dark-mode .bg-primary { background-color: #4dabf7 !important; }
+        body.dark-mode .bg-success { background-color: #51cf66 !important; }
+        body.dark-mode .bg-info { background-color: #74c0fc !important; }
+        body.dark-mode .bg-warning { background-color: #ffd43b !important; }
+        body.dark-mode .bg-danger { background-color: #ff6b6b !important; }
+        body.dark-mode .bg-secondary { background-color: #868e96 !important; }
+
+        body.dark-mode .border-left-primary { border-left-color: #4dabf7 !important; }
+        body.dark-mode .border-left-success { border-left-color: #51cf66 !important; }
+        body.dark-mode .border-left-info { border-left-color: #74c0fc !important; }
+        body.dark-mode .border-left-warning { border-left-color: #ffd43b !important; }
+        body.dark-mode .border-left-danger { border-left-color: #ff6b6b !important; }
+        body.dark-mode .border-left-secondary { border-left-color: #868e96 !important; }
+
+        /* Enhanced mobile dark mode */
+        @media (max-width: 768px) {
+            body.dark-mode {
+                background-color: #0d0d0d;
+            }
+
+            body.dark-mode .stat-card,
+            body.dark-mode .card {
+                background-color: #1a1a1a;
+                border-color: #404040;
+            }
+
+            body.dark-mode .card-header {
+                background-color: #262626;
+                border-color: #404040;
+            }
+
+            body.dark-mode .table th,
+            body.dark-mode .table td {
+                border-color: #404040;
+            }
+
+            body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+                background-color: #202020;
+            }
+
+            body.dark-mode .table-striped tbody tr:nth-of-type(even) {
+                background-color: #1a1a1a;
+            }
         }
     </style>
 </head>
@@ -282,26 +361,26 @@
                     </div>
                 </div>
 
-                <!-- Recent Sessions -->
+                <!-- Student Exam Scores & Proctoring Flags -->
                 <div class="col-xl-8 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Recent Exam Sessions</h6>
+                            <h6 class="m-0 fw-bold">Student Exam Scores & Proctoring Flags</h6>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>Student</th>
-                                            <th>Exam</th>
-                                            <th>Date</th>
-                                            <th>Duration</th>
-                                            <th>Alerts</th>
+                                            <th>Student Name</th>
+                                            <th>Exam Type</th>
+                                            <th>Score</th>
+                                            <th>Date Taken</th>
+                                            <th>Proctoring Flags</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="recentSessions">
-                                        <!-- Recent sessions will be inserted here -->
+                                    <tbody id="studentScoresTable">
+                                        <!-- Student scores will be loaded here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -311,9 +390,9 @@
             </div>
 
             <!-- Additional Stats Row -->
-            <div class="row">
+            <div class="row mb-4">
                 <!-- Teachers Count -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-secondary shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -329,8 +408,38 @@
                     </div>
                 </div>
 
+                <!-- Delete Reports Button (Admin Only) -->
+                <div class="col-xl-6 col-lg-12 col-md-12 mb-4" id="adminControls" style="display: none;">
+                    <div class="stat-card card border-left-danger shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label for="cutoffDays" class="form-label small">Delete reports older than (days):</label>
+                                    <input type="number" class="form-control form-control-sm" id="cutoffDays" value="14" min="1" max="365">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="cutoffDate" class="form-label small">Or select specific date:</label>
+                                    <input type="date" class="form-control form-control-sm" id="cutoffDate">
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-danger btn-sm me-2" id="deleteReportsBtn" onclick="deleteOldReports()">
+                                    <i class='bx bx-trash'></i> Delete Old Reports
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm me-2" onclick="clearDateSelection()">
+                                    <i class='bx bx-x'></i> Clear Date
+                                </button>
+                                <button class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
+                                    <i class='bx bx-trash-alt'></i> Delete ALL Reports
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Average Session Duration -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-danger shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -347,7 +456,7 @@
                 </div>
 
                 <!-- Total Questions -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-primary shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -364,7 +473,7 @@
                 </div>
 
                 <!-- Alert Rate -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-warning shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -381,9 +490,9 @@
                 </div>
             </div>
     
-            <!-- NEW: More statistics (10+) -->
-            <div class="row">
-                <div class="col-xl-3 col-md-6 mb-4">
+            <!-- Additional Statistics -->
+            <div class="row mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-1 fw-bold">Total Classes</div>
@@ -393,7 +502,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-1 fw-bold">Avg Exams per Class</div>
@@ -403,7 +512,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-1 fw-bold">Completion Rate</div>
@@ -413,7 +522,7 @@
                     </div>
                 </div>
 
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-1 fw-bold">Avg Alerts / Session</div>
@@ -422,32 +531,38 @@
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- row 3: Top lists -->
-                <div class="col-xl-6 mb-4">
+            <!-- Top Lists -->
+            <div class="row">
+                <div class="col-lg-6 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
                             <h6 class="m-0 fw-bold">Top 5 Students by Alerts</h6>
                         </div>
                         <div class="card-body">
-                            <table class="table table-sm">
-                                <thead><tr><th>Student</th><th>Alerts</th></tr></thead>
-                                <tbody id="topStudentsByAlerts"></tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead><tr><th>Student</th><th>Alerts</th></tr></thead>
+                                    <tbody id="topStudentsByAlerts"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="col-xl-6 mb-4">
+                <div class="col-lg-6 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
                             <h6 class="m-0 fw-bold">Top 5 Exams by Alert Rate</h6>
                         </div>
                         <div class="card-body">
-                            <table class="table table-sm">
-                                <thead><tr><th>Exam</th><th>Alerts / Session</th></tr></thead>
-                                <tbody id="topExamsByAlertRate"></tbody>
-                            </table>
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead><tr><th>Exam</th><th>Alerts / Session</th></tr></thead>
+                                    <tbody id="topExamsByAlertRate"></tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -488,18 +603,20 @@
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
 
-                // Alerts aggregation
+                // Alerts aggregation - using same types as reports page
                 let totalAlerts = 0;
                 let alertTypes = {
                     twofaces: 0,
-                    notlooking: 0,
+                    loud_sound: 0,
                     phone: 0,
-                    loudsound: 0,
-                    mvoices: 0
+                    fullscreen_exit: 0,
+                    keyboard_shortcut: 0,
+                    right_click: 0,
+                    tab_switch: 0
                 };
                 (sessions || []).forEach(session => {
-                    if (session.alerts) {
-                        Object.entries(session.alerts).forEach(([type, alerts]) => {
+                    if (session.flags) {
+                        Object.entries(session.flags).forEach(([type, alerts]) => {
                             if (Array.isArray(alerts)) {
                                 alertTypes[type] = (alertTypes[type] || 0) + alerts.length;
                                 totalAlerts += alerts.length;
@@ -538,38 +655,14 @@
                     .map(([type, count]) => `
                         <div class="alert-type bg-light">
                             <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-capitalize">${type}</span>
+                                <span class="text-capitalize">${type.replace(/_/g, ' ')}</span>
                                 <span class="badge bg-primary">${count}</span>
                             </div>
                         </div>
                     `).join('');
-                document.getElementById('alertTypes').innerHTML = alertTypesHtml;
+                document.getElementById('alertTypes').innerHTML = alertTypesHtml || '<div class="text-muted">No alerts detected</div>';
 
-                // Update recent sessions table (defensive lookups)
-                const recentSessionsHtml = (sessions || [])
-                    .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
-                    .slice(0, 5)
-                    .map(session => {
-                        const student = users.find(u => u.id === session.user_id) || { name: session.user_id || 'Unknown' };
-                        const exam = (exams || []).find(e => e.id === session.exam_id) || { title: session.exam_id || 'Unknown' };
-                        const alertCount = Object.values(session.alerts || {}).reduce((sum, alerts) => sum + ((alerts && alerts.length) || 0), 0);
-                        const duration = (() => {
-                            const start = new Date(session.start_time), end = new Date(session.end_time);
-                            if (isNaN(start) || isNaN(end)) return 'N/A';
-                            return `${Math.round((end - start) / (1000 * 60))} min`;
-                        })();
 
-                        return `
-                            <tr>
-                                <td>${student.name || 'Unknown'}</td>
-                                <td>${exam.title || 'Unknown'}</td>
-                                <td>${isNaN(new Date(session.start_time)) ? 'N/A' : new Date(session.start_time).toLocaleDateString()}</td>
-                                <td>${duration}</td>
-                                <td><span class="badge bg-warning">${alertCount}</span></td>
-                            </tr>
-                        `;
-                    }).join('');
-                document.getElementById('recentSessions').innerHTML = recentSessionsHtml;
 
                 // --- NEW metrics calculations ---
 
@@ -587,13 +680,15 @@
                 const completionRate = (sessions && sessions.length) ? Math.round((completed / sessions.length) * 100) : 0;
                 document.getElementById('completionRate').textContent = `${completionRate}%`;
 
-
+                // Avg alerts per session
+                const avgAlertsPerSession = sessions && sessions.length ? (totalAlerts / sessions.length).toFixed(2) : 0;
+                document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
                 // Top 5 students by total alerts across sessions
                 const studentAlertCounts = {};
                 (sessions || []).forEach(s => {
                     const uid = s.user_id;
-                    const count = Object.values(s.alerts || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
                     if (!uid) return;
                     studentAlertCounts[uid] = (studentAlertCounts[uid] || 0) + count;
                 });
@@ -611,7 +706,7 @@
                 (sessions || []).forEach(s => {
                     const eid = s.exam_id;
                     if (!eid) return;
-                    const count = Object.values(s.alerts || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
                     if (!examStats[eid]) examStats[eid] = { alerts: 0, sessions: 0 };
                     examStats[eid].alerts += count;
                     examStats[eid].sessions += 1;
@@ -632,6 +727,9 @@
                 // set a tooltip or reuse element (here we set 'totalStudents' title)
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
 
+                // Load student scores with proctoring flags
+                await loadStudentScoresWithFlags(users, exams, sessions, examResults);
+
                 // done
             } catch (err) {
                 console.error('Error loading dashboard data:', err);
@@ -640,6 +738,196 @@
 
         // Load data when page loads
         loadDashboardData();
+
+        // Real-time data updates every 30 seconds
+        setInterval(loadDashboardData, 30000);
+
+        // Load student scores with proctoring flags
+        async function loadStudentScoresWithFlags(users, exams, sessions, examResults) {
+            try {
+                const tbody = document.getElementById('studentScoresTable');
+                tbody.innerHTML = '';
+
+                // Group results by student
+                const studentResults = {};
+
+                (examResults || []).forEach(result => {
+                    if (!studentResults[result.user_id]) {
+                        studentResults[result.user_id] = [];
+                    }
+                    studentResults[result.user_id].push(result);
+                });
+
+                // Display results for each student
+                Object.entries(studentResults).forEach(([userId, results]) => {
+                    const student = users.find(u => u.id === userId);
+
+                    results.forEach(result => {
+                        const exam = exams.find(e => e.id === result.exam_id);
+
+                        // Calculate score
+                        let scoreDisplay = 'N/A';
+                        if (exam && exam.questions && result.answers) {
+                            let correctAnswers = 0;
+                            exam.questions.forEach((question, index) => {
+                                if (result.answers[index] === question.correctAnswer) {
+                                    correctAnswers++;
+                                }
+                            });
+                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                        }
+
+                        // Get proctoring flags for this session
+                        const session = sessions.find(s => s.user_id === userId && s.exam_id === result.exam_id);
+                        let flagsDisplay = 'None';
+
+                        if (session && session.flags) {
+                            let flagsObj = session.flags;
+                            if (Array.isArray(flagsObj)) {
+                                flagsObj = {};
+                                flagsObj.forEach(f => Object.assign(flagsObj, f));
+                            }
+                            const flags = [];
+                            Object.entries(flagsObj).forEach(([type, alerts]) => {
+                                if (Array.isArray(alerts) && alerts.length > 0) {
+                                    flags.push(`${type}: ${alerts.length}`);
+                                }
+                            });
+                            if (flags.length > 0) {
+                                flagsDisplay = flags.join(', ');
+                            }
+                        }
+
+                        const row = `
+                            <tr>
+                                <td>${student?.name || 'Unknown'}</td>
+                                <td>${exam?.title || 'Unknown'} (${exam?.subject || ''})</td>
+                                <td>${scoreDisplay}</td>
+                                <td>${result.timestamp ? new Date(result.timestamp).toLocaleDateString() : 'N/A'}</td>
+                                <td>${flagsDisplay}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                });
+
+                if (tbody.innerHTML === '') {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
+                }
+
+            } catch (err) {
+                console.error('Error loading student scores:', err);
+                document.getElementById('studentScoresTable').innerHTML =
+                    '<tr><td colspan="5" class="text-center text-danger">Error loading scores</td></tr>';
+            }
+        }
+
+        // Function to delete old reports (admin only)
+        async function deleteOldReports() {
+            const cutoffDays = document.getElementById('cutoffDays').value;
+            const cutoffDate = document.getElementById('cutoffDate').value;
+
+            let confirmMessage = 'Are you sure you want to delete all reports ';
+            if (cutoffDate) {
+                confirmMessage += `older than ${cutoffDate}?`;
+            } else {
+                confirmMessage += `older than ${cutoffDays} days?`;
+            }
+            confirmMessage += ' This action cannot be undone.';
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('deleteReportsBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                btn.disabled = true;
+
+                const requestBody = {};
+                if (cutoffDate) {
+                    requestBody.cutoff_date = cutoffDate + 'T00:00:00Z';
+                } else {
+                    requestBody.cutoff_days = parseInt(cutoffDays);
+                }
+
+                const response = await fetch('/delete_old_reports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    // Reload dashboard data
+                    loadDashboardData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete reports error:', error);
+                alert('Failed to delete reports. Please try again.');
+            } finally {
+                const btn = document.getElementById('deleteReportsBtn');
+                btn.innerHTML = '<i class="bx bx-trash"></i> Delete Old Reports';
+                btn.disabled = false;
+            }
+        }
+
+        // Function to clear date selection
+        function clearDateSelection() {
+            document.getElementById('cutoffDate').value = '';
+        }
+
+        // Function to delete ALL reports (admin only)
+        async function deleteAllReports() {
+            const confirmationText = prompt('Type "CONFIRM DELETION" to delete ALL reports permanently:');
+            if (confirmationText !== 'CONFIRM DELETION') {
+                alert('Deletion cancelled. You must type "CONFIRM DELETION" exactly.');
+                return;
+            }
+
+            if (!confirm('⚠️ WARNING: This will delete ALL proctoring reports and associated files permanently. This action CANNOT be undone. Are you absolutely sure?')) {
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('deleteAllBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                btn.disabled = true;
+
+                const response = await fetch('/delete_old_reports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ delete_all: true })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    // Reload dashboard data
+                    loadDashboardData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete all reports error:', error);
+                alert('Failed to delete reports. Please try again.');
+            } finally {
+                const btn = document.getElementById('deleteAllBtn');
+                btn.innerHTML = '<i class="bx bx-trash-alt"></i> Delete ALL Reports';
+                btn.disabled = false;
+            }
+        }
 
         (async function redirectUsers() {
             const userId = sessionStorage.getItem('userId');
@@ -650,6 +938,12 @@
                 if (!res.ok) return;
                 const user = await res.json();
                 const role = (user.role || user.type || '').toString().toLowerCase();
+
+                // Show admin controls if user is admin
+                if (role === 'admin') {
+                    document.getElementById('adminControls').style.display = 'block';
+                }
+
                 if (role === 'proctor') {
                     // redirect proctor to the proctor-scoped dashboard
                     window.location.replace('/proctor_dashboard');

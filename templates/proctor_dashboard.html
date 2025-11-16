@@ -39,6 +39,7 @@
             background: rgba(255,255,255,0.9);
             border: 1px solid #dee2e6;
             color: #495057;
+            display: none;
         }
 
         .back-btn-mobile:hover {
@@ -93,9 +94,34 @@
             .badge {
                 font-size: 0.7rem;
             }
+
+            /* Stack cards vertically on mobile */
+            .row .col-xl-3,
+            .row .col-md-6 {
+                margin-bottom: 1rem;
+            }
+
+            /* Make tables more mobile-friendly */
+            .table-responsive {
+                border: none;
+            }
+
+            .table-responsive .table {
+                margin-bottom: 0;
+            }
+
+            /* Adjust top lists layout */
+            .col-xl-6 {
+                margin-bottom: 1rem;
+            }
+
+            /* Show back button on mobile */
+            .back-btn-mobile {
+                display: block !important;
+            }
         }
 
-        /* Dark mode support */
+        /* Dark mode support - Optimized for all devices */
         body.dark-mode {
             background-color: #121212;
             color: #ffffff;
@@ -105,21 +131,36 @@
             background-color: #1e1e1e;
             border: 1px solid #333;
             color: #ffffff;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.4) !important;
+        }
+
+        body.dark-mode .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5) !important;
         }
 
         body.dark-mode .stat-card .text-muted {
             color: #cccccc !important;
         }
 
+        body.dark-mode .stat-card .stat-icon {
+            background-color: rgba(255, 255, 255, 0.1) !important;
+        }
+
         body.dark-mode .card {
             background-color: #1e1e1e;
             border: 1px solid #333;
             color: #ffffff;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.4) !important;
         }
 
         body.dark-mode .card-header {
             background-color: #2d2d2d;
             border-bottom: 1px solid #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .card-header h6 {
             color: #ffffff;
         }
 
@@ -131,11 +172,13 @@
             background-color: #2d2d2d;
             border-color: #444;
             color: #ffffff;
+            font-weight: 600;
         }
 
         body.dark-mode .table td {
             background-color: #1e1e1e;
             border-color: #333;
+            color: #ffffff;
         }
 
         body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
@@ -144,6 +187,11 @@
 
         body.dark-mode .table-striped tbody tr:nth-of-type(even) {
             background-color: #1e1e1e;
+        }
+
+        body.dark-mode .table-hover tbody tr:hover {
+            background-color: #333333;
+            color: #ffffff;
         }
 
         body.dark-mode .alert-type {
@@ -155,6 +203,67 @@
         body.dark-mode .badge {
             background-color: #6ee7b7 !important;
             color: #032;
+            font-weight: 500;
+        }
+
+        body.dark-mode .text-uppercase {
+            color: #ffffff;
+        }
+
+        body.dark-mode h1, body.dark-mode h3, body.dark-mode h4, body.dark-mode h6 {
+            color: #ffffff;
+        }
+
+        body.dark-mode .text-primary { color: #4dabf7 !important; }
+        body.dark-mode .text-success { color: #51cf66 !important; }
+        body.dark-mode .text-info { color: #74c0fc !important; }
+        body.dark-mode .text-warning { color: #ffd43b !important; }
+        body.dark-mode .text-danger { color: #ff6b6b !important; }
+        body.dark-mode .text-secondary { color: #868e96 !important; }
+
+        body.dark-mode .bg-primary { background-color: #4dabf7 !important; }
+        body.dark-mode .bg-success { background-color: #51cf66 !important; }
+        body.dark-mode .bg-info { background-color: #74c0fc !important; }
+        body.dark-mode .bg-warning { background-color: #ffd43b !important; }
+        body.dark-mode .bg-danger { background-color: #ff6b6b !important; }
+        body.dark-mode .bg-secondary { background-color: #868e96 !important; }
+
+        body.dark-mode .border-left-primary { border-left-color: #4dabf7 !important; }
+        body.dark-mode .border-left-success { border-left-color: #51cf66 !important; }
+        body.dark-mode .border-left-info { border-left-color: #74c0fc !important; }
+        body.dark-mode .border-left-warning { border-left-color: #ffd43b !important; }
+        body.dark-mode .border-left-danger { border-left-color: #ff6b6b !important; }
+        body.dark-mode .border-left-secondary { border-left-color: #868e96 !important; }
+
+        /* Enhanced mobile dark mode */
+        @media (max-width: 768px) {
+            body.dark-mode {
+                background-color: #0d0d0d;
+            }
+
+            body.dark-mode .stat-card,
+            body.dark-mode .card {
+                background-color: #1a1a1a;
+                border-color: #404040;
+            }
+
+            body.dark-mode .card-header {
+                background-color: #262626;
+                border-color: #404040;
+            }
+
+            body.dark-mode .table th,
+            body.dark-mode .table td {
+                border-color: #404040;
+            }
+
+            body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
+                background-color: #202020;
+            }
+
+            body.dark-mode .table-striped tbody tr:nth-of-type(even) {
+                background-color: #1a1a1a;
+            }
         }
     </style>
 </head>
@@ -162,6 +271,7 @@
     {% include 'sidebar.html' %}
 
     <div class="main-content" id="main-content">
+        <button class="btn btn-secondary back-btn-mobile" onclick="window.history.back()"><i class='bx bx-arrow-back'></i> Back</button>
         {% include 'navbar.html' %}
 
         <div class="container-fluid p-4">
@@ -258,26 +368,26 @@
                     </div>
                 </div>
 
-                <!-- Recent Sessions -->
+                <!-- Student Exam Scores & Proctoring Flags -->
                 <div class="col-xl-8 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Recent Exam Sessions</h6>
+                            <h6 class="m-0 fw-bold">Student Exam Scores & Proctoring Flags</h6>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-hover">
+                                <table class="table table-striped">
                                     <thead>
                                         <tr>
-                                            <th>Student</th>
-                                            <th>Exam</th>
-                                            <th>Date</th>
-                                            <th>Duration</th>
-                                            <th>Alerts</th>
+                                            <th>Student Name</th>
+                                            <th>Exam Type</th>
+                                            <th>Score</th>
+                                            <th>Date Taken</th>
+                                            <th>Proctoring Flags</th>
                                         </tr>
                                     </thead>
-                                    <tbody id="recentSessions">
-                                        <!-- Recent sessions will be inserted here -->
+                                    <tbody id="studentScoresTable">
+                                        <!-- Student scores will be loaded here -->
                                     </tbody>
                                 </table>
                             </div>
@@ -287,9 +397,9 @@
             </div>
 
             <!-- Additional Stats Row -->
-            <div class="row">
+            <div class="row mb-4">
                 <!-- Teachers Count -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-secondary shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -305,8 +415,38 @@
                     </div>
                 </div>
 
+                <!-- Delete Reports Button (Admin Only) -->
+                <div class="col-xl-6 col-lg-12 col-md-12 mb-4" id="adminControls" style="display: none;">
+                    <div class="stat-card card border-left-danger shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label for="cutoffDays" class="form-label small">Delete reports older than (days):</label>
+                                    <input type="number" class="form-control form-control-sm" id="cutoffDays" value="14" min="1" max="365">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="cutoffDate" class="form-label small">Or select specific date:</label>
+                                    <input type="date" class="form-control form-control-sm" id="cutoffDate">
+                                </div>
+                            </div>
+                            <div class="mt-2">
+                                <button class="btn btn-danger btn-sm me-2" id="deleteReportsBtn" onclick="deleteOldReports()">
+                                    <i class='bx bx-trash'></i> Delete Old Reports
+                                </button>
+                                <button class="btn btn-outline-secondary btn-sm me-2" onclick="clearDateSelection()">
+                                    <i class='bx bx-x'></i> Clear Date
+                                </button>
+                                <button class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
+                                    <i class='bx bx-trash-alt'></i> Delete ALL Reports
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Average Session Duration -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-danger shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -323,7 +463,7 @@
                 </div>
 
                 <!-- Total Questions -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-primary shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -340,7 +480,7 @@
                 </div>
 
                 <!-- Alert Rate -->
-                <div class="col-xl-3 col-md-6 mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-warning shadow h-100">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
@@ -356,72 +496,162 @@
                     </div>
                 </div>
             </div>
+    
+            <!-- Additional Statistics -->
+            <div class="row mb-4">
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Total Classes</div>
+                            <div class="h4 fw-bold" id="totalClasses">0</div>
+                            <div class="text-muted small">Course & Section</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Avg Exams per Class</div>
+                            <div class="h4 fw-bold" id="avgExamsPerClass">0</div>
+                            <div class="text-muted small">Distribution</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Completion Rate</div>
+                            <div class="h4 fw-bold" id="completionRate">0%</div>
+                            <div class="text-muted small">Sessions Completed</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
+                    <div class="stat-card card shadow h-100">
+                        <div class="card-body">
+                            <div class="text-xs text-uppercase mb-1 fw-bold">Avg Alerts / Session</div>
+                        <div class="h4 fw-bold" id="avgAlertsPerSession">0</div>
+                            <div class="text-muted small">Alert density</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top Lists -->
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 fw-bold">Top 5 Students by Alerts</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead><tr><th>Student</th><th>Alerts</th></tr></thead>
+                                    <tbody id="topStudentsByAlerts"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 fw-bold">Top 5 Exams by Alert Rate</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm">
+                                    <thead><tr><th>Exam</th><th>Alerts / Session</th></tr></thead>
+                                    <tbody id="topExamsByAlertRate"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Load dashboard data (proctor-scoped)
+        // Load dashboard data
         async function loadDashboardData() {
             try {
-                // get current user from sessionStorage
+                // Get current proctor user ID
                 const userId = sessionStorage.getItem('userId');
                 if (!userId) {
-                    // not logged in client-side; let template handle or redirect
-                    console.warn('No userId in sessionStorage');
+                    console.error('No user ID found');
+                    return;
                 }
 
-                // Fetch all required data
-                const [allUsers, allExams, allSessions] = await Promise.all([
+                // Fetch all required data (include classes)
+                const [users, exams, sessions, classes, examResults] = await Promise.all([
                     fetch('/select?collection=users').then(r => r.json()),
                     fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json())
+                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
+                    fetch('/select?collection=classes').then(r => r.json()),
+                    fetch('/select?collection=exam_results').then(r => r.json())
                 ]);
 
-                // determine current user object and role (support role or type field)
-                const currentUser = allUsers.find(u => u.id === userId) || null;
-                const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
+                // Filter classes assigned to this proctor
+                const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
+                const proctorClassIds = proctorClasses.map(c => c.id);
 
-                // if proctor, limit exams and sessions to those assigned/created by this proctor
-                let exams = allExams || [];
-                let sessions = allSessions || [];
-                if (role === 'proctor') {
-                    const allowedExamIds = exams
-                        .filter(e => (e.proctor_id && e.proctor_id === userId) || (e.created_by && e.created_by === userId))
-                        .map(e => e.id);
+                // Filter exams to those in proctor's classes
+                const proctorExams = (exams || []).filter(e => proctorClassIds.includes(e.class_id));
 
-                    exams = exams.filter(e => allowedExamIds.includes(e.id));
-                    sessions = sessions.filter(s => allowedExamIds.includes(s.exam_id) || (s.proctor_id && s.proctor_id === userId));
+                // Filter sessions to those for proctor's exams
+                const proctorExamIds = proctorExams.map(e => e.id);
+                const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
+
+                // Filter exam results to those for proctor's exams
+                const proctorExamResults = (examResults || []).filter(r => proctorExamIds.includes(r.exam_id));
+
+                // Use filtered data
+                const filteredUsers = users;
+                const filteredExams = proctorExams;
+                const filteredSessions = proctorSessions;
+                const filteredClasses = proctorClasses;
+                const filteredExamResults = proctorExamResults;
+
+                // Normalize role/type accessor
+                const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
+
+                // Students: prefer explicit user records, otherwise infer from results/sessions
+                let studentUsers = users.filter(u => userRole(u) === 'student');
+                if (studentUsers.length === 0) {
+                    // fallback: unique user ids from exam_results and sessions
+                    const idsFromResults = (examResults || []).map(r => r.user_id).filter(Boolean);
+                    const idsFromSessions = (sessions || []).map(s => s.user_id).filter(Boolean);
+                    const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions]));
+                    studentUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
                 }
 
-                // Calculate basic stats scoped to available records
-                const studentsSet = new Set();
-                sessions.forEach(s => {
-                    if (s.user_id) studentsSet.add(s.user_id);
-                });
-                const studentsCount = studentsSet.size;
+                // Proctors: combine explicit proctor users and any proctor_id referenced in classes
+                const proctorUsers = users.filter(u => userRole(u) === 'proctor');
+                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id).filter(Boolean)));
+                const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
+                const teachersCount = combinedProctorIds.size;
 
-                // Count proctors (for proctor view, show only this proctor)
-                let teachersCount;
-                if (role === 'proctor') {
-                    teachersCount = 1;
-                } else {
-                    teachersCount = (allUsers.filter(u => (u.role || u.type) === 'proctor')).length;
-                }
-
-                // Process sessions for alerts (scoped)
+                // Alerts aggregation - using same types as reports page
                 let totalAlerts = 0;
                 let alertTypes = {
                     twofaces: 0,
-                    notlooking: 0,
+                    loud_sound: 0,
                     phone: 0,
-                    loudsound: 0,
-                    mvoices: 0
+                    fullscreen_exit: 0,
+                    keyboard_shortcut: 0,
+                    right_click: 0,
+                    tab_switch: 0
                 };
-
-                sessions.forEach(session => {
-                    if (session.alerts) {
-                        Object.entries(session.alerts).forEach(([type, alerts]) => {
+                (sessions || []).forEach(session => {
+                    if (session.flags) {
+                        Object.entries(session.flags).forEach(([type, alerts]) => {
                             if (Array.isArray(alerts)) {
                                 alertTypes[type] = (alertTypes[type] || 0) + alerts.length;
                                 totalAlerts += alerts.length;
@@ -430,64 +660,112 @@
                     }
                 });
 
-                // Calculate total questions (scoped to exams)
-                const totalQuestions = exams.reduce((sum, exam) => sum + ((exam.questions && exam.questions.length) || 0), 0);
+                // Total questions (defensive)
+                const totalQuestions = (exams || []).reduce((sum, exam) => {
+                    const qlen = Array.isArray(exam.questions) ? exam.questions.length : 0;
+                    return sum + qlen;
+                }, 0);
 
-                // Calculate average session duration (scoped)
-                const durations = sessions.map(s => {
+                // Avg session duration (defensive)
+                const durations = (sessions || []).map(s => {
                     const start = new Date(s.start_time);
                     const end = new Date(s.end_time);
+                    if (isNaN(start) || isNaN(end)) return 0;
                     return (end - start) / (1000 * 60); // minutes
-                });
+                }).filter(d => d > 0);
                 const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b) / durations.length) : 0;
 
-                // Update UI (scoped)
-                document.getElementById('totalStudents').textContent = studentsCount;
+                // Update UI
+                document.getElementById('totalStudents').textContent = studentUsers.length;
                 document.getElementById('totalTeachers').textContent = teachersCount;
-                document.getElementById('totalExams').textContent = exams.length;
-                document.getElementById('totalSessions').textContent = sessions.length;
+                document.getElementById('totalExams').textContent = (exams || []).length;
+                document.getElementById('totalSessions').textContent = (sessions || []).length;
                 document.getElementById('totalAlerts').textContent = totalAlerts;
                 document.getElementById('totalQuestions').textContent = totalQuestions;
                 document.getElementById('avgDuration').textContent = `${avgDuration} min`;
-                document.getElementById('alertRate').textContent = `${Math.round((totalAlerts / (sessions.length || 1)))} per exam`;
+                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (sessions || []).length))} per exam`;
 
                 // Update alert types distribution
                 const alertTypesHtml = Object.entries(alertTypes)
                     .map(([type, count]) => `
                         <div class="alert-type bg-light">
                             <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-capitalize">${type}</span>
+                                <span class="text-capitalize">${type.replace(/_/g, ' ')}</span>
                                 <span class="badge bg-primary">${count}</span>
                             </div>
                         </div>
                     `).join('');
-                document.getElementById('alertTypes').innerHTML = alertTypesHtml;
+                document.getElementById('alertTypes').innerHTML = alertTypesHtml || '<div class="text-muted">No alerts detected</div>';
 
-                // Update recent sessions table (scoped)
-                const recentSessionsHtml = sessions
-                    .sort((a, b) => new Date(b.start_time) - new Date(a.start_time))
+
+
+                // --- NEW metrics calculations ---
+
+                // Total classes
+                const totalClasses = (classes || []).length;
+                document.getElementById('totalClasses').textContent = totalClasses;
+
+                // Avg exams per class (map by class.course+section or count exams with exam.class_id if present)
+                // fallback: exams / classes
+                const avgExamsPerClass = totalClasses ? ((exams || []).length / totalClasses) : 0;
+                document.getElementById('avgExamsPerClass').textContent = avgExamsPerClass.toFixed(2);
+
+                // Completion rate: sessions with status === 'completed'
+                const completed = (sessions || []).filter(s => (s.status || '').toString().toLowerCase() === 'completed').length;
+                const completionRate = (sessions && sessions.length) ? Math.round((completed / sessions.length) * 100) : 0;
+                document.getElementById('completionRate').textContent = `${completionRate}%`;
+
+                // Avg alerts per session
+                const avgAlertsPerSession = sessions && sessions.length ? (totalAlerts / sessions.length).toFixed(2) : 0;
+                document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
+
+                // Top 5 students by total alerts across sessions
+                const studentAlertCounts = {};
+                (sessions || []).forEach(s => {
+                    const uid = s.user_id;
+                    const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    if (!uid) return;
+                    studentAlertCounts[uid] = (studentAlertCounts[uid] || 0) + count;
+                });
+                const topStudents = Object.entries(studentAlertCounts)
+                    .sort((a, b) => b[1] - a[1])
                     .slice(0, 5)
-                    .map(session => {
-                        const student = allUsers.find(u => u.id === session.user_id);
-                        const exam = exams.find(e => e.id === session.exam_id) || allExams.find(e => e.id === session.exam_id);
-                        const alertCount = Object.values(session.alerts || {})
-                            .reduce((sum, alerts) => sum + (alerts?.length || 0), 0);
-                        const duration = Math.round(
-                            (new Date(session.end_time) - new Date(session.start_time)) / (1000 * 60)
-                        );
-
-                        return `
-                            <tr>
-                                <td>${student?.name || 'Unknown'}</td>
-                                <td>${exam?.title || 'Unknown'}</td>
-                                <td>${new Date(session.start_time).toLocaleDateString()}</td>
-                                <td>${duration} min</td>
-                                <td><span class="badge bg-warning">${alertCount}</span></td>
-                            </tr>
-                        `;
+                    .map(([uid, count]) => {
+                        const u = users.find(x => x.id === uid) || { name: uid };
+                        return `<tr><td>${u.name}</td><td>${count}</td></tr>`;
                     }).join('');
-                document.getElementById('recentSessions').innerHTML = recentSessionsHtml;
+                document.getElementById('topStudentsByAlerts').innerHTML = topStudents || '<tr><td colspan="2">No data</td></tr>';
 
+                // Top 5 exams by alerts per session
+                const examStats = {};
+                (sessions || []).forEach(s => {
+                    const eid = s.exam_id;
+                    if (!eid) return;
+                    const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    if (!examStats[eid]) examStats[eid] = { alerts: 0, sessions: 0 };
+                    examStats[eid].alerts += count;
+                    examStats[eid].sessions += 1;
+                });
+                const topExams = Object.entries(examStats)
+                    .map(([eid, st]) => ({ eid, rate: st.alerts / Math.max(1, st.sessions) }))
+                    .sort((a, b) => b.rate - a.rate)
+                    .slice(0, 5)
+                    .map(x => {
+                        const ex = exams.find(e => e.id === x.eid) || { title: x.eid };
+                        return `<tr><td>${ex.title}</td><td>${x.rate.toFixed(2)}</td></tr>`;
+                    }).join('');
+                document.getElementById('topExamsByAlertRate').innerHTML = topExams || '<tr><td colspan="2">No data</td></tr>';
+
+                // (optional) Participation rate: users who appear in exam_results vs known students
+                const resultUserIds = new Set((examResults || []).map(r => r.user_id).filter(Boolean));
+                const participationRate = studentUsers.length ? Math.round((resultUserIds.size / studentUsers.length) * 100) : 0;
+                // set a tooltip or reuse element (here we set 'totalStudents' title)
+                document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
+
+                // Load student scores with proctoring flags
+                await loadStudentScoresWithFlags(users, exams, sessions, examResults);
+
+                // done
             } catch (err) {
                 console.error('Error loading dashboard data:', err);
             }
@@ -496,23 +774,199 @@
         // Load data when page loads
         loadDashboardData();
 
-        (async function redirectStudent() {
-            const userId = sessionStorage.getItem('userId');
-            if (!userId) return; // no client session, do nothing
+        // Real-time data updates every 30 seconds
+        setInterval(loadDashboardData, 30000);
+
+        // Load student scores with proctoring flags
+        async function loadStudentScoresWithFlags(users, exams, sessions, examResults) {
+            try {
+                const tbody = document.getElementById('studentScoresTable');
+                tbody.innerHTML = '';
+
+                // Group results by student
+                const studentResults = {};
+
+                (examResults || []).forEach(result => {
+                    if (!studentResults[result.user_id]) {
+                        studentResults[result.user_id] = [];
+                    }
+                    studentResults[result.user_id].push(result);
+                });
+
+                // Display results for each student
+                Object.entries(studentResults).forEach(([userId, results]) => {
+                    const student = users.find(u => u.id === userId);
+
+                    results.forEach(result => {
+                        const exam = exams.find(e => e.id === result.exam_id);
+
+                        // Calculate score
+                        let scoreDisplay = 'N/A';
+                        if (exam && exam.questions && result.answers) {
+                            let correctAnswers = 0;
+                            exam.questions.forEach((question, index) => {
+                                if (result.answers[index] === question.correctAnswer) {
+                                    correctAnswers++;
+                                }
+                            });
+                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                        }
+
+                        // Get proctoring flags for this session
+                        const session = sessions.find(s => s.user_id === userId && s.exam_id === result.exam_id);
+                        let flagsDisplay = 'None';
+
+                        if (session && session.flags) {
+                            let flagsObj = session.flags;
+                            if (Array.isArray(flagsObj)) {
+                                flagsObj = {};
+                                flagsObj.forEach(f => Object.assign(flagsObj, f));
+                            }
+                            const flags = [];
+                            Object.entries(flagsObj).forEach(([type, alerts]) => {
+                                if (Array.isArray(alerts) && alerts.length > 0) {
+                                    flags.push(`${type}: ${alerts.length}`);
+                                }
+                            });
+                            if (flags.length > 0) {
+                                flagsDisplay = flags.join(', ');
+                            }
+                        }
+
+                        const row = `
+                            <tr>
+                                <td>${student?.name || 'Unknown'}</td>
+                                <td>${exam?.title || 'Unknown'} (${exam?.subject || ''})</td>
+                                <td>${scoreDisplay}</td>
+                                <td>${result.timestamp ? new Date(result.timestamp).toLocaleDateString() : 'N/A'}</td>
+                                <td>${flagsDisplay}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    });
+                });
+
+                if (tbody.innerHTML === '') {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
+                }
+
+            } catch (err) {
+                console.error('Error loading student scores:', err);
+                document.getElementById('studentScoresTable').innerHTML =
+                    '<tr><td colspan="5" class="text-center text-danger">Error loading scores</td></tr>';
+            }
+        }
+
+        // Function to delete old reports (admin only)
+        async function deleteOldReports() {
+            const cutoffDays = document.getElementById('cutoffDays').value;
+            const cutoffDate = document.getElementById('cutoffDate').value;
+
+            let confirmMessage = 'Are you sure you want to delete all reports ';
+            if (cutoffDate) {
+                confirmMessage += `older than ${cutoffDate}?`;
+            } else {
+                confirmMessage += `older than ${cutoffDays} days?`;
+            }
+            confirmMessage += ' This action cannot be undone.';
+
+            if (!confirm(confirmMessage)) {
+                return;
+            }
 
             try {
-                const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
-                if (!res.ok) return;
-                const user = await res.json();
-                const role = (user.role || user.type || '').toString().toLowerCase();
-                if (role === 'student') {
-                    // redirect student to student dashboard
-                    window.location.replace('/student_dashboard');
+                const btn = document.getElementById('deleteReportsBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                btn.disabled = true;
+
+                const requestBody = {};
+                if (cutoffDate) {
+                    requestBody.cutoff_date = cutoffDate + 'T00:00:00Z';
+                } else {
+                    requestBody.cutoff_days = parseInt(cutoffDays);
                 }
-            } catch (err) {
-                console.error('Student redirect check failed', err);
+
+                const response = await fetch('/delete_old_reports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    // Reload dashboard data
+                    loadDashboardData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete reports error:', error);
+                alert('Failed to delete reports. Please try again.');
+            } finally {
+                const btn = document.getElementById('deleteReportsBtn');
+                btn.innerHTML = '<i class="bx bx-trash"></i> Delete Old Reports';
+                btn.disabled = false;
             }
-        })();
+        }
+
+        // Function to clear date selection
+        function clearDateSelection() {
+            document.getElementById('cutoffDate').value = '';
+        }
+
+        // Function to delete ALL reports (admin only)
+        async function deleteAllReports() {
+            const confirmationText = prompt('Type "CONFIRM DELETION" to delete ALL reports permanently:');
+            if (confirmationText !== 'CONFIRM DELETION') {
+                alert('Deletion cancelled. You must type "CONFIRM DELETION" exactly.');
+                return;
+            }
+
+            if (!confirm('⚠️ WARNING: This will delete ALL proctoring reports and associated files permanently. This action CANNOT be undone. Are you absolutely sure?')) {
+                return;
+            }
+
+            try {
+                const btn = document.getElementById('deleteAllBtn');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                btn.disabled = true;
+
+                const response = await fetch('/delete_old_reports', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ delete_all: true })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(result.message);
+                    // Reload dashboard data
+                    loadDashboardData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete all reports error:', error);
+                alert('Failed to delete reports. Please try again.');
+            } finally {
+                const btn = document.getElementById('deleteAllBtn');
+                btn.innerHTML = '<i class="bx bx-trash-alt"></i> Delete ALL Reports';
+                btn.disabled = false;
+            }
+        }
     </script>
+
 </body>
+
 </html>
+ 
+ 

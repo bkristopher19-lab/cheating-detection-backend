@@ -105,6 +105,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         // 2) Try to get Firestore user document by UID (your screenshot shows doc IDs look like UIDs)
         let role = 'student';
         let name = firebaseUser.email;
+        let userDocId = uid; // Default to UID, but will update if found
         let userDocSnap = await getDoc(doc(db, "users", uid));
 
         // If not found by UID, fallback to search by email
@@ -116,7 +117,10 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             const querySnap = await getDocs(q);
             if (!querySnap.empty) {
                 userDocSnap = querySnap.docs[0];
+                userDocId = userDocSnap.id; // Use the actual document ID
             }
+        } else {
+            userDocId = userDocSnap.id; // Use the actual document ID
         }
 
         if (userDocSnap.exists()) {
@@ -129,7 +133,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
         // 3) Build user object like before
         const userObj = {
-            id: uid,
+            id: userDocId, // Use the Firestore document ID
             uid: uid,
             email: firebaseUser.email,
             name: name,

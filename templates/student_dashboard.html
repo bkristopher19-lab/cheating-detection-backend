@@ -106,9 +106,33 @@
 
     <div class="container py-4">
         <h2 class="mb-4">Available Exams</h2>
-        
+
         <div class="row" id="examsList">
             <!-- Exams will be loaded here dynamically -->
+        </div>
+
+        <!-- Student Scores Section -->
+        <div class="mt-5">
+            <h2 class="mb-4">My Exam Scores</h2>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Exam Type</th>
+                                    <th>Score</th>
+                                    <th>Date Taken</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scoresTable">
+                                <!-- Scores will be loaded here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -275,8 +299,66 @@
             document.getElementById('darkModeText').textContent = isDark ? 'Light Mode' : 'Dark Mode';
         });
 
+        // Load student scores
+        async function loadStudentScores() {
+            const userId = sessionStorage.getItem('userId');
+            const userResponse = await fetch('/select?collection=users&id=' + userId);
+            const user = await userResponse.json();
+
+            const tbody = document.getElementById('scoresTable');
+            tbody.innerHTML = '';
+
+            if (user.exams_taken && user.exams_taken.length > 0) {
+                for (const examId of user.exams_taken) {
+                    try {
+                        // Get exam details
+                        const examResponse = await fetch(`/select?collection=exams&id=${examId}`);
+                        const exam = await examResponse.json();
+
+                        // Get exam results to calculate score
+                        const resultsResponse = await fetch('/select?collection=exam_results');
+                        const allResults = await resultsResponse.json();
+
+                        // Find the result for this user and exam
+                        const userResult = allResults.find(result =>
+                            result.user_id === userId && result.exam_id === examId
+                        );
+
+                        let scoreDisplay = 'N/A';
+                        let dateTaken = 'N/A';
+
+                        if (userResult && exam.questions) {
+                            let correctAnswers = 0;
+                            exam.questions.forEach((question, index) => {
+                                if (userResult.answers && userResult.answers[index] === question.correctAnswer) {
+                                    correctAnswers++;
+                                }
+                            });
+                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                            dateTaken = userResult.timestamp ? new Date(userResult.timestamp).toLocaleDateString() : 'N/A';
+                        }
+
+                        const row = `
+                            <tr>
+                                <td>${user.name || 'Unknown'}</td>
+                                <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
+                                <td>${scoreDisplay}</td>
+                                <td>${dateTaken}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    } catch (err) {
+                        console.warn('Error loading score for exam:', examId, err);
+                    }
+                }
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No exams taken yet</td></tr>';
+            }
+        }
+
         // Load exams when page loads
         loadExams();
+        loadStudentScores();
     </script>
 </body>
 </html>

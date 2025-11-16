@@ -240,15 +240,20 @@
 
             const stats = {
                 twofaces: 0,
-                notlooking: 0,
+                loud_sound: 0,
                 phone: 0,
-                loudsound: 0,
-                mvoices: 0,
-                captions: 0
+                fullscreen_exit: 0,
+                keyboard_shortcut: 0,
+                right_click: 0,
+                tab_switch: 0
             };
 
-            Object.keys(session.alerts).forEach(type => {
-                stats[type] = session.alerts[type].length;
+            // Use session.flags if available, otherwise fallback to session.alerts
+            const alertData = session.flags || session.alerts || {};
+            Object.keys(alertData).forEach(type => {
+                if (Array.isArray(alertData[type])) {
+                    stats[type] = alertData[type].length;
+                }
             });
 
             // FIXED — Alert Stats now wrap using Bootstrap grid
@@ -266,10 +271,12 @@
             timeline.innerHTML = '';
 
             const allAlerts = [];
-            Object.entries(session.alerts).forEach(([type, alerts]) => {
-                alerts.forEach(alert => {
-                    allAlerts.push({ ...alert, type });
-                });
+            Object.entries(alertData).forEach(([type, alerts]) => {
+                if (Array.isArray(alerts)) {
+                    alerts.forEach(alert => {
+                        allAlerts.push({ ...alert, type });
+                    });
+                }
             });
 
             allAlerts.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
@@ -302,7 +309,7 @@
 
         function getAlertClass(type) {
             switch(type) {
-                case 'twofaces':
+                case 'multiplefaces':
                 case 'phone':
                     return 'danger';
                 case 'notlooking':
@@ -316,7 +323,7 @@
 
         function getAlertBadgeClass(type) {
             switch(type) {
-                case 'twofaces':
+                case 'multiplefaces':
                 case 'phone':
                     return 'bg-danger text-white';
                 case 'notlooking':

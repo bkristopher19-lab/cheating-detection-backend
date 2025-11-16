@@ -408,7 +408,7 @@
     <div class="exam-container" id="examContainer" style="display: none;">
         <!-- Left side: Proctoring -->
         <div class="detection-area" id="detectionArea">
-            <button class="proctor-toggle" id="proctorToggle" title="Hide proctoring">−</button>
+
 
             <div class="proctor-header">
                 <button class="back-btn" onclick="window.history.back()" title="Go Back">
@@ -423,12 +423,12 @@
             <div class="viewer">
                 <!-- Alerts area -->
                 <div id="alerts" aria-live="polite">
-                    <div id="alert-noface" class="alert danger">No face detected!</div>
-                    <div id="alert-twofaces" class="alert warn">Two faces detected!</div>
-                    <div id="alert-notlooking" class="alert danger">Student not looking!</div>
-                    <div id="alert-phone" class="alert warn">Phone detected!</div>
-                    <div id="alert-loudsound" class="alert danger">Loud sound detected!</div>
-                    <div id="alert-mvoices" class="alert warn">Multiple voices detected!</div>
+                <div id="alert-noface" class="alert danger">No face detected!</div>
+                <div id="alert-multiplefaces" class="alert warn">Multiple faces detected!</div>
+                <div id="alert-phone" class="alert warn">Phone detected!</div>
+                <div id="alert-loudsound" class="alert danger">Loud sound detected!</div>
+
+                <div id="alert-mvoices" class="alert danger">Multiple voices detected!</div>
                 </div>
 
                 <div class="media">
@@ -476,19 +476,7 @@
     <canvas id="canvas" width="640" height="360" style="display:none;"></canvas>
 
     <script>
-// Proctoring Collapse Toggle
-const detectionArea = document.getElementById('detectionArea');
-const toggleBtn = document.getElementById('proctorToggle');
 
-toggleBtn.addEventListener('click', () => {
-  detectionArea.classList.toggle('collapsed');
-  toggleBtn.textContent = detectionArea.classList.contains('collapsed') ? '+' : '−';
-  toggleBtn.classList.toggle('collapsed');
-
-  // Log proctoring area toggle
-  const isCollapsed = detectionArea.classList.contains('collapsed');
-  logAlert('proctoring_toggle', `Proctoring area ${isCollapsed ? 'minimized' : 'expanded'}`);
-});
 </script>
     <!-- Keep existing scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.21.0/dist/tf.min.js"></script>
@@ -512,23 +500,16 @@ toggleBtn.addEventListener('click', () => {
             sessionId: null,
             userId: null,
             examId: null,
-            alerts: {
-                noface: [],
+            flags: {
+                face_absent: [],
                 twofaces: [],
-                notlooking: [],
+                loud_sound: [],
                 phone: [],
-                loudsound: [],
-                mvoices: [],
-                captions: [], // Add this for storing captions
-                tab_switch: [], // Tab switch detection
-                fullscreen_exit: [], // Fullscreen exit detection
-                right_click: [], // Right-click attempts
-                keyboard_shortcut: [], // Keyboard shortcuts
-                dev_tools: [], // Developer tools attempts
-                text_selection: [], // Text selection attempts
-                copy_attempt: [], // Copy attempts
-                paste_attempt: [], // Paste attempts
-                proctoring_toggle: [] // Proctoring area minimize/expand
+                fullscreen_exit: [],
+                keyboard_shortcut: [],
+                right_click: [],
+                tab_switch: [],
+                captions: []
             },
             clipRecorded: false, // Track if a cheating clip has been recorded
             clipRecorder: null,
@@ -643,14 +624,20 @@ toggleBtn.addEventListener('click', () => {
                     try { await alertsSession.videoUploadPromise; } catch(e) { console.warn('video upload failed', e); }
                 }
 
-                // Update user's exam history using backend endpoint
+                // Update user's exam history using backend endpoint (union exams_taken)
+                const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
+                const userData = await userResponse.json();
+                const currentExams = userData.exams_taken || [];
+                if (!currentExams.includes(examState.examId)) {
+                    currentExams.push(examState.examId);
+                }
                 await fetch(`/edit/${examState.userId}?collection=users`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        exams_taken: [examState.examId] // Backend will handle array union
+                        exams_taken: currentExams
                     })
                 });
 
@@ -676,7 +663,7 @@ toggleBtn.addEventListener('click', () => {
                             'Content-Type': 'application/json'
                         },
                         body: JSON.stringify({
-                            alerts: alertsSession.alerts,
+                            flags: alertsSession.flags,
                             end_time: new Date().toISOString(),
                             status: 'completed'
                         })
@@ -691,8 +678,8 @@ toggleBtn.addEventListener('click', () => {
                         if (session.flags) {
                             for (const [flagType, flagList] of Object.entries(session.flags)) {
                                 flagList.forEach(flag => {
-                                    alertsSession.alerts[flagType] = alertsSession.alerts[flagType] || [];
-                                    alertsSession.alerts[flagType].push(flag);
+                                    alertsSession.flags[flagType] = alertsSession.flags[flagType] || [];
+                                    alertsSession.flags[flagType].push(flag);
                                 });
                             }
                         }
@@ -723,22 +710,16 @@ toggleBtn.addEventListener('click', () => {
                         exam_id: examState.examId,
                         start_time: new Date().toISOString(),
                         status: 'active',
-                        alerts: {
-                            noface: [],
+                        flags: {
+                            face_absent: [],
                             twofaces: [],
-                            notlooking: [],
+                            loud_sound: [],
                             phone: [],
-                            loudsound: [],
-                            mvoices: [],
-                            tab_switch: [],
                             fullscreen_exit: [],
-                            right_click: [],
                             keyboard_shortcut: [],
-                            dev_tools: [],
-                            text_selection: [],
-                            copy_attempt: [],
-                            paste_attempt: [],
-                            proctoring_toggle: []
+                            right_click: [],
+                            tab_switch: [],
+                            captions: []
                         }
                     })
                 });
@@ -891,72 +872,40 @@ toggleBtn.addEventListener('click', () => {
                     e.preventDefault();
                     logAlert('keyboard_shortcut', `Keyboard shortcut attempted: Ctrl+${e.key.toUpperCase()}`);
                 }
-                // Prevent F12 (dev tools)
-                if (e.key === 'F12') {
-                    e.preventDefault();
-                    logAlert('dev_tools', 'Developer tools attempted to open');
-                }
-                // Prevent Ctrl+Shift+I (dev tools)
-                if (e.ctrlKey && e.shiftKey && e.key === 'I') {
-                    e.preventDefault();
-                    logAlert('dev_tools', 'Developer tools attempted to open');
-                }
+
             });
 
-            // Prevent text selection
-            document.addEventListener('selectstart', (e) => {
-                if (e.target.closest('#questionsContainer')) {
-                    e.preventDefault();
-                    logAlert('text_selection', 'Text selection attempted on questions');
-                }
-            });
 
-            // Prevent copy event
-            document.addEventListener('copy', (e) => {
-                e.preventDefault();
-                logAlert('copy_attempt', 'Copy attempt detected');
-            });
-
-            // Prevent paste event
-            document.addEventListener('paste', (e) => {
-                e.preventDefault();
-                logAlert('paste_attempt', 'Paste attempt detected');
-            });
         }
 
-        // Modify logAlert function to batch updates and trigger clip recording
+        // Modify logAlert function to update immediately and trigger clip recording
         async function logAlert(type, message) {
             if (!alertsSession.sessionId) return;
 
-            // Add timestamp to local alerts array
-            alertsSession.alerts[type].push({
+            // Add timestamp to local flags array
+            alertsSession.flags[type].push({
                 timestamp: new Date().toISOString(),
                 message: message
             });
 
             // Start cheating clip recording if not already recorded
-            if (!alertsSession.clipRecorded && (type === 'phone' || type === 'twofaces' || type === 'notlooking' || type === 'loudsound' || type === 'mvoices' || type === 'noface' || type === 'proctoring_toggle')) {
+            if (!alertsSession.clipRecorded && (type === 'phone' || type === 'twofaces' || type === 'loud_sound' || type === 'face_absent')) {
                 startCheatingClip();
             }
 
-            // Update database every 5 seconds
-            if (!logAlert.updateTimeout) {
-                logAlert.updateTimeout = setTimeout(async () => {
-                    try {
-                        await fetch(`/edit/${alertsSession.sessionId}?collection=proctoring_sessions`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                alerts: alertsSession.alerts
-                            })
-                        });
-                    } catch (err) {
-                        console.error('Error updating alerts:', err);
-                    }
-                    logAlert.updateTimeout = null;
-                }, 5000);
+            // Update database immediately
+            try {
+                await fetch(`/edit/${alertsSession.sessionId}?collection=proctoring_sessions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        flags: alertsSession.flags
+                    })
+                });
+            } catch (err) {
+                console.error('Error updating alerts:', err);
             }
         }
 
@@ -1027,10 +976,10 @@ toggleBtn.addEventListener('click', () => {
 
         // Alert elements
         const alertNoFace = document.getElementById('alert-noface');
-        const alertTwoFaces = document.getElementById('alert-twofaces');
-        const alertNotLooking = document.getElementById('alert-notlooking');
+        const alertTwoFaces = document.getElementById('alert-multiplefaces');
         const alertPhone = document.getElementById('alert-phone');
         const alertLoudSound = document.getElementById('alert-loudsound');
+
         const alertMVoices = document.getElementById('alert-mvoices');
 
         // Mic UI
@@ -1259,32 +1208,20 @@ toggleBtn.addEventListener('click', () => {
             // 0) No face
             if (faces.length === 0) {
                 setAlert(alertNoFace, true, 'No face detected!');
-                logAlert('noface', 'No face detected!');
+                logAlert('face_absent', 'No face detected!');
             } else {
                 setAlert(alertNoFace, false);
             }
 
-            // 1) Two faces
+            // 1) Multiple faces
             if (faces.length >= 2) {
-                setAlert(alertTwoFaces, true, `Two faces detected (${faces.length})`);
-                logAlert('twofaces', `Two faces detected (${faces.length})`);
+                setAlert(alertTwoFaces, true, `Multiple faces detected (${faces.length})`);
+                logAlert('twofaces', `Multiple faces detected (${faces.length})`);
             } else {
                 setAlert(alertTwoFaces, false);
             }
 
-            // 2) Not looking: improved detection
-            const lookingRatio = faces.length ? (lookingCount / faces.length) : 0;
-            if (faces.length > 0) {
-                if (lookingRatio < 0.6) {
-                    const message = `Student not looking (${Math.round(lookingRatio*100)}%)`;
-                    setAlert(alertNotLooking, true, message);
-                    logAlert('notlooking', message);
-                } else {
-                    setAlert(alertNotLooking, false);
-                }
-            } else {
-                setAlert(alertNotLooking, false);
-            }
+
 
             // 3) Phone detected
             if (phoneDetections.length > 0) {
@@ -1368,7 +1305,7 @@ toggleBtn.addEventListener('click', () => {
                     if (finalTranscript) {
                         captionsEl.textContent = finalTranscript;
                         // Log to alerts session
-                        alertsSession.alerts.captions.push({
+                        alertsSession.flags.captions.push({
                             timestamp: new Date().toISOString(),
                             text: finalTranscript
                         });
@@ -1489,28 +1426,12 @@ toggleBtn.addEventListener('click', () => {
                     const loudDetected = meterPct > 0.90;
                     if (loudDetected) {
                         setAlert(alertLoudSound, true, `Loud sound detected (${Math.round(meterPct*100)}%)`);
-                        logAlert('loudsound', `Loud sound detected (${Math.round(meterPct*100)}%)`);
+                        logAlert('loud_sound', `Loud sound detected (${Math.round(meterPct*100)}%)`);
                     } else {
                         setAlert(alertLoudSound, false);
                     }
 
-                    // Multiple voices detection: simple spectral-change heuristic
-                    // Compute spectral variation between previous frame and current
-                    let variation = 0;
-                    for(let i=0;i<bufferLength;i++){
-                        const cur = micDataArray[i];
-                        const prev = prevSpec[i] || 0;
-                        variation += Math.abs(cur - prev);
-                        prevSpec[i] = cur;
-                    }
-                    // Normalized approximate threshold: tuneable; 200000 is moderate
-                    const multiVoices = variation > 200000;
-                    if (multiVoices) {
-                        setAlert(alertMVoices, true, `Multiple voices detected (${Math.round(variation/1000)}k)`);
-                        logAlert('mvoices', `Multiple voices detected (${Math.round(variation/1000)}k)`);
-                    } else {
-                        setAlert(alertMVoices, false);
-                    }
+
 
                     requestAnimationFrame(analyzeAudio);
                 }

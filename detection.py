@@ -5,7 +5,7 @@ import mediapipe as mp
 import base64
 import math
 from werkzeug.utils import secure_filename
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Web server
 from flask import Flask, render_template, Response, request, jsonify, redirect, url_for
@@ -13,6 +13,16 @@ from flask import Flask, render_template, Response, request, jsonify, redirect, 
 # Firebase
 from firebase_admin import credentials, firestore
 import firebase_admin
+
+# Audio processing
+import librosa
+import pydub
+from pydub import AudioSegment
+import io
+
+# Scheduler for automatic cleanup
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Mediapipe setup
 mp_holistic = mp.solutions.holistic
@@ -171,6 +181,101 @@ def estimate_head_pose_from_mesh(results, image):
     except Exception:
         return False, None
 
+
+@app.route('/detect_audio', methods=['POST'])
+def detect_audio():
+    """
+    Process audio data for loud sounds detection.
+    Expects multipart/form-data with 'audio' file or base64 encoded audio in JSON/form.
+    Query param: session_id (optional) for flagging
+    Returns: {'loud_sound': bool, 'multiple_voices': bool, 'confidence': float}
+    """
+    try:
+        session_id = request.args.get('session_id')
+
+        # Get audio data
+        audio_data = None
+        if 'audio' in request.files:
+            audio_file = request.files['audio']
+            audio_data = audio_file.read()
+        elif request.is_json:
+            data = request.get_json()
+            b64_audio = data.get('audio') or data.get('audio_b64')
+            if b64_audio:
+                if b64_audio.startswith('data:'):
+                    _, b64_audio = b64_audio.split(',', 1)
+                audio_data = base64.b64decode(b64_audio)
+        elif request.form:
+            b64_audio = request.form.get('audio') or request.form.get('audio_b64')
+            if b64_audio:
+                if b64_audio.startswith('data:'):
+                    _, b64_audio = b64_audio.split(',', 1)
+                audio_data = base64.b64decode(b64_audio)
+
+        if not audio_data:
+            return jsonify({'error': 'No audio data provided'}), 400
+
+        # Convert audio data to numpy array
+        try:
+            # Try to load as WAV/PCM first
+            audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
+            samples = np.array(audio_segment.get_array_of_samples())
+            if audio_segment.channels == 2:
+                samples = samples.reshape((-1, 2))
+            sample_rate = audio_segment.frame_rate
+        except Exception:
+            # Fallback: assume raw PCM data
+            samples = np.frombuffer(audio_data, dtype=np.int16)
+            sample_rate = 44100  # default assumption
+
+        # Convert to mono if stereo
+        if len(samples.shape) > 1:
+            samples = samples.mean(axis=1)
+
+        # Convert to float
+        samples = samples.astype(np.float32)
+        if samples.max() > 1.0:
+            samples = samples / 32768.0  # normalize 16-bit
+
+        # Detect loud sounds (simple RMS threshold)
+        rms = np.sqrt(np.mean(samples**2))
+        loud_threshold = 0.1  # adjustable threshold
+        is_loud = rms > loud_threshold
+
+        # Detect loud sounds only (removed multiple voices detection)
+        # Flag session if session_id provided
+        if session_id:
+            flags = {}
+            if is_loud:
+                flags['loud_sound'] = [{'timestamp': datetime.utcnow().isoformat(),
+                                       'message': f'Loud sound detected (RMS: {rms:.3f})'}]
+
+            if flags:
+                try:
+                    # Get current session data
+                    session_ref = db.collection('proctoring_sessions').document(session_id)
+                    session_doc = session_ref.get()
+                    if session_doc.exists:
+                        current_flags = session_doc.to_dict().get('flags', {})
+                        # Merge new flags with existing flags
+                        for key, value in flags.items():
+                            if key not in current_flags:
+                                current_flags[key] = []
+                            current_flags[key].extend(value)
+                        session_ref.update({'flags': current_flags})
+                except Exception as e:
+                    print('Warning: failed to update session flags:', e)
+
+        return jsonify({
+            'loud_sound': bool(is_loud),
+            'rms_level': float(rms)
+        })
+
+    except Exception as e:
+        print('Audio detection error:', e)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/predict', methods=['POST'])
 def predict():
     session_id = request.args.get('session_id')
@@ -254,6 +359,60 @@ def predict():
         # estimate head pose / gaze
         looking, angles = estimate_head_pose_from_mesh(results, image)
 
+        # Extract keypoints for potential ML model integration
+        keypoints = extract_keypoints(results)
+
+    # 3) Object detection using YOLO for phones and other objects
+    detected_objects = []
+    if yolo_net is not None:
+        try:
+            blob = cv2.dnn.blobFromImage(frame, 1/255.0, (640, 640), swapRB=True, crop=False)
+            yolo_net.setInput(blob)
+            outputs = yolo_net.forward(yolo_net.getUnconnectedOutLayersNames())
+
+            h, w = frame.shape[:2]
+            for output in outputs:
+                for detection in output:
+                    scores = detection[5:]
+                    class_id = np.argmax(scores)
+                    confidence = scores[class_id]
+                    if confidence > 0.5:  # confidence threshold
+                        center_x = int(detection[0] * w)
+                        center_y = int(detection[1] * h)
+                        width = int(detection[2] * w)
+                        height = int(detection[3] * h)
+                        x = int(center_x - width / 2)
+                        y = int(center_y - height / 2)
+
+                        # COCO class names (assuming standard YOLOv5 COCO model)
+                        class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
+                                     'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
+                                     'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
+                                     'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
+                                     'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+                                     'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
+                                     'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
+                                     'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+                                     'scissors', 'teddy bear', 'hair drier', 'toothbrush']
+
+                        if class_id < len(class_names):
+                            obj_name = class_names[class_id]
+                            detected_objects.append({
+                                'name': obj_name,
+                                'confidence': float(confidence),
+                                'bbox': [x, y, width, height]
+                            })
+
+                            # Draw bounding box for detected objects
+                            cv2.rectangle(image, (x, y), (x + width, y + height), (0, 0, 255), 2)
+                            cv2.putText(image, f"{obj_name}: {confidence:.2f}", (x, y - 10),
+                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+        except Exception as e:
+            print(f"YOLO detection error: {e}")
+            detected_objects = []
+    else:
+        detected_objects = []
+
 
 
     # overlay hints and boxes
@@ -275,12 +434,15 @@ def predict():
     if session_id:
         try:
             flags = {}
-            if face_count == 0:
-                flags['face_absent'] = [{'timestamp': datetime.utcnow().isoformat(), 'message': 'No face detected'}]
             if face_count > 1:
-                flags['multiple_faces'] = [{'timestamp': datetime.utcnow().isoformat(), 'message': f'Multiple faces detected ({face_count})'}]
-            if not looking:
-                flags['not_looking'] = [{'timestamp': datetime.utcnow().isoformat(), 'message': 'Student not looking at screen'}]
+                flags['twofaces'] = [{'timestamp': datetime.utcnow().isoformat(), 'message': f'Multiple faces detected ({face_count})'}]
+
+            # Add object detection flags
+            for obj in detected_objects:
+                if obj['name'] in ['cell phone', 'laptop', 'book', 'remote', 'keyboard']:
+                    flag_key = f'object_detected_{obj["name"].replace(" ", "_")}'
+                    flags[flag_key] = [{'timestamp': datetime.utcnow().isoformat(),
+                                       'message': f'{obj["name"]} detected with confidence {obj["confidence"]:.2f}'}]
 
             if flags:
                 # Update proctoring_sessions with flags
@@ -298,6 +460,8 @@ def predict():
         'face_count': face_count,
         'looking_at_screen': bool(looking),
         'head_angles': {'yaw': angles[0], 'pitch': angles[1], 'roll': angles[2]} if angles else None,
+        'detected_objects': detected_objects,
+        'keypoints': keypoints.tolist() if keypoints is not None else None,  # Include keypoints in response
     })
 
 
@@ -437,6 +601,112 @@ def proctor_dashboard():
 @app.route('/logout', methods=['POST'])
 def logout():
     return jsonify({'message': 'Logged out successfully'}), 200
+
+
+@app.route('/delete_old_reports', methods=['POST'])
+def delete_old_reports():
+    """
+    Manually delete old proctoring reports older than specified date.
+    Expects JSON with 'cutoff_date' (ISO format) or 'cutoff_days' (default: 14)
+    Requires admin authentication.
+    """
+    try:
+        # Check for admin authentication (you may need to implement proper auth)
+        # For now, we'll assume this is called from an admin context
+        # In production, add proper authentication check here
+
+        data = request.get_json() or {}
+        delete_all = data.get('delete_all', False)
+
+        if delete_all:
+            print("Starting manual cleanup of ALL reports...")
+            cutoff_iso = None  # Delete all, no cutoff
+        else:
+            cutoff_date_str = data.get('cutoff_date')
+            cutoff_days = data.get('cutoff_days', 14)
+
+            if cutoff_date_str:
+                # Parse specific date
+                try:
+                    cutoff_date = datetime.fromisoformat(cutoff_date_str.replace('Z', '+00:00'))
+                    cutoff_iso = cutoff_date.isoformat()
+                    print(f"Starting manual cleanup of reports older than {cutoff_date_str}...")
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'cutoff_date must be a valid ISO format date'}), 400
+            else:
+                # Use days (backward compatibility)
+                try:
+                    cutoff_days = int(cutoff_days)
+                    if cutoff_days < 1:
+                        return jsonify({'error': 'cutoff_days must be at least 1'}), 400
+                except (ValueError, TypeError):
+                    return jsonify({'error': 'cutoff_days must be a valid integer'}), 400
+
+                cutoff_date = datetime.utcnow() - timedelta(days=cutoff_days)
+                cutoff_iso = cutoff_date.isoformat()
+                print(f"Starting manual cleanup of reports older than {cutoff_days} days...")
+
+        # Delete old proctoring sessions
+        sessions_ref = db.collection('proctoring_sessions')
+        if cutoff_iso is None:
+            # Delete ALL sessions
+            old_sessions = sessions_ref.stream()
+        else:
+            old_sessions = sessions_ref.where('start_time', '<', cutoff_iso).stream()
+
+        deleted_count = 0
+        for session_doc in old_sessions:
+            session_data = session_doc.to_dict()
+
+            # Delete associated video files
+            for path_key in ['video_path', 'clip_path']:
+                if session_data.get(path_key):
+                    # Convert web path to file system path
+                    web_path = session_data[path_key]
+                    if web_path.startswith('/static/recordings/'):
+                        filename = web_path.replace('/static/recordings/', '')
+                        file_path = os.path.join(os.path.dirname(__file__), 'static', 'recordings', filename)
+                        try:
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                                print(f"Deleted file: {file_path}")
+                        except Exception as e:
+                            print(f"Error deleting file {file_path}: {e}")
+
+            # Delete the session document
+            session_doc.reference.delete()
+            deleted_count += 1
+
+        print(f"Manually deleted {deleted_count} old proctoring sessions")
+
+        # If deleting all, also delete exam_results to clear the student scores table
+        if cutoff_iso is None:
+            results_ref = db.collection('exam_results')
+            deleted_results = 0
+            for result_doc in results_ref.stream():
+                result_doc.reference.delete()
+                deleted_results += 1
+            print(f"Deleted {deleted_results} exam results")
+
+        # Clean up expired shared reports (if any have expiration set)
+        shared_ref = db.collection('shared_reports')
+        expired_shares = shared_ref.where('expires_at', '<', datetime.utcnow().isoformat()).stream()
+
+        expired_count = 0
+        for share_doc in expired_shares:
+            share_doc.reference.delete()
+            expired_count += 1
+
+        print(f"Deleted {expired_count} expired shared reports")
+
+        return jsonify({
+            'success': True,
+            'message': f'Successfully deleted {deleted_count} old reports and {expired_count} expired shares'
+        }), 200
+
+    except Exception as e:
+        print(f"Error during manual cleanup: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/upload_video', methods=['POST'])
 def upload_video():
@@ -587,10 +857,166 @@ def shared_report(token):
         return render_template('error.html', message='Error loading report'), 500
 
 
+@app.route('/start_session', methods=['POST'])
+def start_session():
+    """
+    Start a new proctoring session.
+    Expects JSON with: student_id, exam_id
+    Returns: session_id
+    """
+    try:
+        data = request.get_json()
+        student_id = data.get('student_id')
+        exam_id = data.get('exam_id')
+
+        if not student_id or not exam_id:
+            return jsonify({'error': 'student_id and exam_id are required'}), 400
+
+        session_data = {
+            'student_id': student_id,
+            'exam_id': exam_id,
+            'start_time': datetime.utcnow().isoformat(),
+            'status': 'active',
+            'flags': {},
+            'video_path': None,
+            'clip_path': None
+        }
+
+        doc_ref = db.collection('proctoring_sessions').add(session_data)
+        session_id = doc_ref[1].id
+
+        return jsonify({
+            'success': True,
+            'session_id': session_id,
+            'message': 'Session started successfully'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/end_session', methods=['POST'])
+def end_session():
+    """
+    End an active proctoring session.
+    Expects JSON with: session_id
+    """
+    try:
+        data = request.get_json()
+        session_id = data.get('session_id')
+
+        if not session_id:
+            return jsonify({'error': 'session_id is required'}), 400
+
+        db.collection('proctoring_sessions').document(session_id).update({
+            'end_time': datetime.utcnow().isoformat(),
+            'status': 'completed'
+        })
+
+        return jsonify({
+            'success': True,
+            'message': 'Session ended successfully'
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/get_session_status')
+def get_session_status():
+    """
+    Get the status of a proctoring session.
+    Query param: session_id
+    """
+    try:
+        session_id = request.args.get('session_id')
+        if not session_id:
+            return jsonify({'error': 'session_id is required'}), 400
+
+        doc = db.collection('proctoring_sessions').document(session_id).get()
+        if not doc.exists:
+            return jsonify({'error': 'Session not found'}), 404
+
+        session_data = doc.to_dict()
+        session_data['id'] = doc.id
+
+        return jsonify(session_data), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+def cleanup_old_reports():
+    """
+    Scheduled task to delete proctoring sessions and associated files older than 14 days.
+    Also cleans up expired shared reports.
+    """
+    try:
+        print("Starting scheduled cleanup of old reports...")
+
+        # Calculate cutoff date (14 days ago)
+        cutoff_date = datetime.utcnow() - timedelta(days=14)
+        cutoff_iso = cutoff_date.isoformat()
+
+        # Delete old proctoring sessions
+        sessions_ref = db.collection('proctoring_sessions')
+        old_sessions = sessions_ref.where('start_time', '<', cutoff_iso).stream()
+
+        deleted_count = 0
+        for session_doc in old_sessions:
+            session_data = session_doc.to_dict()
+
+            # Delete associated video files
+            for path_key in ['video_path', 'clip_path']:
+                if session_data.get(path_key):
+                    # Convert web path to file system path
+                    web_path = session_data[path_key]
+                    if web_path.startswith('/static/recordings/'):
+                        filename = web_path.replace('/static/recordings/', '')
+                        file_path = os.path.join(os.path.dirname(__file__), 'static', 'recordings', filename)
+                        try:
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                                print(f"Deleted file: {file_path}")
+                        except Exception as e:
+                            print(f"Error deleting file {file_path}: {e}")
+
+            # Delete the session document
+            session_doc.reference.delete()
+            deleted_count += 1
+
+        print(f"Deleted {deleted_count} old proctoring sessions")
+
+        # Clean up expired shared reports (if any have expiration set)
+        shared_ref = db.collection('shared_reports')
+        expired_shares = shared_ref.where('expires_at', '<', datetime.utcnow().isoformat()).stream()
+
+        expired_count = 0
+        for share_doc in expired_shares:
+            share_doc.reference.delete()
+            expired_count += 1
+
+        print(f"Deleted {expired_count} expired shared reports")
+
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+
+
+# Initialize scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    func=cleanup_old_reports,
+    trigger=CronTrigger(hour=2, minute=0),  # Run daily at 2 AM
+    id='cleanup_old_reports',
+    name='Clean up old proctoring reports',
+    replace_existing=True
+)
+scheduler.start()
+
+# Ensure scheduler shuts down gracefully
+import atexit
+atexit.register(lambda: scheduler.shutdown())
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
-if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_admin_key.json")
-    firebase_admin.initialize_app(cred)
-db = firestore.client()

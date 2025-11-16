@@ -50,12 +50,8 @@
             margin-bottom: 0.5rem;
         }
         .alert-badge.phone { background-color: #dc3545; color: white; }
-        .alert-badge.twofaces { background-color: #fd7e14; color: white; }
-        .alert-badge.notlooking { background-color: #ffc107; color: black; }
+        .alert-badge.multiplefaces { background-color: #fd7e14; color: white; }
         .alert-badge.loudsound { background-color: #20c997; color: white; }
-        .alert-badge.mvoices { background-color: #e83e8c; color: white; }
-        .alert-badge.noface { background-color: #6f42c1; color: white; }
-        .alert-badge.proctoring_toggle { background-color: #17a2b8; color: white; }
         .timestamp {
             color: #6c757d;
             font-size: 0.875rem;
@@ -181,14 +177,9 @@
         function getAlertClass(type) {
             switch(type) {
                 case 'phone':
-                case 'twofaces':
-                case 'noface':
+                case 'multiplefaces':
                     return 'danger';
-                case 'notlooking':
-                    return 'warning';
                 case 'loudsound':
-                case 'mvoices':
-                case 'proctoring_toggle':
                     return 'success';
                 default:
                     return '';

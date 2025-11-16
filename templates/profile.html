@@ -8,17 +8,23 @@
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
 </head>
 <body>
-    <!-- Include Sidebar -->
-    {% include 'sidebar.html' %}
+    <!-- Minimal Header -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container-fluid">
+            <button class="btn btn-outline-secondary" onclick="window.history.back()">
+                <i class="bx bx-arrow-back"></i> Back to Dashboard
+            </button>
+            <div class="ms-auto">
+                <button class="btn btn-outline-danger" onclick="logout()">
+                    <i class="bx bx-log-out"></i> Logout
+                </button>
+            </div>
+        </div>
+    </nav>
 
     <!-- Main Content -->
-    <div class="main-content" id="main-content">
-        <!-- Include Navbar -->
-        {% include 'navbar.html' %}
-
-        <!-- Page Content -->
-        <div class="container-fluid p-4">
-            <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="container-fluid p-4">
+            <div class="d-flex justify-content-center align-items-center mb-4">
                 <h1 class="h3">Profile Information</h1>
             </div>
 
@@ -59,29 +65,7 @@
                 </div>
             </div>
 
-            <div class="row mt-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-body">
-                            <h4 class="card-title mb-4">Exam History</h4>
-                            <div class="table-responsive">
-                                <table class="table" id="examHistory">
-                                    <thead>
-                                        <tr>
-                                            <th>Exam</th>
-                                            <th>Date Taken</th>
-                                            <th>Score</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <!-- Exam history will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+
         </div>
     </div>
 
@@ -89,12 +73,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     
     <script>
-        // Toggle Sidebar
-        document.getElementById('menu-toggle').addEventListener('click', function(e) {
-            e.preventDefault();
-            document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
-            document.getElementById('main-content').classList.toggle('main-content-expanded');
-        });
+
 
         async function loadProfile() {
             const userId = sessionStorage.getItem('userId');
@@ -106,25 +85,7 @@
             document.getElementById('type').value = (user.role || user.type || 'Unknown').toLowerCase();
             document.getElementById('created_at').value = user.createdAt ? new Date(user.createdAt).toLocaleDateString() : (user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Not set');
 
-            // Load exam history
-            if (user.exams_taken) {
-                const tbody = document.querySelector('#examHistory tbody');
-                tbody.innerHTML = '';
 
-                for (const examId of user.exams_taken) {
-                    const examResponse = await fetch(`/select?collection=exams&id=${examId}`);
-                    const exam = await examResponse.json();
-
-                    const row = `
-                        <tr>
-                            <td>${exam.title || 'Unknown'}</td>
-                            <td>${exam.date_taken ? new Date(exam.date_taken).toLocaleDateString() : 'Not set'}</td>
-                            <td>${exam.score || 'N/A'}%</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                }
-            }
         }
 
         document.getElementById('profileForm').addEventListener('submit', async (e) => {
@@ -156,6 +117,25 @@
                 alert('Error updating profile: ' + err.message);
             }
         });
+
+        async function logout() {
+            try {
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (response.ok) {
+                    sessionStorage.clear();
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (error) {
+                alert('Error during logout: ' + error.message);
+            }
+        }
 
         // Load profile when page loads
         loadProfile();
