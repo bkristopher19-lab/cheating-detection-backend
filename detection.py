@@ -45,7 +45,7 @@ def draw_styled_landmarks(image, results):
         h, w, _ = image.shape
         for lm in results.face_landmarks.landmark:
             x, y = int(lm.x * w), int(lm.y * h)
-            cv2.circle(image, (x, y), 1, (80,110,10), -1)
+            cv2.circle(image, (x, y), 1, (80, 110, 10), -1)
 
     # Draw left hand landmarks and connections
     if results.left_hand_landmarks:
@@ -53,8 +53,8 @@ def draw_styled_landmarks(image, results):
             image,
             results.left_hand_landmarks,
             mp_holistic.HAND_CONNECTIONS,
-            mp_draw.DrawingSpec(color=(121,22,76), thickness=2, circle_radius=4),
-            mp_draw.DrawingSpec(color=(121,44,250), thickness=2, circle_radius=2)
+            mp_draw.DrawingSpec(color=(121, 22, 76), thickness=2, circle_radius=4),
+            mp_draw.DrawingSpec(color=(121, 44, 250), thickness=2, circle_radius=2)
         )
 
     # Draw right hand landmarks and connections
@@ -63,25 +63,27 @@ def draw_styled_landmarks(image, results):
             image,
             results.right_hand_landmarks,
             mp_holistic.HAND_CONNECTIONS,
-            mp_draw.DrawingSpec(color=(245,117,66), thickness=2, circle_radius=4),
-            mp_draw.DrawingSpec(color=(245,66,230), thickness=2, circle_radius=2)
+            mp_draw.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=4),
+            mp_draw.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2)
         )
 
 
 def extract_keypoints(results):
     # keep helper if later needed; returns concatenated arrays (pose excluded to focus on face+hands)
-    face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468*3)
-    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21*3)
-    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21*3)
+    face = np.array([[res.x, res.y, res.z] for res in results.face_landmarks.landmark]).flatten() if results.face_landmarks else np.zeros(468 * 3)
+    lh = np.array([[res.x, res.y, res.z] for res in results.left_hand_landmarks.landmark]).flatten() if results.left_hand_landmarks else np.zeros(21 * 3)
+    rh = np.array([[res.x, res.y, res.z] for res in results.right_hand_landmarks.landmark]).flatten() if results.right_hand_landmarks else np.zeros(21 * 3)
     return np.concatenate([face, lh, rh])
 
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Required for session management
 
-# Initialize Firebase
-cred = credentials.Certificate(r"firebase_admin_key.json")
-firebase_admin.initialize_app(cred)
+# Initialize Firebase (using Render secret file path)
+if not firebase_admin._apps:
+    cred = credentials.Certificate("/etc/firebase_admin_key.json")
+    firebase_admin.initialize_app(cred)
+
 db = firestore.client()
 
 
@@ -153,7 +155,13 @@ def estimate_head_pose_from_mesh(results, image):
                                   [0, 0, 1]], dtype="double")
         dist_coeffs = np.zeros((4, 1))
 
-        success, rotation_vector, translation_vector = cv2.solvePnP(model_points, image_points, camera_matrix, dist_coeffs, flags=cv2.SOLVEPNP_ITERATIVE)
+        success, rotation_vector, translation_vector = cv2.solvePnP(
+            model_points,
+            image_points,
+            camera_matrix,
+            dist_coeffs,
+            flags=cv2.SOLVEPNP_ITERATIVE
+        )
         if not success:
             return False, None
 
@@ -247,8 +255,10 @@ def detect_audio():
         if session_id:
             flags = {}
             if is_loud:
-                flags['loud_sound'] = [{'timestamp': datetime.utcnow().isoformat(),
-                                       'message': f'Loud sound detected (RMS: {rms:.3f})'}]
+                flags['loud_sound'] = [{
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'message': f'Loud sound detected (RMS: {rms:.3f})'
+                }]
 
             if flags:
                 try:
@@ -366,7 +376,7 @@ def predict():
     detected_objects = []
     if yolo_net is not None:
         try:
-            blob = cv2.dnn.blobFromImage(frame, 1/255.0, (640, 640), swapRB=True, crop=False)
+            blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (640, 640), swapRB=True, crop=False)
             yolo_net.setInput(blob)
             outputs = yolo_net.forward(yolo_net.getUnconnectedOutLayersNames())
 
@@ -385,15 +395,19 @@ def predict():
                         y = int(center_y - height / 2)
 
                         # COCO class names (assuming standard YOLOv5 COCO model)
-                        class_names = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-                                     'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow',
-                                     'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee',
-                                     'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard',
-                                     'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
-                                     'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch',
-                                     'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard',
-                                     'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase',
-                                     'scissors', 'teddy bear', 'hair drier', 'toothbrush']
+                        class_names = [
+                            'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat',
+                            'traffic light', 'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat',
+                            'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'backpack',
+                            'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard', 'sports ball',
+                            'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 'tennis racket',
+                            'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple',
+                            'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake',
+                            'chair', 'couch', 'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop',
+                            'mouse', 'remote', 'keyboard', 'cell phone', 'microwave', 'oven', 'toaster', 'sink',
+                            'refrigerator', 'book', 'clock', 'vase', 'scissors', 'teddy bear', 'hair drier',
+                            'toothbrush'
+                        ]
 
                         if class_id < len(class_names):
                             obj_name = class_names[class_id]
@@ -405,22 +419,35 @@ def predict():
 
                             # Draw bounding box for detected objects
                             cv2.rectangle(image, (x, y), (x + width, y + height), (0, 0, 255), 2)
-                            cv2.putText(image, f"{obj_name}: {confidence:.2f}", (x, y - 10),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                            cv2.putText(
+                                image,
+                                f"{obj_name}: {confidence:.2f}",
+                                (x, y - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.5,
+                                (0, 0, 255),
+                                2
+                            )
         except Exception as e:
             print(f"YOLO detection error: {e}")
             detected_objects = []
     else:
         detected_objects = []
 
-
-
     # overlay hints and boxes
     if face_count:
-        for (x,y,wc,hc) in face_boxes:
-            cv2.rectangle(image, (x,y), (x+wc, y+hc), (0,200,0), 2)
-    cv2.putText(image, f"Faces: {face_count}", (10,50), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200,255,200), 2, cv2.LINE_AA)
-
+        for (x, y, wc, hc) in face_boxes:
+            cv2.rectangle(image, (x, y), (x + wc, y + hc), (0, 200, 0), 2)
+    cv2.putText(
+        image,
+        f"Faces: {face_count}",
+        (10, 50),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.8,
+        (200, 255, 200),
+        2,
+        cv2.LINE_AA
+    )
 
     # encode to JPEG and base64
     ret, buffer = cv2.imencode('.jpg', image)
@@ -435,14 +462,19 @@ def predict():
         try:
             flags = {}
             if face_count > 1:
-                flags['twofaces'] = [{'timestamp': datetime.utcnow().isoformat(), 'message': f'Multiple faces detected ({face_count})'}]
+                flags['twofaces'] = [{
+                    'timestamp': datetime.utcnow().isoformat(),
+                    'message': f'Multiple faces detected ({face_count})'
+                }]
 
             # Add object detection flags
             for obj in detected_objects:
                 if obj['name'] in ['cell phone', 'laptop', 'book', 'remote', 'keyboard']:
-                    flag_key = f'object_detected_{obj["name"].replace(" ", "_")}'
-                    flags[flag_key] = [{'timestamp': datetime.utcnow().isoformat(),
-                                       'message': f'{obj["name"]} detected with confidence {obj["confidence"]:.2f}'}]
+                    flag_key = f'object_detected_{obj['name'].replace(' ', '_')}'
+                    flags[flag_key] = [{
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'message': f'{obj["name"]} detected with confidence {obj["confidence"]:.2f}'
+                    }]
 
             if flags:
                 # Update proctoring_sessions with flags
@@ -459,7 +491,11 @@ def predict():
         'probability': 0.0,
         'face_count': face_count,
         'looking_at_screen': bool(looking),
-        'head_angles': {'yaw': angles[0], 'pitch': angles[1], 'roll': angles[2]} if angles else None,
+        'head_angles': {
+            'yaw': angles[0],
+            'pitch': angles[1],
+            'roll': angles[2]
+        } if angles else None,
         'detected_objects': detected_objects,
         'keypoints': keypoints.tolist() if keypoints is not None else None,  # Include keypoints in response
     })
@@ -476,6 +512,7 @@ def add():
         return jsonify({'id': doc_ref[1].id}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/select')
 def select():
@@ -502,6 +539,7 @@ def select():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/edit/<id>', methods=['POST'])
 def edit(id):
     try:
@@ -511,6 +549,7 @@ def edit(id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/delete/<id>', methods=['POST'])
 def delete(id):
     try:
@@ -519,6 +558,7 @@ def delete(id):
         return jsonify({'message': 'Deleted'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -548,55 +588,67 @@ def login():
 def login_page():
     return render_template('login.html')
 
+
 @app.route('/detection')
 def detection():
     return render_template('index.html')
+
 
 @app.route('/register')
 def register_page():
     return render_template('register.html')
 
+
 @app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html')
+
 
 @app.route('/student_dashboard')
 def student_dashboard():
     return render_template('student_dashboard.html')
 
+
 @app.route('/users')
 def users():
     return render_template('users.html')
+
 
 @app.route('/exams')
 def exams():
     return render_template('exams.html')
 
+
 @app.route('/classes')
 def classes():
     return render_template('classes.html')
 
+
 @app.route('/reports')
 def reports():
     return render_template('reports.html')
- 
+
+
 @app.route('/take_exam/<exam_id>')
 def take_exam(exam_id):
     exam_ref = db.collection('exams').document(exam_id)
     exam = exam_ref.get()
-    
+
     if not exam.exists:
         return redirect('/student_dashboard')
-        
+
     return render_template('index.html', exam_id=exam_id)
+
 
 @app.route('/profile')
 def profile():
     return render_template('profile.html')
 
+
 @app.route('/proctor_dashboard')
 def proctor_dashboard():
     return render_template('proctor_dashboard.html')
+
 
 @app.route('/logout', methods=['POST'])
 def logout():
@@ -611,10 +663,6 @@ def delete_old_reports():
     Requires admin authentication.
     """
     try:
-        # Check for admin authentication (you may need to implement proper auth)
-        # For now, we'll assume this is called from an admin context
-        # In production, add proper authentication check here
-
         data = request.get_json() or {}
         delete_all = data.get('delete_all', False)
 
@@ -708,6 +756,7 @@ def delete_old_reports():
         print(f"Error during manual cleanup: {e}")
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/upload_video', methods=['POST'])
 def upload_video():
     """
@@ -759,6 +808,7 @@ def upload_video():
         print('upload_video error', e)
         return jsonify({'error': str(e)}), 500
 
+
 @app.route('/share_report', methods=['POST'])
 def share_report():
     """
@@ -802,6 +852,7 @@ def share_report():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/shared_report/<token>')
 def shared_report(token):
@@ -848,10 +899,12 @@ def shared_report(token):
         session = session_doc.to_dict()
         session['id'] = session_doc.id
 
-        return render_template('shared_report.html',
-                             student=student,
-                             exam=exam,
-                             session=session)
+        return render_template(
+            'shared_report.html',
+            student=student,
+            exam=exam,
+            session=session
+        )
 
     except Exception as e:
         return render_template('error.html', message='Error loading report'), 500
