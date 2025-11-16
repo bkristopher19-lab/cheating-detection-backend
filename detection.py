@@ -81,7 +81,7 @@ app.secret_key = 'your-secret-key-here'  # Required for session management
 
 # Initialize Firebase (using Render secret file path)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("/etc/firebase_admin_key.json")
+    cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
