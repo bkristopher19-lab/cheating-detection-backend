@@ -2,7 +2,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0f1724">
     <title>Online Exam with Proctoring</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -319,25 +323,36 @@
         @media (max-width: 768px) {
             .exam-container {
                 flex-direction: column;
+                height: 100vh;
+                height: -webkit-fill-available; /* iOS Safari fix */
+                overflow: hidden;
             }
             .detection-area {
                 flex: 0 0 auto;
                 height: auto;
-                max-height: 40vh; /* Reduced height for better performance */
+                max-height: 35vh; /* Reduced height for better exam visibility */
                 border-right: none;
                 border-bottom: 1px solid rgba(255,255,255,.1);
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
             }
             .detection-area.collapsed {
                 height: 44px;
+                min-height: 44px;
             }
             .detection-area:not(.collapsed) {
-                height: calc(40vh - 50px); /* Reduced height */
+                max-height: 35vh;
             }
             .exam-questions {
+                flex: 1;
                 padding: 1rem;
                 border-left: none;
-                max-height: 60vh; /* Limit exam area height */
-                overflow-y: auto; /* Add scrolling if needed */
+                overflow-y: auto;
+                overflow-x: hidden;
+                -webkit-overflow-scrolling: touch; /* Smooth iOS scrolling */
+                height: calc(100vh - 35vh - 44px); /* Dynamic height */
+                height: calc(-webkit-fill-available - 35vh); /* iOS fix */
+                min-height: 0; /* Allow flex shrinking */
             }
             .timer {
                 font-size: 1.2rem;
@@ -347,20 +362,113 @@
                 top: 0;
                 background: var(--card);
                 z-index: 10;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             }
             .proctor-toggle {
                 display: block !important; /* Always show toggle on mobile */
             }
             /* Reduce video size on mobile */
             .media video, #processed {
-                max-height: 200px;
+                max-height: 180px;
+                width: 100%;
+                object-fit: cover;
             }
             /* Optimize controls for mobile */
             .controls, .mic-ui {
-                font-size: 0.9rem;
-                padding: 8px;
+                font-size: 0.85rem;
+                padding: 6px;
             }
-
+            /* Touch-friendly answer buttons */
+            .answer-option {
+                min-height: 48px; /* Minimum touch target for mobile */
+                padding: 1rem;
+                font-size: 1rem;
+                -webkit-tap-highlight-color: rgba(110,231,183,0.3);
+                touch-action: manipulation; /* Prevent double-tap zoom */
+            }
+            .question-card {
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+            /* Prevent text selection on mobile */
+            .exam-questions {
+                -webkit-user-select: none;
+                user-select: none;
+            }
+            /* Fix submit button on mobile */
+            .submit-btn, .btn {
+                min-height: 48px;
+                font-size: 1rem;
+                padding: 1rem 2rem;
+                -webkit-tap-highlight-color: rgba(110,231,183,0.3);
+                touch-action: manipulation; /* Prevent double-tap zoom */
+            }
+            /* Prevent zoom on input focus (iOS) */
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+            /* Better touch handling */
+            button, .answer-option, .btn {
+                touch-action: manipulation;
+                -webkit-user-select: none;
+                user-select: none;
+                cursor: pointer;
+            }
+            /* Active state for touch feedback */
+            .answer-option:active {
+                background: rgba(110,231,183,0.2) !important;
+                transform: scale(0.98);
+            }
+            /* Ensure exam questions container is properly scrollable */
+            .exam-questions {
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+            }
+        }
+        
+        /* Small mobile devices */
+        @media (max-width: 480px) {
+            .exam-questions {
+                padding: 0.75rem;
+            }
+            .question-card {
+                padding: 0.75rem;
+                margin-bottom: 0.75rem;
+            }
+            .answer-option {
+                padding: 0.875rem;
+                min-height: 44px;
+            }
+            .timer {
+                font-size: 1rem;
+                padding: 0.6rem;
+            }
+            .detection-area {
+                max-height: 28vh;
+            }
+            .exam-questions {
+                height: calc(100vh - 28vh - 44px);
+                height: calc(-webkit-fill-available - 28vh);
+            }
+        }
+        
+        /* Fix iOS Safari viewport height issues */
+        @supports (-webkit-touch-callout: none) {
+            .exam-container {
+                min-height: -webkit-fill-available;
+                height: -webkit-fill-available;
+            }
+            html, body {
+                height: -webkit-fill-available;
+            }
+        }
+        
+        /* Android Chrome viewport fixes */
+        @media screen and (-webkit-min-device-pixel-ratio: 1) {
+            .exam-container {
+                min-height: 100vh;
+                min-height: 100dvh; /* Dynamic viewport height */
+            }
         }
 
         @media (max-width:520px){
@@ -679,11 +787,40 @@
 
         // Handle answer selection
         function selectAnswer(questionIdx, answerIdx, element) {
+            examState.answers[questionIdx] = answerIdx;
             const questionCard = element.closest('.question-card');
             questionCard.querySelectorAll('.answer-option').forEach(opt => {
                 opt.classList.remove('selected');
             });
             element.classList.add('selected');
+            
+            // Touch feedback for mobile
+            if (window.TouchEvent || 'ontouchstart' in window) {
+                element.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    element.style.transform = '';
+                }, 150);
+            }
+        }
+        
+        // Add touch event support for better mobile interaction
+        if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+            document.addEventListener('DOMContentLoaded', function() {
+                // Improve touch feedback for answer options
+                document.addEventListener('touchstart', function(e) {
+                    const answerOption = e.target.closest('.answer-option');
+                    if (answerOption) {
+                        answerOption.style.opacity = '0.7';
+                    }
+                }, { passive: true });
+                
+                document.addEventListener('touchend', function(e) {
+                    const answerOption = e.target.closest('.answer-option');
+                    if (answerOption) {
+                        answerOption.style.opacity = '';
+                    }
+                }, { passive: true });
+            });
         }
 
         // Submit exam
