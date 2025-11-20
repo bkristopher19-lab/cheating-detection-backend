@@ -598,15 +598,23 @@
                     fetch('/select?collection=exam_results').then(r => r.json())
                 ]);
 
-                // Filter classes assigned to this proctor
+                // Check if proctor has classes assigned
                 const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
                 const proctorClassIds = proctorClasses.map(c => c.id);
 
-                // Filter exams to those in proctor's classes
-                const proctorExams = (exams || []).filter(e => proctorClassIds.includes(e.class_id));
+                // If proctor has classes, filter by classes; otherwise show all exams
+                let proctorExams, proctorExamIds;
+                if (proctorClassIds.length > 0) {
+                    // Filter exams to those in proctor's classes
+                    proctorExams = (exams || []).filter(e => proctorClassIds.includes(e.class_id));
+                    proctorExamIds = proctorExams.map(e => e.id);
+                } else {
+                    // If no classes assigned, show all exams (admin/proctor can see all)
+                    proctorExams = exams || [];
+                    proctorExamIds = proctorExams.map(e => e.id);
+                }
 
                 // Filter sessions to those for proctor's exams
-                const proctorExamIds = proctorExams.map(e => e.id);
                 const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
 
                 // Filter exam results to those for proctor's exams
@@ -783,29 +791,51 @@
                 const tbody = document.getElementById('studentScoresTable');
                 tbody.innerHTML = '';
 
+                // If no exam results, show message
+                if (!examResults || examResults.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found. Students will appear here after they complete exams.</td></tr>';
+                    return;
+                }
+
                 // Group results by student
                 const studentResults = {};
 
-                (examResults || []).forEach(result => {
-                    if (!studentResults[result.user_id]) {
-                        studentResults[result.user_id] = [];
+                examResults.forEach(result => {
+                    // Handle both user_id and student_id fields
+                    const userId = result.user_id || result.student_id;
+                    if (userId) {
+                        if (!studentResults[userId]) {
+                            studentResults[userId] = [];
+                        }
+                        studentResults[userId].push(result);
                     }
-                    studentResults[result.user_id].push(result);
                 });
 
                 // Display results for each student
                 Object.entries(studentResults).forEach(([userId, results]) => {
                     const student = users.find(u => u.id === userId);
+                    
+                    // Skip if student not found (might be deleted user)
+                    if (!student) {
+                        console.warn('Student not found for userId:', userId);
+                        return;
+                    }
 
                     results.forEach(result => {
                         const exam = exams.find(e => e.id === result.exam_id);
 
+                        // Skip if exam not found
+                        if (!exam) {
+                            console.warn('Exam not found for exam_id:', result.exam_id);
+                            return;
+                        }
+
                         // Calculate score
                         let scoreDisplay = 'N/A';
-                        if (exam && exam.questions && result.answers) {
+                        if (exam.questions && result.answers) {
                             let correctAnswers = 0;
                             exam.questions.forEach((question, index) => {
-                                if (result.answers[index] === question.correctAnswer) {
+                                if (result.answers && result.answers[index] === question.correctAnswer) {
                                     correctAnswers++;
                                 }
                             });
@@ -813,7 +843,11 @@
                         }
 
                         // Get proctoring flags for this session
-                        const session = sessions.find(s => s.user_id === userId && s.exam_id === result.exam_id);
+                        // Check both user_id and student_id for compatibility
+                        const session = sessions.find(s => 
+                            (s.user_id === userId || s.student_id === userId) && 
+                            s.exam_id === result.exam_id
+                        );
                         let flagsDisplay = 'None';
 
                         if (session && session.flags) {
@@ -835,16 +869,29 @@
 
                         const row = `
                             <tr>
-                                <td>${student?.name || 'Unknown'}</td>
-                                <td>${exam?.title || 'Unknown'} (${exam?.subject || ''})</td>
-                                <td>${scoreDisplay}</td>
+                                <td><strong>${student.name || 'Unknown'}</strong><br><small class="text-muted">${student.email || ''}</small></td>
+                                <td>${exam.title || 'Unknown'}<br><small class="text-muted">${exam.subject || ''}</small></td>
+                                <td><strong>${scoreDisplay}</strong></td>
                                 <td>${result.timestamp ? new Date(result.timestamp).toLocaleDateString() : 'N/A'}</td>
-                                <td>${flagsDisplay}</td>
+                                <td><span class="badge ${flagsDisplay !== 'None' ? 'bg-warning' : 'bg-success'}">${flagsDisplay}</span></td>
                             </tr>
                         `;
                         tbody.innerHTML += row;
                     });
                 });
+                
+                // Sort by date taken (most recent first)
+                if (tbody.children.length > 1) {
+                    const rows = Array.from(tbody.children);
+                    rows.sort((a, b) => {
+                        const dateA = new Date(a.cells[3].textContent);
+                        const dateB = new Date(b.cells[3].textContent);
+                        return dateB - dateA; // Most recent first
+                    });
+                    // Clear and re-append sorted rows
+                    tbody.innerHTML = '';
+                    rows.forEach(row => tbody.appendChild(row));
+                }
 
                 if (tbody.innerHTML === '') {
                     tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
@@ -968,5 +1015,3 @@
 </body>
 
 </html>
- 
- 
