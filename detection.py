@@ -78,13 +78,83 @@ def extract_keypoints(results):
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Required for session management
+# -----------------------------------------------
+# FRONTEND ALERT → FIRESTORE (proctoring_sessions)
+# -----------------------------------------------
+
+# Map frontend types → Firestore flag keys used in your alertsSession.flags
+FRONTEND_TYPE_MAP = {
+    "keyboardShortcut": "keyboard_shortcut",
+    "tabSwitch": "tab_switch",
+    "rightClick": "right_click",
+    "fullscreenExit": "fullscreen_exit",
+    "captions": "captions",
+}
+
+@app.route('/frontend_alert', methods=['POST'])
+def frontend_alert():
+    """
+    Receive cheating / behavior alerts from the frontend (take_exams.html)
+    and append them into the proctoring_sessions.flags in Firestore.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        alert_type = data.get("type")
+        user_id = data.get("user_id")
+        session_id = data.get("session_id")
+
+        if not alert_type or not session_id:
+            return jsonify({"error": "Missing type or session_id"}), 400
+
+        # Convert frontend type → flags key
+        flag_key = FRONTEND_TYPE_MAP.get(alert_type)
+        if not flag_key:
+            # Unknown type, you can ignore or still log under "other"
+            return jsonify({"error": f"Unknown alert type: {alert_type}"}), 400
+
+        # Build the flag entry
+        flag_entry = {
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "type": alert_type,
+            "user_id": user_id,
+            "source": "frontend",
+        }
+
+        # If you pass extra fields (like details) from JS, keep them
+        for k, v in data.items():
+            if k not in ("type", "user_id", "session_id"):
+                flag_entry[k] = v
+
+        # Firestore client
+        db = firestore.client()
+        session_ref = db.collection("proctoring_sessions").document(session_id)
+
+        # Make sure the session doc exists
+        if not session_ref.get().exists:
+            # Optional: create a basic session doc if not found
+            session_ref.set({
+                "user_id": user_id,
+                "start_time": datetime.utcnow().isoformat() + "Z",
+                "status": "active",
+                "flags": {}
+            }, merge=True)
+
+        # Append this flag into flags.<flag_key> using ArrayUnion
+        session_ref.update({
+            f"flags.{flag_key}": firestore.ArrayUnion([flag_entry])
+        })
+
+        return jsonify({"status": "ok", "stored_as": flag_key}), 200
+
+    except Exception as e:
+        print("Error in /frontend_alert:", e)
+        return jsonify({"error": str(e)}), 500
 
 # Initialize Firebase (using Render secret file path)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
+    cred = credentials.Certificate("firebase_admin_key.json")
     firebase_admin.initialize_app(cred)
-
-db = firestore.client()
+    db = firestore.client()
 
 
 def count_faces_bounding_boxes(image, min_confidence=0.4):
@@ -1072,5 +1142,14 @@ atexit.register(lambda: scheduler.shutdown())
 
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    # Check if SSL certificates exist
+    ssl_cert = 'cert.pem'
+    ssl_key = 'key.pem'
+
+    if os.path.exists(ssl_cert) and os.path.exists(ssl_key):
+        print("SSL certificates found. Starting HTTPS server...")
+        app.run(debug=True, host='0.0.0.0', port=5000, ssl_context=(ssl_cert, ssl_key))
+    else:
+        print("SSL certificates not found. Starting HTTP server...")
+        print("Note: Camera access requires HTTPS. Generate SSL certificates for production use.")
+        app.run(debug=True, host='0.0.0.0', port=5000)

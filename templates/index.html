@@ -54,6 +54,7 @@
 .detection-area.collapsed .controls,
 .detection-area.collapsed #processed,
 .detection-area.collapsed #captions,
+.detection-area.collapsed #studentAlertDistribution,
 .detection-area.collapsed .proctor-header {
   display: none !important;
 }
@@ -214,6 +215,14 @@
         .mic-meter{flex:1;height:10px;background:rgba(255,255,255,0.04);border-radius:8px;overflow:hidden}
         .mic-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#4dd0e1)}
         .mic-status{font-size:0.86rem;color:var(--muted);min-width:120px;text-align:right}
+
+        /* Student Alert Distribution Panel */
+        .student-alert-distribution {
+            transition: all 0.3s ease;
+        }
+        .student-alert-distribution .badge {
+            transition: transform 0.2s ease;
+        }
 
 
 
@@ -407,56 +416,102 @@
 
     <div class="exam-container" id="examContainer" style="display: none;">
         <!-- Left side: Proctoring -->
-        <div class="detection-area" id="detectionArea">
+    <div class="detection-area" id="detectionArea">
 
 
-            <div class="proctor-header">
-                <button class="back-btn" onclick="window.history.back()" title="Go Back">
-                    <i class="bx bx-arrow-back"></i>
-                </button>
-                <div class="logo">
+        <div class="proctor-header">
+            <button class="back-btn" onclick="window.history.back()" title="Go Back">
+                <i class="bx bx-arrow-back"></i>
+            </button>
+            <div class="logo">
                     <img src="static/images/logo.jpg.jpg" alt="Logo" style="width:32px;height:32px;border-radius:8px;object-fit:cover">
-                </div>
-                <div class="title">Proctoring Active</div>
             </div>
+            <div class="title">Proctoring Active</div>
+        </div>
 
-            <div class="viewer">
-                <!-- Alerts area -->
-                <div id="alerts" aria-live="polite">
+        <div class="viewer">
+            <!-- Alerts area -->
+            <div id="alerts" aria-live="polite">
                 <div id="alert-noface" class="alert danger">No face detected!</div>
                 <div id="alert-multiplefaces" class="alert warn">Multiple faces detected!</div>
                 <div id="alert-phone" class="alert warn">Phone detected!</div>
                 <div id="alert-loudsound" class="alert danger">Loud sound detected!</div>
 
                 <div id="alert-mvoices" class="alert danger">Multiple voices detected!</div>
-                </div>
-
-                <div class="media">
-                    <video id="video" autoplay playsinline></video>
-                </div>
-
-                <div class="controls">
-                    <div id="label">Waiting for frames...</div>
-                    <div class="prob">
-                        <div class="bar"><i id="barFill"></i></div>
-                        <div id="probText" class="small">—</div>
-                    </div>
-                </div>
-
-                <img id="processed" src="" alt="Processed preview" />
-
-                <div class="mic-ui" aria-live="polite">
-                    <div class="mic-row">
-                        <div class="mic-label">Microphone</div>
-                        <div class="mic-meter"><div id="micFill" class="mic-fill"></div></div>
-                        <div id="micStatus" class="mic-status">Initializing…</div>
-                    </div>
-                </div>
-
-                <!-- Captions area -->
-                <div id="captions" class="captions" aria-live="polite" style="display:none; margin-top:10px; padding:8px; background:rgba(0,0,0,0.5); border-radius:8px; font-size:0.9rem; color:#e6eef8;"></div>
             </div>
+
+            <div class="media">
+                <video id="video" autoplay playsinline></video>
+            </div>
+
+            <div class="controls">
+                <div id="label">Waiting for frames...</div>
+                <div class="prob">
+                    <div class="bar"><i id="barFill"></i></div>
+                    <div id="probText" class="small">—</div>
+                </div>
+            </div>
+
+            <img id="processed" src="" alt="Processed preview" />
+
+            <div class="mic-ui" aria-live="polite">
+                <div class="mic-row">
+                    <div class="mic-label">Microphone</div>
+                    <div class="mic-meter"><div id="micFill" class="mic-fill"></div></div>
+                    <div id="micStatus" class="mic-status">Initializing…</div>
+                </div>
+            </div>
+
+            <!-- Captions area -->
+                <div id="captions" class="captions" aria-live="polite" style="display:block; margin-top:10px; padding:8px; background:rgba(0,0,0,0.5); border-radius:8px; font-size:0.9rem; color:#e6eef8; min-height:30px;">Listening...</div>
+
+                <!-- Alert Distribution Panel for Students -->
+                <div id="studentAlertDistribution" class="student-alert-distribution" style="margin-top:15px; padding:12px; background:rgba(255,255,255,0.05); border-radius:10px; border:1px solid rgba(255,255,255,0.1);">
+                    <div style="font-weight:600; font-size:0.95rem; margin-bottom:10px; color:#e6eef8; display:flex; align-items:center; gap:8px;">
+                        <span>⚠️</span>
+                        <span>Your Violations</span>
+            </div>
+                    <div class="alert-dist-list" style="display:flex; flex-direction:column; gap:6px; font-size:0.85rem;">
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffd59a;">Multiple Faces</span>
+                            <span class="badge" id="student-alert-twofaces" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
         </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffb3b3;">Loud Sound</span>
+                            <span class="badge" id="student-alert-loud-sound" style="background:rgba(255,80,80,0.2); color:#ffb3b3; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffd59a;">Phone Detected</span>
+                            <span class="badge" id="student-alert-phone" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffb3b3;">Fullscreen Exit</span>
+                            <span class="badge" id="student-alert-fullscreen-exit" style="background:rgba(255,80,80,0.2); color:#ffb3b3; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffd59a;">Keyboard Shortcut</span>
+                            <span class="badge" id="student-alert-keyboard-shortcut" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffd59a;">Right Click</span>
+                            <span class="badge" id="student-alert-right-click" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffd59a;">Tab Switch</span>
+                            <span class="badge" id="student-alert-tab-switch" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffd59a;">Speech Detected</span>
+                            <span class="badge" id="student-alert-captions" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                        <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
+                            <span style="color:#ffb3b3;">Face Absent</span>
+                            <span class="badge" id="student-alert-face-absent" style="background:rgba(255,80,80,0.2); color:#ffb3b3; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                    </div>
+                    </div>
+                    </div>
+                </div>
+</div>
 
         <!-- Right side: Exam Questions -->
         <div class="exam-questions">
@@ -467,11 +522,11 @@
 
             <div id="questionsContainer">
                 <!-- Questions will be loaded here -->
-            </div>
+                </div>
 
             <button class="btn btn-primary mt-4" onclick="submitExam()">Submit Exam</button>
-        </div>
     </div>
+</div>
 
     <canvas id="canvas" width="640" height="360" style="display:none;"></canvas>
 
@@ -487,12 +542,36 @@
 
     <!-- Add new script for exam functionality -->
     <script>
+        // Function to show exam alerts to students
+        function showExamAlert(message) {
+            // Create or get alert element
+            let alertBox = document.getElementById('examInlineAlert');
+            if (!alertBox) {
+                alertBox = document.createElement('div');
+                alertBox.id = 'examInlineAlert';
+                alertBox.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(255,193,7,0.95); color:#000; padding:12px 20px; border-radius:8px; font-weight:600; z-index:10000; box-shadow:0 4px 12px rgba(0,0,0,0.3); max-width:500px; text-align:center;';
+                document.body.appendChild(alertBox);
+            }
+
+        alertBox.textContent = message;
+            alertBox.style.display = 'block';
+
+            // Auto-hide after 3 seconds
+        setTimeout(() => {
+                if (alertBox) {
+                    alertBox.style.display = 'none';
+                }
+        }, 3000);
+    }
+
         // Exam state
         let examState = {
             examId: null,
             userId: null,
             answers: [],
-            submitted: false
+            submitted: false,
+            questions: [], // Store exam questions for speech detection
+            allAnswers: [] // Store all possible answers for speech detection
         };
 
         // Update alertsSession structure to include captions and clip recording
@@ -540,6 +619,16 @@
 
                 document.getElementById('examTitle').textContent = examData.title;
                 document.getElementById('examSubject').textContent = `Subject: ${examData.subject}`;
+                
+                // Store exam questions and answers for speech detection
+                examState.questions = examData.questions.map(q => q.text.toLowerCase());
+                examState.allAnswers = [];
+                examData.questions.forEach(q => {
+                    examState.allAnswers.push(q.correctAnswer.toLowerCase());
+                    q.wrongAnswers.forEach(ans => {
+                        examState.allAnswers.push(ans.toLowerCase());
+                    });
+                });
                 
                 const container = document.getElementById('questionsContainer');
                 examData.questions.forEach((q, idx) => {
@@ -624,14 +713,16 @@
                     try { await alertsSession.videoUploadPromise; } catch(e) { console.warn('video upload failed', e); }
                 }
 
-                // Update user's exam history using backend endpoint (union exams_taken)
+                // Update user's exam history - mark exam as completed
                 const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
                 const userData = await userResponse.json();
                 const currentExams = userData.exams_taken || [];
                 if (!currentExams.includes(examState.examId)) {
                     currentExams.push(examState.examId);
                 }
-                await fetch(`/edit/${examState.userId}?collection=users`, {
+                
+                // Update user document to mark exam as completed
+                const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -640,6 +731,12 @@
                         exams_taken: currentExams
                     })
                 });
+                
+                if (!updateResponse.ok) {
+                    console.error('Failed to update user exams_taken');
+                } else {
+                    console.log('Exam marked as completed in user profile');
+                }
 
                 // Save exam results using backend endpoint
                 await fetch('/add?collection=exam_results', {
@@ -688,7 +785,9 @@
                     }
                 }
 
-                alert('Exam submitted successfully');
+                alert('Exam submitted successfully! You will be redirected to your dashboard.');
+                // Clear any cached data and redirect
+                sessionStorage.removeItem('examData');
                 window.location.href = '/student_dashboard';
 
             } catch (err) {
@@ -699,6 +798,12 @@
 
         // Modified initAlertsSession function
         async function initAlertsSession() {
+            // Verify authentication before creating session
+            if (!examState.userId || !sessionStorage.getItem('userId')) {
+                console.error('Cannot create proctoring session: User not authenticated');
+                return;
+            }
+
             try {
                 const response = await fetch('/add?collection=proctoring_sessions', {
                     method: 'POST',
@@ -723,6 +828,11 @@
                         }
                     })
                 });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to create proctoring session');
+                }
+                
                 const data = await response.json();
                 alertsSession.sessionId = data.id;
                 alertsSession.userId = examState.userId;
@@ -816,6 +926,20 @@
 
             // Tab switch detection
             document.addEventListener('visibilitychange', handleVisibilityChange);
+            
+            // Window blur/focus detection (catches Alt+Tab, clicking outside window, etc.)
+            let windowBlurTime = null;
+            window.addEventListener('blur', () => {
+                windowBlurTime = Date.now();
+                logAlert('tab_switch', 'Window lost focus (Alt+Tab or clicked outside)');
+            });
+            
+            window.addEventListener('focus', () => {
+                if (windowBlurTime && Date.now() - windowBlurTime > 500) {
+                    logAlert('tab_switch', 'Window regained focus after being inactive');
+                }
+                windowBlurTime = null;
+            });
 
             // Copy-paste prevention
             disableCopyPaste();
@@ -843,9 +967,23 @@
             }
         }
 
+        let tabSwitchCount = 0;
+        let lastTabSwitchTime = 0;
+
         function handleVisibilityChange() {
             if (document.hidden) {
-                logAlert('tab_switch', 'User switched tabs or minimized window');
+                const now = Date.now();
+                // Prevent rapid-fire detection (debounce)
+                if (now - lastTabSwitchTime > 500) {
+                tabSwitchCount++;
+                    lastTabSwitchTime = now;
+                    logAlert('tab_switch', `User switched tabs or minimized window (count: ${tabSwitchCount})`);
+                    
+                    // Show warning after multiple tab switches
+                    if (tabSwitchCount >= 3) {
+                        showExamAlert(`⚠️ Warning: You have switched tabs ${tabSwitchCount} times. Continued tab switching may result in exam termination.`);
+                    }
+                }
             }
         }
 
@@ -854,6 +992,29 @@
             document.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 logAlert('right_click', 'Right-click attempted');
+                showExamAlert('⚠️ Right-click is disabled during the exam.');
+                return false;
+            }, true);
+
+            // Also prevent right-click on specific elements
+            document.addEventListener('mousedown', (e) => {
+                if (e.button === 2) { // Right mouse button
+                    e.preventDefault();
+                    logAlert('right_click', 'Right-click attempted (mousedown)');
+                    return false;
+                }
+            }, true);
+
+            // Disable text selection on entire page during exam
+            document.addEventListener('selectstart', (e) => {
+                e.preventDefault();
+                return false;
+            });
+
+            // Disable drag
+            document.addEventListener('dragstart', (e) => {
+                e.preventDefault();
+                return false;
             });
 
             // Disable text selection on questions
@@ -865,17 +1026,229 @@
                 questionContainer.style.msUserSelect = 'none';
             }
 
-            // Prevent keyboard shortcuts
+            // Prevent keyboard shortcuts - comprehensive list
             document.addEventListener('keydown', (e) => {
-                // Prevent Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A (select all)
-                if (e.ctrlKey && (e.key === 'c' || e.key === 'v' || e.key === 'x' || e.key === 'a')) {
-                    e.preventDefault();
-                    logAlert('keyboard_shortcut', `Keyboard shortcut attempted: Ctrl+${e.key.toUpperCase()}`);
+                let shortcutDetected = false;
+                let shortcutName = '';
+
+                // Ctrl/Cmd combinations
+                if (e.ctrlKey || e.metaKey) {
+                    const key = e.key.toLowerCase();
+                    
+                    // Copy, Paste, Cut, Select All
+                    if (key === 'c' || key === 'v' || key === 'x' || key === 'a') {
+                        shortcutDetected = true;
+                        shortcutName = `Ctrl+${key.toUpperCase()}`;
+                    }
+                    // Save (Ctrl+S)
+                    else if (key === 's') {
+                        shortcutDetected = true;
+                        shortcutName = 'Ctrl+S';
+                    }
+                    // Print (Ctrl+P)
+                    else if (key === 'p') {
+                        shortcutDetected = true;
+                        shortcutName = 'Ctrl+P';
+                    }
+                    // Find (Ctrl+F)
+                    else if (key === 'f') {
+                        shortcutDetected = true;
+                        shortcutName = 'Ctrl+F';
+                    }
+                    // View Source (Ctrl+U)
+                    else if (key === 'u') {
+                        shortcutDetected = true;
+                        shortcutName = 'Ctrl+U';
+                    }
+                    // Reload (Ctrl+R, Ctrl+Shift+R)
+                    else if (key === 'r') {
+                        shortcutDetected = true;
+                        shortcutName = e.shiftKey ? 'Ctrl+Shift+R' : 'Ctrl+R';
+                    }
+                    // New Tab (Ctrl+T)
+                    else if (key === 't') {
+                        shortcutDetected = true;
+                        shortcutName = 'Ctrl+T';
+                    }
+                    // Close Tab (Ctrl+W)
+                    else if (key === 'w') {
+                        shortcutDetected = true;
+                        shortcutName = 'Ctrl+W';
+                    }
+                    // Developer Tools (Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C)
+                    else if (e.shiftKey && (key === 'i' || key === 'j' || key === 'c')) {
+                        shortcutDetected = true;
+                        shortcutName = `Ctrl+Shift+${key.toUpperCase()}`;
+                    }
+                }
+                
+                // Function keys
+                else if (e.key.startsWith('F')) {
+                    // Block F12 (Developer Tools), F5 (Refresh), etc.
+                    if (['F12', 'F5', 'F11'].includes(e.key)) {
+                        shortcutDetected = true;
+                        shortcutName = e.key;
+                    }
+                }
+                
+                // Print Screen
+                else if (e.key === 'PrintScreen' || (e.keyCode === 44)) {
+                    shortcutDetected = true;
+                    shortcutName = 'Print Screen';
+                }
+                
+                // Escape key (prevent closing dialogs or exiting)
+                else if (e.key === 'Escape') {
+                    // Allow escape only for closing modals, but log it
+                    if (!document.getElementById('permissionModal') || 
+                        document.getElementById('permissionModal').style.display === 'none') {
+                        shortcutDetected = true;
+                        shortcutName = 'Escape';
+                    }
                 }
 
-            });
+                if (shortcutDetected) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', `Keyboard shortcut attempted: ${shortcutName}`);
+                    showExamAlert(`⚠️ Keyboard shortcut blocked: ${shortcutName}`);
+                    return false;
+                }
+            }, true);
 
+            // Prevent Ctrl+Shift+Delete (Clear browsing data)
+            document.addEventListener('keyup', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Delete') {
+                    e.preventDefault();
+                    logAlert('keyboard_shortcut', 'Keyboard shortcut attempted: Ctrl+Shift+Delete');
+                    showExamAlert('⚠️ Keyboard shortcut blocked: Ctrl+Shift+Delete');
+                    return false;
+                }
+            }, true);
+        }
 
+        // Check if speech contains exam questions or answers
+        // Track last detection to prevent spam
+        let lastExamContentDetection = 0;
+        const EXAM_CONTENT_COOLDOWN = 3000; // 3 seconds between detections
+
+        function checkForExamContent(transcript) {
+            if (!examState.questions || examState.questions.length === 0) return;
+            
+            const transcriptLower = transcript.toLowerCase().trim();
+            if (transcriptLower.length < 3) return; // Skip very short transcripts
+            
+            let examContentDetected = false;
+            let detectedType = '';
+            let detectedContent = '';
+            
+            // Check for exam questions - improved matching
+            for (let i = 0; i < examState.questions.length; i++) {
+                const question = examState.questions[i].toLowerCase();
+                // Extract meaningful words (longer than 3 characters)
+                const questionWords = question.split(' ').filter(w => w.length > 3);
+                
+                // Check if at least 3 key words from question appear in transcript
+                const matchingWords = questionWords.filter(word => transcriptLower.includes(word));
+                if (matchingWords.length >= 3) {
+                    examContentDetected = true;
+                    detectedType = 'question';
+                    detectedContent = `Question ${i + 1}: "${question.substring(0, 60)}..."`;
+                    break;
+                }
+            }
+            
+            // Check for exam answers - improved matching
+            if (!examContentDetected) {
+                for (let answer of examState.allAnswers) {
+                    const answerLower = answer.toLowerCase().trim();
+                    const answerWords = answerLower.split(' ');
+                    
+                    if (answerWords.length >= 3) {
+                        // For longer answers, check if at least 2-3 key words match
+                        const keyWords = answerWords.filter(w => w.length > 3).slice(0, 4);
+                        if (keyWords.length >= 2) {
+                            const matchingWords = keyWords.filter(word => transcriptLower.includes(word));
+                            if (matchingWords.length >= 2) {
+                                examContentDetected = true;
+                                detectedType = 'answer';
+                                detectedContent = `Answer: "${answer.substring(0, 50)}..."`;
+                                break;
+                            }
+                        }
+                    } else if (answerWords.length > 0) {
+                        // For short answers, check if the full answer or significant part appears
+                        if (transcriptLower.includes(answerLower) || 
+                            (answerLower.length > 5 && transcriptLower.includes(answerLower.substring(0, Math.floor(answerLower.length * 0.7))))) {
+                            examContentDetected = true;
+                            detectedType = 'answer';
+                            detectedContent = `Answer: "${answer}"`;
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // If exam content detected, log as cheating alert (with cooldown)
+            if (examContentDetected) {
+                const now = Date.now();
+                if (now - lastExamContentDetection > EXAM_CONTENT_COOLDOWN) {
+                    lastExamContentDetection = now;
+                    
+                    const alertMessage = `🚨 CHEATING DETECTED: Student is reading ${detectedType} from exam! (${detectedContent})`;
+                    logAlert('captions', alertMessage);
+                    showExamAlert(alertMessage);
+                    
+                    // Highlight captions in red to show it's a violation
+                    const captionsElement = document.getElementById('captions');
+                    if (captionsElement) {
+                        captionsElement.style.background = 'rgba(255,80,80,0.4)';
+                        captionsElement.style.border = '2px solid rgba(255,80,80,0.9)';
+                        captionsElement.style.color = '#ffb3b3';
+                        captionsElement.style.fontWeight = 'bold';
+                        setTimeout(() => {
+                            if (captionsElement) {
+                                captionsElement.style.background = 'rgba(0,0,0,0.5)';
+                                captionsElement.style.border = 'none';
+                                captionsElement.style.color = '#e6eef8';
+                                captionsElement.style.fontWeight = 'normal';
+                            }
+                        }, 5000);
+                    }
+                    
+                    console.warn('EXAM CONTENT DETECTED IN SPEECH:', detectedType, detectedContent);
+                }
+            }
+        }
+
+        // Update student Alert Distribution panel
+        function updateStudentAlertDistribution(type) {
+            const idMap = {
+                twofaces:          'student-alert-twofaces',
+                loud_sound:        'student-alert-loud-sound',
+                phone:             'student-alert-phone',
+                fullscreen_exit:   'student-alert-fullscreen-exit',
+                keyboard_shortcut: 'student-alert-keyboard-shortcut',
+                right_click:       'student-alert-right-click',
+                tab_switch:        'student-alert-tab-switch',
+                captions:          'student-alert-captions',
+                face_absent:       'student-alert-face-absent'
+            };
+
+            const elId = idMap[type];
+            if (!elId) return;
+
+            const badge = document.getElementById(elId);
+            if (!badge) return;
+
+            const current = parseInt(badge.textContent || '0', 10);
+            badge.textContent = current + 1;
+            
+            // Add animation effect when count updates
+            badge.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                badge.style.transform = 'scale(1)';
+            }, 200);
         }
 
         // Modify logAlert function to update immediately and trigger clip recording
@@ -887,6 +1260,9 @@
                 timestamp: new Date().toISOString(),
                 message: message
             });
+
+            // Update student Alert Distribution panel
+            updateStudentAlertDistribution(type);
 
             // Start cheating clip recording if not already recorded
             if (!alertsSession.clipRecorded && (type === 'phone' || type === 'twofaces' || type === 'loud_sound' || type === 'face_absent')) {
@@ -974,7 +1350,7 @@
         // Captions elements
         const captionsEl = document.getElementById('captions');
 
-        // Alert elements
+       // Alert elements
         const alertNoFace = document.getElementById('alert-noface');
         const alertTwoFaces = document.getElementById('alert-multiplefaces');
         const alertPhone = document.getElementById('alert-phone');
@@ -1259,6 +1635,7 @@
 
         // ================= SPEECH RECOGNITION =================
         let recognition = null;
+        let captionsClearTimeout = null;
 
         async function startSpeechRecognition() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -1283,9 +1660,29 @@
 
                 recognition.onstart = () => {
                     console.log('Speech recognition started');
-                    captionsEl.style.display = 'block';
-                    captionsEl.textContent = 'Listening...';
-                    micStatus.innerText = 'Listening (speech recognition active)';
+                    // Show captions area with "Listening..." message
+                    const captionsElement = document.getElementById('captions');
+                    if (captionsElement) {
+                        captionsElement.style.display = 'block';
+                        captionsElement.textContent = 'Listening...';
+                        console.log('Captions element found and displayed');
+                        
+                        // Clear "Listening..." after 3 seconds if no speech detected
+                        if (captionsClearTimeout) {
+                            clearTimeout(captionsClearTimeout);
+                        }
+                        captionsClearTimeout = setTimeout(() => {
+                            if (captionsElement && captionsElement.textContent === 'Listening...') {
+                                captionsElement.textContent = '';
+                                captionsElement.style.display = 'none';
+                            }
+                        }, 3000);
+                    } else {
+                        console.error('Captions element not found!');
+                    }
+                    if (micStatus) {
+                        micStatus.innerText = 'Listening...';
+                    }
                 };
 
                 recognition.onresult = (event) => {
@@ -1295,78 +1692,157 @@
                     for (let i = event.resultIndex; i < event.results.length; i++) {
                         const transcript = event.results[i][0].transcript;
                         if (event.results[i].isFinal) {
-                            finalTranscript += transcript;
+                            finalTranscript += transcript + ' ';
                         } else {
-                            interimTranscript += transcript;
+                            interimTranscript += transcript + ' ';
                         }
                     }
 
-                    // Display captions
-                    if (finalTranscript) {
-                        captionsEl.textContent = finalTranscript;
-                        // Log to alerts session
+                    // Get captions element fresh each time to ensure it exists
+                    const captionsElement = document.getElementById('captions');
+                    
+                    // Clear any existing timeout
+                    if (captionsClearTimeout) {
+                        clearTimeout(captionsClearTimeout);
+                        captionsClearTimeout = null;
+                    }
+                    
+                    // Display captions - show both final and interim results
+                    let displayText = '';
+                    if (finalTranscript.trim()) {
+                        displayText = finalTranscript.trim();
+                    }
+                    if (interimTranscript.trim()) {
+                        displayText = (displayText ? displayText + ' ' : '') + interimTranscript.trim() + '...';
+                    }
+
+                    // Update captions if there's any text (interim or final)
+                    if (captionsElement) {
+                        if (displayText) {
+                            captionsElement.style.display = 'block';
+                            captionsElement.textContent = displayText;
+                            console.log('Speech detected:', displayText);
+                            
+                            // Set timeout to clear captions after 5 seconds of no new speech
+                            captionsClearTimeout = setTimeout(() => {
+                                if (captionsElement) {
+                                    captionsElement.textContent = '';
+                                    captionsElement.style.display = 'none';
+                                }
+                            }, 5000);
+                        } else {
+                            // Keep showing "Listening..." if no speech yet
+                            captionsElement.style.display = 'block';
+                            captionsElement.textContent = 'Listening...';
+                        }
+                    } else {
+                        console.error('Captions element not found in onresult!');
+                    }
+
+                    // Check for exam content on both interim and final transcripts
+                    const fullTranscript = (finalTranscript + ' ' + interimTranscript).trim();
+                    if (fullTranscript) {
+                        // Check if speech contains exam questions or answers
+                        checkForExamContent(fullTranscript);
+                    }
+
+                    // Log final transcripts to alerts session
+                    if (finalTranscript.trim()) {
+                        if (alertsSession && alertsSession.flags) {
                         alertsSession.flags.captions.push({
                             timestamp: new Date().toISOString(),
-                            text: finalTranscript
+                                text: finalTranscript.trim()
                         });
-                    } else if (interimTranscript) {
-                        captionsEl.textContent = interimTranscript + '...';
+                        }
+                        // Update student alert distribution
+                        updateStudentAlertDistribution('captions');
                     }
                 };
 
                 recognition.onerror = (event) => {
                     console.warn('Speech recognition error:', event.error);
-                    let errorMessage = 'Speech recognition error: ' + event.error;
 
                     // Handle specific error types
                     switch(event.error) {
                         case 'aborted':
-                            errorMessage = 'Speech recognition aborted. Retrying...';
-                            // Longer delay for aborted errors to avoid rapid retry loops
-                            setTimeout(() => startSpeechRecognition(), 5000);
+                            // Silently retry - aborted is usually normal (user interaction, etc.)
+                            setTimeout(() => startSpeechRecognition(), 3000);
                             break;
                         case 'network':
-                            errorMessage = 'Network error. Check internet connection.';
+                            // Network error - show warning but don't spam
+                            if (micStatus) {
+                                micStatus.innerText = 'Network error. Retrying...';
+                            }
                             setTimeout(() => startSpeechRecognition(), 5000);
                             break;
                         case 'not-allowed':
-                            errorMessage = 'Microphone permission denied for speech recognition.';
-                            alert('Microphone permission is required for speech recognition. Please allow microphone access and refresh the page.');
+                            // Permission denied - show alert once
+                            if (micStatus) {
+                                micStatus.innerText = 'Microphone permission denied';
+                            }
+                            console.error('Microphone permission denied for speech recognition');
+                            // Don't retry if permission denied
                             break;
                         case 'no-speech':
-                            errorMessage = 'No speech detected. Retrying...';
-                            setTimeout(() => startSpeechRecognition(), 2000);
+                            // No speech detected is NORMAL - don't show error message
+                            // Just silently restart - this happens when user is quiet
+                            setTimeout(() => startSpeechRecognition(), 3000);
+                            // Keep captions showing "Listening..." when no speech
+                            if (captionsEl) {
+                                captionsEl.style.display = 'block';
+                                captionsEl.textContent = 'Listening...';
+                            }
                             break;
                         case 'audio-capture':
-                            errorMessage = 'Audio capture failed. Check microphone.';
+                            // Audio capture failed - show alert once
+                            if (micStatus) {
+                                micStatus.innerText = 'Audio capture failed';
+                            }
                             alert('Audio capture failed. Please check your microphone and refresh the page.');
+                            // Don't retry if audio capture failed
                             break;
                         default:
-                            errorMessage = 'Speech recognition error. Retrying...';
-                            setTimeout(() => startSpeechRecognition(), 2000);
+                            // Other errors - silently retry
+                            console.warn('Speech recognition error:', event.error, '- retrying...');
+                            setTimeout(() => startSpeechRecognition(), 3000);
                     }
 
-                    captionsEl.textContent = errorMessage;
-                    micStatus.innerText = errorMessage;
+                    // Only update captions for errors that should be shown to user
+                    if (event.error !== 'no-speech' && event.error !== 'aborted') {
+                        if (captionsEl && (event.error === 'network' || event.error === 'audio-capture')) {
+                            captionsEl.textContent = 'Error: ' + event.error;
+                        }
+                    }
                 };
 
                 recognition.onend = () => {
-                    console.log('Speech recognition ended');
-                    // Auto-restart speech recognition with longer delay
+                    console.log('Speech recognition ended - restarting silently');
+                    // Auto-restart speech recognition silently
+                    // This is normal behavior - recognition ends after a timeout and restarts
                     setTimeout(() => {
                         try {
                             startSpeechRecognition();
                         } catch (e) {
                             console.warn('Speech recognition restart failed:', e);
+                            if (micStatus) {
                             micStatus.innerText = 'Speech recognition stopped';
                         }
-                    }, 2000); // Increased delay to prevent rapid restarts
+                        }
+                    }, 2000);
                 };
 
                 recognition.start();
+                console.log('Speech recognition start() called');
             } catch (e) {
                 console.warn('Failed to start speech recognition:', e);
+                const captionsElement = document.getElementById('captions');
+                if (captionsElement) {
+                    captionsElement.textContent = 'Speech recognition failed to start';
+                    captionsElement.style.display = 'block';
+                }
+                if (micStatus) {
                 micStatus.innerText = 'Failed to start speech recognition';
+                }
                 alert('Failed to start speech recognition. Please refresh the page or use a different browser.');
             }
         }
@@ -1556,4 +2032,5 @@
 
     </script>
 </body>
+</html>
 </html>

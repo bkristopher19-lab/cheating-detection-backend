@@ -7,7 +7,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
- 
 </head>
 <body>
     <!-- Sidebar -->
@@ -17,7 +16,6 @@
     <div class="main-content" id="main-content">
         {% include 'navbar.html' %}
    
-
         <!-- Page Content -->
         <div class="container-fluid p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -27,22 +25,80 @@
                 </button>
             </div>
 
-            <!-- Exams Table -->
-            <div class="card">
-                <div class="card-body">
-                    <table id="examsTable" class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Exam Title</th>
-                                <th>Subject</th>
-                                <th>Duration</th>
-                                <th>Questions</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+            <!-- Layout row: table + alert distribution -->
+            <div class="row">
+                <div class="col-lg-8">
+                    <!-- Exams Table -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <table id="examsTable" class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Exam Title</th>
+                                        <th>Subject</th>
+                                        <th>Duration</th>
+                                        <th>Questions</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
+
+                <!-- ALERT DISTRIBUTION PANEL -->
+                <div class="col-lg-4">
+                    <div class="card mb-3">
+                        <div class="card-header fw-bold">
+                            Alert Distribution
+                        </div>
+                        <div class="list-group list-group-flush" id="alert-distribution">
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Twofaces</span>
+                                <span class="badge bg-primary" id="alert-twofaces">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Loud Sound</span>
+                                <span class="badge bg-primary" id="alert-loud-sound">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Phone</span>
+                                <span class="badge bg-primary" id="alert-phone">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Fullscreen Exit</span>
+                                <span class="badge bg-primary" id="alert-fullscreen-exit">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Keyboard Shortcut</span>
+                                <span class="badge bg-primary" id="alert-keyboard-shortcut">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Right Click</span>
+                                <span class="badge bg-primary" id="alert-right-click">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Tab Switch</span>
+                                <span class="badge bg-primary" id="alert-tab-switch">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Captions</span>
+                                <span class="badge bg-primary" id="alert-captions">0</span>
+                            </div>
+                            <div class="list-group-item d-flex justify-content-between align-items-center">
+                                <span>Face Absent</span>
+                                <span class="badge bg-primary" id="alert-face-absent">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Chart under the badges -->
+                        <div class="p-3">
+                            <canvas id="alertsChart" height="220"></canvas>
+                        </div>
+                    </div>
+                </div>
+                <!-- END ALERT DISTRIBUTION PANEL -->
             </div>
         </div>
     </div>
@@ -91,11 +147,14 @@
         </div>
     </div>
 
+    <!-- JS libs -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Custom logic -->
     <script>
         // Toggle Sidebar
         document.getElementById('menu-toggle').addEventListener('click', function(e) {
@@ -107,7 +166,7 @@
         // Initialize DataTable
         let examTable = $('#examsTable').DataTable();
 
-        // Question Template (same as before)
+        // Question Template
         function getQuestionTemplate(index) {
             return `
                 <div class="card mb-2 question-item">
@@ -140,7 +199,7 @@
             `;
         }
 
-        // Add / remove question handlers (unchanged)
+        // Add / remove question handlers
         $('#addQuestion').click(function() {
             const questionCount = $('.question-item').length;
             $('#questionsContainer').append(getQuestionTemplate(questionCount));
@@ -154,7 +213,6 @@
 
         // Load Exams (filtered for proctors)
         async function loadExams() {
-            // get current user from sessionStorage
             const userId = sessionStorage.getItem('userId');
             let currentUser = null;
             if (userId) {
@@ -169,7 +227,6 @@
             const response = await fetch('/select?collection=exams');
             let exams = await response.json() || [];
 
-            // if proctor, only show exams assigned to or created by this proctor
             const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
             if (role === 'proctor') {
                 exams = exams.filter(e => (e.proctor_id && e.proctor_id === userId) || (e.created_by && e.created_by === userId));
@@ -178,22 +235,35 @@
             examTable.clear();
             exams.forEach(exam => {
                 examTable.row.add([
-                    exam.title,
+                    `<span class="exam-title-link" data-exam-id="${exam.id}" style="cursor:pointer; text-decoration:underline;">
+                        ${exam.title}
+                      </span>`,
                     exam.subject,
                     `${exam.duration} mins`,
                     (exam.questions || []).length,
                     `<button onclick="editExam('${exam.id}')" class="btn btn-sm btn-warning me-1">
                         <i class='bx bx-edit'></i>
-                     </button>
-                     <button onclick="deleteExam('${exam.id}')" class="btn btn-sm btn-danger">
+                      </button>
+                      <button onclick="deleteExam('${exam.id}')" class="btn btn-sm btn-danger">
                         <i class='bx bx-trash'></i>
-                     </button>`
+                      </button>`
                 ]);
             });
             examTable.draw();
         }
 
-        // Save Exam (set created_by to current user when available)
+        // Which exam we're monitoring alerts for
+        let currentMonitoredExamId = null;
+
+        // Click on title to focus alert distribution on that exam
+        $('#examsTable tbody').on('click', 'span.exam-title-link', function () {
+            const examId = $(this).data('exam-id');
+            currentMonitoredExamId = examId;
+            console.log('Monitoring alerts for exam:', examId);
+            refreshAlertDistribution(); // refresh immediately
+        });
+
+        // Save Exam
         $('#saveExam').click(async function() {
             const userId = sessionStorage.getItem('userId') || null;
             const examData = {
@@ -203,7 +273,6 @@
                 questions: []
             };
 
-            // Collect questions
             $('.question-item').each(function() {
                 const question = {
                     text: $(this).find('.question-text').val(),
@@ -221,7 +290,10 @@
             if (userId) examData.created_by = userId;
 
             const examId = $('#examId').val();
-            const url = examId ? `/edit/${examId}?collection=exams` : '/add?collection=exams';
+            const url = examId
+                ? `/edit/${examId}?collection=exams`
+                : '/add?collection=exams';
+
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -234,7 +306,7 @@
             }
         });
 
-        // Edit Exam (unchanged)
+        // Edit Exam
         async function editExam(id) {
             const response = await fetch(`/select?collection=exams&id=${id}`);
             const exam = await response.json();
@@ -258,7 +330,7 @@
             $('#examModal').modal('show');
         }
 
-        // Delete Exam (unchanged)
+        // Delete Exam
         async function deleteExam(id) {
             if (!confirm('Are you sure you want to delete this exam?')) return;
 
@@ -278,10 +350,7 @@
             $('#questionsContainer').empty();
         });
 
-        // Load exams on page load
-        loadExams();
-
-        // Load user name (unchanged)
+        // Load user name
         async function loadUserName() {
             const userId = sessionStorage.getItem('userId');
             if (!userId) {
@@ -298,7 +367,7 @@
             }
         }
 
-        // Logout handler (unchanged)
+        // Logout handler
         document.getElementById('logoutBtn').addEventListener('click', async (e) => {
             e.preventDefault();
             try {
@@ -314,7 +383,135 @@
             }
         });
 
+        loadExams();
         loadUserName();
+
+        /* =======================
+           REAL-TIME ALERT DISTRIBUTION + CHART
+           ======================= */
+
+        let alertsChart = null;
+
+        function createOrUpdateAlertsChart(counts) {
+            const ctx = document.getElementById('alertsChart');
+            if (!ctx) return;
+
+            const labels = [
+                'Twofaces',
+                'Loud Sound',
+                'Phone',
+                'Fullscreen Exit',
+                'Keyboard Shortcut',
+                'Right Click',
+                'Tab Switch',
+                'Captions',
+                'Face Absent'
+            ];
+
+            const dataArray = [
+                counts.twofaces,
+                counts.loud_sound,
+                counts.phone,
+                counts.fullscreen_exit,
+                counts.keyboard_shortcut,
+                counts.right_click,
+                counts.tab_switch,
+                counts.captions,
+                counts.face_absent
+            ];
+
+            if (!alertsChart) {
+                alertsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Alert Count',
+                            data: dataArray
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { precision: 0 }
+                            }
+                        }
+                    }
+                });
+            } else {
+                alertsChart.data.datasets[0].data = dataArray;
+                alertsChart.update();
+            }
+        }
+
+        async function refreshAlertDistribution() {
+            try {
+                const res = await fetch('/select?collection=proctoring_sessions');
+                let sessions = await res.json() || [];
+
+                if (!Array.isArray(sessions) || sessions.length === 0) {
+                    return;
+                }
+
+                // If a specific exam is selected, filter sessions to that exam
+                if (currentMonitoredExamId) {
+                    sessions = sessions.filter(s => s.exam_id === currentMonitoredExamId);
+                }
+
+                // Prefer active session, else latest by start_time
+                let session = null;
+                const active = sessions.filter(s => s.status === 'active');
+                if (active.length > 0) {
+                    active.sort((a, b) => new Date(b.start_time || 0) - new Date(a.start_time || 0));
+                    session = active[0];
+                } else {
+                    sessions.sort((a, b) => new Date(b.start_time || 0) - new Date(a.start_time || 0));
+                    session = sessions[0];
+                }
+                if (!session) return;
+
+                const flags = session.flags || {};
+                const count = (name) => Array.isArray(flags[name]) ? flags[name].length : 0;
+
+                const counts = {
+                    twofaces: count('twofaces'),
+                    loud_sound: count('loud_sound'),
+                    phone: count('phone'),
+                    fullscreen_exit: count('fullscreen_exit'),
+                    keyboard_shortcut: count('keyboard_shortcut'),
+                    right_click: count('right_click'),
+                    tab_switch: count('tab_switch'),
+                    captions: count('captions'),
+                    face_absent: count('face_absent')
+                };
+
+                // Update badges
+                document.getElementById('alert-twofaces').innerText          = counts.twofaces;
+                document.getElementById('alert-loud-sound').innerText        = counts.loud_sound;
+                document.getElementById('alert-phone').innerText             = counts.phone;
+                document.getElementById('alert-fullscreen-exit').innerText   = counts.fullscreen_exit;
+                document.getElementById('alert-keyboard-shortcut').innerText = counts.keyboard_shortcut;
+                document.getElementById('alert-right-click').innerText       = counts.right_click;
+                document.getElementById('alert-tab-switch').innerText        = counts.tab_switch;
+                document.getElementById('alert-captions').innerText          = counts.captions;
+                document.getElementById('alert-face-absent').innerText       = counts.face_absent;
+
+                // Update chart
+                createOrUpdateAlertsChart(counts);
+
+            } catch (err) {
+                console.error('Failed to refresh alert distribution:', err);
+            }
+        }
+
+        // First load + auto-refresh every 5 seconds
+        refreshAlertDistribution();
+        setInterval(refreshAlertDistribution, 5000);
     </script>
 </body>
 </html>

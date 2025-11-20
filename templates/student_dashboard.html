@@ -359,6 +359,21 @@
         // Load exams when page loads
         loadExams();
         loadStudentScores();
+        
+        // Refresh exams when page becomes visible (user returns from exam)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Page is now visible, refresh exams to show updated completion status
+                loadExams();
+                loadStudentScores();
+            }
+        });
+        
+        // Also refresh on focus (when user switches back to tab)
+        window.addEventListener('focus', () => {
+            loadExams();
+            loadStudentScores();
+        });
     </script>
 </body>
 </html>
