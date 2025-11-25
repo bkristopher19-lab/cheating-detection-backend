@@ -703,6 +703,11 @@
             clipChunks: []
         };
 
+        // Alert counting for exam termination
+        let totalAlertCount = 0;
+        let lastAlertTime = 0;
+        const ALERT_COOLDOWN = 5000; // 5 seconds between counting alerts
+
         // Initialize exam with session data
         async function initExam() {
             // Get exam ID from URL
@@ -1234,10 +1239,16 @@
                     shortcutName = 'Print Screen';
                 }
                 
+                // Alt+Tab detection (system shortcut, can't be prevented but can be detected)
+                else if (e.altKey && e.key === 'Tab') {
+                    shortcutDetected = true;
+                    shortcutName = 'Alt+Tab';
+                }
+
                 // Escape key (prevent closing dialogs or exiting)
                 else if (e.key === 'Escape') {
                     // Allow escape only for closing modals, but log it
-                    if (!document.getElementById('permissionModal') || 
+                    if (!document.getElementById('permissionModal') ||
                         document.getElementById('permissionModal').style.display === 'none') {
                         shortcutDetected = true;
                         shortcutName = 'Escape';
@@ -1404,6 +1415,41 @@
             // Start cheating clip recording if not already recorded
             if (!alertsSession.clipRecorded && (type === 'phone' || type === 'twofaces' || type === 'loud_sound' || type === 'face_absent')) {
                 startCheatingClip();
+            }
+
+            // Alert counting and exam termination logic
+            const now = Date.now();
+            if (now - lastAlertTime > ALERT_COOLDOWN) {
+                totalAlertCount++;
+                lastAlertTime = now;
+
+                if (totalAlertCount === 1) {
+                    // 1st alert: warning
+                    showExamAlert('⚠️ WARNING: Suspicious activity detected! This is your first violation.');
+                } else if (totalAlertCount === 2) {
+                    // 2nd alert: pause exam for 5 seconds
+                    showExamAlert('🚨 SECOND VIOLATION: Exam paused for 5 seconds due to suspicious activity.');
+                    // Disable exam interaction
+                    const examContainer = document.getElementById('examContainer');
+                    if (examContainer) {
+                        examContainer.style.pointerEvents = 'none';
+                        examContainer.style.opacity = '0.5';
+                    }
+                    // Re-enable after 5 seconds
+                    setTimeout(() => {
+                        if (examContainer) {
+                            examContainer.style.pointerEvents = 'auto';
+                            examContainer.style.opacity = '1';
+                        }
+                        showExamAlert('Exam resumed. Please continue taking your exam.');
+                    }, 5000);
+                } else if (totalAlertCount >= 3) {
+                    // 3rd alert: automatic finish exam as incomplete
+                    showExamAlert('🚨 THIRD VIOLATION: Exam terminated due to multiple violations. Your exam will be marked as incomplete.');
+                    setTimeout(() => {
+                        submitExam();
+                    }, 2000);
+                }
             }
 
             // Update database immediately
