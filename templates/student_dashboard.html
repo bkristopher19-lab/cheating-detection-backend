@@ -180,14 +180,45 @@
             const exams = await response.json();
             const userResponse = await fetch('/select?collection=users&id=' + sessionStorage.getItem('userId'));
             const user = await userResponse.json();
-            
+
             const examsList = document.getElementById('examsList');
             examsList.innerHTML = '';
-            
+
+            const now = new Date();
+
             exams.forEach(exam => {
                 // Check if user has already taken this exam
                 const taken = user.exams_taken && user.exams_taken.includes(exam.id);
-                
+
+                // Check deadline
+                let deadlineStatus = 'available';
+                let deadlineText = '';
+                if (exam.start_date && exam.end_date) {
+                    const startDate = new Date(exam.start_date);
+                    const endDate = new Date(exam.end_date);
+
+                    if (now < startDate) {
+                        deadlineStatus = 'not-started';
+                        deadlineText = `Starts: ${startDate.toLocaleString()}`;
+                    } else if (now > endDate) {
+                        deadlineStatus = 'expired';
+                        deadlineText = `Ended: ${endDate.toLocaleString()}`;
+                    } else {
+                        deadlineText = `Ends: ${endDate.toLocaleString()}`;
+                    }
+                }
+
+                let buttonHtml = '';
+                if (taken) {
+                    buttonHtml = '<button class="btn btn-secondary" disabled>Completed</button>';
+                } else if (deadlineStatus === 'not-started') {
+                    buttonHtml = '<button class="btn btn-warning" disabled>Not Started</button>';
+                } else if (deadlineStatus === 'expired') {
+                    buttonHtml = '<button class="btn btn-danger" disabled>Expired</button>';
+                } else {
+                    buttonHtml = `<button class="btn btn-primary" onclick="showProctoring('${exam.id}')">Take Exam</button>`;
+                }
+
                 const card = `
                     <div class="col-md-4 mb-4">
                         <div class="card exam-card">
@@ -196,10 +227,8 @@
                                 <p class="card-text">${exam.subject}</p>
                                 <p class="card-text">Duration: ${exam.duration} minutes</p>
                                 <p class="card-text">Questions: ${exam.questions.length}</p>
-                                ${taken ? 
-                                    '<button class="btn btn-secondary" disabled>Completed</button>' :
-                                    `<button class="btn btn-primary" onclick="showProctoring('${exam.id}')">Take Exam</button>`
-                                }
+                                <p class="card-text small text-muted">${deadlineText}</p>
+                                ${buttonHtml}
                             </div>
                         </div>
                     </div>

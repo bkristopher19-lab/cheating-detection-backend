@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 
 # Web server
-from flask import Flask, render_template, Response, request, jsonify, redirect, url_for
+from flask import Flask, render_template, Response, request, jsonify, redirect, url_for, flash
 
 # Firebase
 from firebase_admin import credentials, firestore
@@ -705,7 +705,23 @@ def take_exam(exam_id):
     exam = exam_ref.get()
 
     if not exam.exists:
+        flash('Exam not found.', 'error')
         return redirect('/student_dashboard')
+
+    exam_data = exam.to_dict()
+
+    # Check deadlines
+    now = datetime.utcnow()
+    if exam_data.get('start_date') and exam_data.get('end_date'):
+        start_date = datetime.fromisoformat(exam_data['start_date'])
+        end_date = datetime.fromisoformat(exam_data['end_date'])
+
+        if now < start_date:
+            flash('This exam has not started yet.', 'warning')
+            return redirect('/student_dashboard')
+        elif now > end_date:
+            flash('This exam has expired and is no longer available.', 'error')
+            return redirect('/student_dashboard')
 
     return render_template('index.html', exam_id=exam_id)
 

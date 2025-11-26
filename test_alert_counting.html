@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Alert Counting System</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .alert { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .danger { background-color: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        .exam-container { border: 2px solid #007bff; padding: 20px; margin: 20px 0; }
+        .paused { opacity: 0.5; pointer-events: none; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        .status { margin: 10px 0; padding: 10px; background-color: #e9ecef; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Test Alert Counting System</h1>
+    <div class="status" id="status">Total Alerts: 0</div>
+
+    <div class="exam-container" id="examContainer">
+        <h2>Mock Exam Interface</h2>
+        <p>This is a simulated exam interface for testing alert counting.</p>
+        <button onclick="answerQuestion()">Answer Question</button>
+        <button onclick="nextQuestion()">Next Question</button>
+    </div>
+
+    <div id="alerts"></div>
+
+    <h3>Test Controls</h3>
+    <button onclick="triggerAlert('face_absent')">Trigger Face Absent Alert</button>
+    <button onclick="triggerAlert('twofaces')">Trigger Multiple Faces Alert</button>
+    <button onclick="triggerAlert('loud_sound')">Trigger Loud Sound Alert</button>
+    <button onclick="triggerAlert('phone')">Trigger Phone Detection Alert</button>
+    <button onclick="resetAlerts()">Reset Alert Count</button>
+
+    <script>
+        // Alert counting for exam termination (copied from index.html)
+        let totalAlertCount = 0;
+        let lastAlertTime = 0;
+        const ALERT_COOLDOWN = 5000; // 5 seconds between counting alerts
+
+        function showExamAlert(message) {
+            const alertsDiv = document.getElementById('alerts');
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert warning';
+            alertDiv.textContent = message;
+            alertsDiv.appendChild(alertDiv);
+
+            // Auto-remove after 5 seconds
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.parentNode.removeChild(alertDiv);
+                }
+            }, 5000);
+        }
+
+        function logAlert(type, message) {
+            console.log('Alert triggered:', type, message);
+
+            // Alert counting and exam termination logic
+            const now = Date.now();
+            if (now - lastAlertTime > ALERT_COOLDOWN) {
+                totalAlertCount++;
+                lastAlertTime = now;
+
+                document.getElementById('status').textContent = `Total Alerts: ${totalAlertCount}`;
+
+                if (totalAlertCount === 1) {
+                    // 1st alert: warning
+                    showExamAlert('⚠️ WARNING: Suspicious activity detected! This is your first violation.');
+                    console.log('1st alert: Warning shown');
+                } else if (totalAlertCount === 2) {
+                    // 2nd alert: pause exam for 5 seconds
+                    showExamAlert('🚨 SECOND VIOLATION: Exam paused for 5 seconds due to suspicious activity.');
+                    console.log('2nd alert: Exam paused for 5 seconds');
+
+                    // Disable exam interaction
+                    const examContainer = document.getElementById('examContainer');
+                    if (examContainer) {
+                        examContainer.classList.add('paused');
+                    }
+
+                    // Re-enable after 5 seconds
+                    setTimeout(() => {
+                        const examContainer = document.getElementById('examContainer');
+                        if (examContainer) {
+                            examContainer.classList.remove('paused');
+                        }
+                        showExamAlert('Exam resumed. Please continue taking your exam.');
+                        console.log('Exam resumed after 5 seconds');
+                    }, 5000);
+                } else if (totalAlertCount >= 3) {
+                    // 3rd alert: automatic finish exam as incomplete
+                    showExamAlert('🚨 THIRD VIOLATION: Exam terminated due to multiple violations. Your exam will be marked as incomplete.');
+                    console.log('3rd alert: Exam terminated');
+
+                    // Disable exam permanently
+                    const examContainer = document.getElementById('examContainer');
+                    if (examContainer) {
+                        examContainer.classList.add('paused');
+                        examContainer.innerHTML = '<h2>Exam Terminated</h2><p>Your exam has been marked as incomplete due to multiple violations.</p>';
+                    }
+
+                    // In real implementation, this would call submitExam()
+                    setTimeout(() => {
+                        console.log('Exam would be submitted as incomplete');
+                    }, 2000);
+                }
+            } else {
+                console.log('Alert ignored due to cooldown');
+            }
+        }
+
+        function triggerAlert(type) {
+            const messages = {
+                'face_absent': 'Face not detected in frame',
+                'twofaces': 'Multiple faces detected',
+                'loud_sound': 'Loud sound detected',
+                'phone': 'Phone detected in frame'
+            };
+            logAlert(type, messages[type] || 'Suspicious activity detected');
+        }
+
+        function resetAlerts() {
+            totalAlertCount = 0;
+            lastAlertTime = 0;
+            document.getElementById('status').textContent = 'Total Alerts: 0';
+            document.getElementById('alerts').innerHTML = '';
+
+            // Reset exam container
+            const examContainer = document.getElementById('examContainer');
+            examContainer.classList.remove('paused');
+            examContainer.innerHTML = `
+                <h2>Mock Exam Interface</h2>
+                <p>This is a simulated exam interface for testing alert counting.</p>
+                <button onclick="answerQuestion()">Answer Question</button>
+                <button onclick="nextQuestion()">Next Question</button>
+            `;
+            console.log('Alerts reset');
+        }
+
+        function answerQuestion() {
+            console.log('Question answered');
+        }
+
+        function nextQuestion() {
+            console.log('Next question');
+        }
+
+        // Test the cooldown mechanism
+        function testCooldown() {
+            console.log('Testing cooldown mechanism...');
+            triggerAlert('face_absent');
+            setTimeout(() => triggerAlert('face_absent'), 1000); // Should be ignored
+            setTimeout(() => triggerAlert('face_absent'), 6000); // Should count
+        }
+
+        // Expose test function to console
+        window.testCooldown = testCooldown;
+    </script>
+</body>
+</html>

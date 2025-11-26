@@ -36,6 +36,8 @@
                                     <tr>
                                         <th>Exam Title</th>
                                         <th>Subject</th>
+                                        <th>Section</th>
+                                        <th>Participants</th>
                                         <th>Duration</th>
                                         <th>Questions</th>
                                         <th>Actions</th>
@@ -126,7 +128,21 @@
                             <label class="form-label">Duration (minutes)</label>
                             <input type="number" class="form-control" id="examDuration" required>
                         </div>
-                        
+                        <div class="mb-3">
+                            <label class="form-label">Start Date & Time</label>
+                            <input type="datetime-local" class="form-control" id="examStartDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">End Date & Time</label>
+                            <input type="datetime-local" class="form-control" id="examEndDate" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Class (Course & Section)</label>
+                            <select class="form-control" id="examClassSelect" required>
+                                <option value="">-- Select Class --</option>
+                            </select>
+                        </div>
+
                         <!-- Dynamic Questions Section -->
                         <div class="mb-3">
                             <label class="form-label">Questions</label>
@@ -211,6 +227,35 @@
             });
         });
 
+        // Load Classes into Select (filtered for proctor)
+        async function loadClassesIntoSelect() {
+            const userId = sessionStorage.getItem('userId');
+            let currentUser = null;
+            if (userId) {
+                try {
+                    const ur = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+                    if (ur.ok) currentUser = await ur.json();
+                } catch (err) {
+                    console.error('Failed to load current user', err);
+                }
+            }
+
+            const response = await fetch('/select?collection=classes');
+            let classes = await response.json() || [];
+
+            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
+            if (role === 'proctor') {
+                classes = classes.filter(c => c.proctor_id === userId);
+            }
+
+            const $sel = $('#examClassSelect');
+            $sel.empty();
+            $sel.append('<option value="">-- Select Class --</option>');
+            classes.forEach(cls => {
+                $sel.append(`<option value="${cls.id}">${cls.course} - ${cls.section}</option>`);
+            });
+        }
+
         // Load Exams (filtered for proctors)
         async function loadExams() {
             const userId = sessionStorage.getItem('userId');
@@ -224,8 +269,18 @@
                 }
             }
 
-            const response = await fetch('/select?collection=exams');
-            let exams = await response.json() || [];
+            const [examsResponse, classesResponse, resultsResponse] = await Promise.all([
+                fetch('/select?collection=exams'),
+                fetch('/select?collection=classes'),
+                fetch('/select?collection=exam_results')
+            ]);
+
+            let exams = await examsResponse.json() || [];
+            const classes = await classesResponse.json() || [];
+            const examResults = await resultsResponse.json() || [];
+
+            const classMap = {};
+            classes.forEach(cls => classMap[cls.id] = cls);
 
             const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
             if (role === 'proctor') {
@@ -234,15 +289,30 @@
 
             examTable.clear();
             exams.forEach(exam => {
+                // Get section
+                let section = 'N/A';
+                if (exam.class_id && classMap[exam.class_id]) {
+                    const cls = classMap[exam.class_id];
+                    section = `${cls.course} - ${cls.section}`;
+                }
+
+                // Get participants count
+                const participants = examResults.filter(r => r.exam_id === exam.id).length;
+
                 examTable.row.add([
                     `<span class="exam-title-link" data-exam-id="${exam.id}" style="cursor:pointer; text-decoration:underline;">
                         ${exam.title}
                       </span>`,
                     exam.subject,
+                    section,
+                    participants,
                     `${exam.duration} mins`,
                     (exam.questions || []).length,
                     `<button onclick="editExam('${exam.id}')" class="btn btn-sm btn-warning me-1">
                         <i class='bx bx-edit'></i>
+                      </button>
+                      <button onclick="copyExam('${exam.id}')" class="btn btn-sm btn-info me-1">
+                        <i class='bx bx-copy'></i>
                       </button>
                       <button onclick="deleteExam('${exam.id}')" class="btn btn-sm btn-danger">
                         <i class='bx bx-trash'></i>
@@ -270,6 +340,9 @@
                 title: $('#examTitle').val(),
                 subject: $('#examSubject').val(),
                 duration: parseInt($('#examDuration').val()),
+                start_date: $('#examStartDate').val(),
+                end_date: $('#examEndDate').val(),
+                class_id: $('#examClassSelect').val(),
                 questions: []
             };
 
@@ -316,6 +389,55 @@
             $('#examSubject').val(exam.subject);
             $('#examDuration').val(exam.duration);
 
+            // Set deadline fields
+            if (exam.start_date) {
+                $('#examStartDate').val(new Date(exam.start_date).toISOString().slice(0, 16));
+            }
+            if (exam.end_date) {
+                $('#examEndDate').val(new Date(exam.end_date).toISOString().slice(0, 16));
+            }
+
+            // Load classes and set selected
+            await loadClassesIntoSelect();
+            $('#examClassSelect').val(exam.class_id || '');
+
+            $('#questionsContainer').empty();
+            (exam.questions || []).forEach((question, index) => {
+                $('#questionsContainer').append(getQuestionTemplate(index));
+                const $questionItem = $('.question-item').last();
+                $questionItem.find('.question-text').val(question.text);
+                $questionItem.find('.correct-answer').val(question.correctAnswer);
+                (question.wrongAnswers || []).forEach((answer, i) => {
+                    $questionItem.find('.wrong-answer').eq(i).val(answer);
+                });
+            });
+
+            $('#examModal').modal('show');
+        }
+
+        // Copy Exam
+        async function copyExam(id) {
+            const response = await fetch(`/select?collection=exams&id=${id}`);
+            const exam = await response.json();
+
+            // Clear examId to create a new exam
+            $('#examId').val('');
+            $('#examTitle').val(exam.title + ' (Copy)');
+            $('#examSubject').val(exam.subject);
+            $('#examDuration').val(exam.duration);
+
+            // Set deadline fields (can be adjusted)
+            if (exam.start_date) {
+                $('#examStartDate').val(new Date(exam.start_date).toISOString().slice(0, 16));
+            }
+            if (exam.end_date) {
+                $('#examEndDate').val(new Date(exam.end_date).toISOString().slice(0, 16));
+            }
+
+            // Load classes but don't set selected (user can choose)
+            await loadClassesIntoSelect();
+            $('#examClassSelect').val('');
+
             $('#questionsContainer').empty();
             (exam.questions || []).forEach((question, index) => {
                 $('#questionsContainer').append(getQuestionTemplate(index));
@@ -348,6 +470,7 @@
             $('#examForm')[0].reset();
             $('#examId').val('');
             $('#questionsContainer').empty();
+            $('#examClassSelect').empty().append('<option value="">-- Select Class --</option>');
         });
 
         // Load user name
@@ -385,6 +508,11 @@
 
         loadExams();
         loadUserName();
+
+        // Show modal -> refresh class list
+        $('#examModal').on('show.bs.modal', function() {
+            loadClassesIntoSelect();
+        });
 
         /* =======================
            REAL-TIME ALERT DISTRIBUTION + CHART

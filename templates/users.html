@@ -46,6 +46,65 @@
         </div>
     </div>
 
+    <!-- User Exams Modal -->
+    <div class="modal fade" id="userExamsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Exams Taken by <span id="modalUserName"></span></h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Exam Title</th>
+                                <th>Subject</th>
+                                <th>Status</th>
+                                <th>Score</th>
+                                <th>Date Taken</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userExamsTableBody"></tbody>
+                    </table>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Score Modal -->
+    <div class="modal fade" id="editScoreModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Score</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editScoreForm">
+                        <input type="hidden" id="editResultId">
+                        <div class="mb-3">
+                            <label class="form-label">New Score (e.g., 5/10)</label>
+                            <input type="text" class="form-control" id="newScore" placeholder="e.g., 8/10" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Reason for Change</label>
+                            <textarea class="form-control" id="scoreReason" rows="3" placeholder="Optional reason"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveScoreBtn">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- User Modal -->
     <div class="modal fade" id="userModal">
         <div class="modal-dialog">
@@ -108,7 +167,10 @@
                     user.name,
                     user.email,
                     user.role || 'student',
-                    `<button onclick="editUser('${user.id}')" class="btn btn-sm btn-warning me-1">
+                    `<button onclick="viewUserExams('${user.id}', '${user.name}')" class="btn btn-sm btn-info me-1">
+                        <i class='bx bx-show'></i> View Exams
+                     </button>
+                     <button onclick="editUser('${user.id}')" class="btn btn-sm btn-warning me-1">
                         <i class='bx bx-edit'></i>
                      </button>
                      <button onclick="deleteUser('${user.id}')" class="btn btn-sm btn-danger">
@@ -184,6 +246,162 @@
             document.getElementById('sidebar').classList.toggle('sidebar-collapsed');
             document.getElementById('main-content').classList.toggle('main-content-expanded');
         });
+
+        // View User Exams
+        async function viewUserExams(userId, userName) {
+            document.getElementById('modalUserName').textContent = userName;
+            const tbody = document.getElementById('userExamsTableBody');
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+
+            try {
+                // Get exam results for this user
+                const resultsResponse = await fetch('/select?collection=exam_results');
+                const allResults = await resultsResponse.json();
+                const userResults = allResults.filter(r => r.user_id === userId);
+
+                // Get all exams
+                const examsResponse = await fetch('/select?collection=exams');
+                const allExams = await examsResponse.json();
+                const examMap = {};
+                allExams.forEach(exam => examMap[exam.id] = exam);
+
+                tbody.innerHTML = '';
+
+                if (userResults.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No exams taken yet</td></tr>';
+                } else {
+                    for (const result of userResults) {
+                        const exam = examMap[result.exam_id];
+                        if (!exam) continue;
+
+                        // Calculate score
+                        let scoreDisplay = 'N/A';
+                        let status = 'Incomplete';
+                        if (exam.questions && result.answers) {
+                            let correctAnswers = 0;
+                            exam.questions.forEach((question, index) => {
+                                if (result.answers[index] === question.correctAnswer) {
+                                    correctAnswers++;
+                                }
+                            });
+                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                            status = 'Completed';
+                        }
+
+                        const dateTaken = result.timestamp ? new Date(result.timestamp).toLocaleDateString() : 'N/A';
+
+                        const row = `
+                            <tr>
+                                <td>${exam.title || 'Unknown'}</td>
+                                <td>${exam.subject || 'N/A'}</td>
+                                <td><span class="badge bg-${status === 'Completed' ? 'success' : 'warning'}">${status}</span></td>
+                                <td>${scoreDisplay}</td>
+                                <td>${dateTaken}</td>
+                                <td>
+                                    ${status === 'Completed' ? `<button onclick="editScore('${result.id}', '${scoreDisplay}')" class="btn btn-sm btn-primary">Edit Score</button>` : ''}
+                                    ${status === 'Incomplete' ? `<button onclick="reopenExam('${result.exam_id}', '${userId}')" class="btn btn-sm btn-warning">Reopen Exam</button>` : ''}
+                                </td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    }
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('userExamsModal'));
+                modal.show();
+            } catch (err) {
+                console.error('Error loading user exams:', err);
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading exams</td></tr>';
+            }
+        }
+
+        // Edit Score
+        function editScore(resultId, currentScore) {
+            document.getElementById('editResultId').value = resultId;
+            document.getElementById('newScore').value = currentScore;
+            document.getElementById('scoreReason').value = '';
+
+            const modal = new bootstrap.Modal(document.getElementById('editScoreModal'));
+            modal.show();
+        }
+
+        // Save Score Changes
+        document.getElementById('saveScoreBtn').addEventListener('click', async function() {
+            const resultId = document.getElementById('editResultId').value;
+            const newScore = document.getElementById('newScore').value;
+            const reason = document.getElementById('scoreReason').value;
+
+            if (!newScore) {
+                alert('Please enter a new score');
+                return;
+            }
+
+            try {
+                const updateData = {
+                    edited_score: newScore,
+                    edit_reason: reason,
+                    edited_at: new Date().toISOString()
+                };
+
+                const response = await fetch(`/edit/${resultId}?collection=exam_results`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(updateData)
+                });
+
+                if (response.ok) {
+                    $('#editScoreModal').modal('hide');
+                    // Refresh the current modal
+                    const userName = document.getElementById('modalUserName').textContent;
+                    const userId = document.querySelector('[onclick*="viewUserExams"]').getAttribute('onclick').match(/'([^']+)'/)[1];
+                    viewUserExams(userId, userName);
+                } else {
+                    alert('Failed to update score');
+                }
+            } catch (err) {
+                console.error('Error updating score:', err);
+                alert('Error updating score');
+            }
+        });
+
+        // Reopen Exam
+        async function reopenExam(examId, userId) {
+            if (!confirm('Are you sure you want to reopen this exam for the student? This will allow them to retake it.')) return;
+
+            try {
+                // Remove from user's exams_taken
+                const userResponse = await fetch(`/select?collection=users&id=${userId}`);
+                const user = await userResponse.json();
+
+                if (user.exams_taken) {
+                    user.exams_taken = user.exams_taken.filter(id => id !== examId);
+                    await fetch(`/edit/${userId}?collection=users`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({exams_taken: user.exams_taken})
+                    });
+                }
+
+                // Delete exam result
+                const resultsResponse = await fetch('/select?collection=exam_results');
+                const allResults = await resultsResponse.json();
+                const userResult = allResults.find(r => r.user_id === userId && r.exam_id === examId);
+
+                if (userResult) {
+                    await fetch(`/delete/${userResult.id}?collection=exam_results`, {
+                        method: 'POST'
+                    });
+                }
+
+                alert('Exam reopened successfully');
+                // Refresh the modal
+                const userName = document.getElementById('modalUserName').textContent;
+                viewUserExams(userId, userName);
+            } catch (err) {
+                console.error('Error reopening exam:', err);
+                alert('Error reopening exam');
+            }
+        }
     </script>
 </body>
 </html>

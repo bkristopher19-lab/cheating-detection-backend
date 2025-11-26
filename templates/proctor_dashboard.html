@@ -372,17 +372,38 @@
                 <div class="col-xl-8 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Student Exam Scores & Proctoring Flags</h6>
+                            <h6 class="m-0 fw-bold">Student Exam Participation & Scores</h6>
                         </div>
                         <div class="card-body">
+                            <!-- Filters -->
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="examFilter" class="form-label">Select Exam</label>
+                                    <select class="form-select" id="examFilter">
+                                        <option value="">All Exams</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="sectionFilter" class="form-label">Select Section/Class</label>
+                                    <select class="form-select" id="sectionFilter">
+                                        <option value="">All Sections</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="studentSearch" class="form-label">Search Students</label>
+                                    <input type="text" id="studentSearch" class="form-control" placeholder="Search by name...">
+                                </div>
+                            </div>
                             <div class="table-responsive">
                                 <table class="table table-striped">
                                     <thead>
                                         <tr>
                                             <th>Student Name</th>
-                                            <th>Exam Type</th>
+                                            <th>Section</th>
+                                            <th>Status</th>
                                             <th>Score</th>
-                                            <th>Date Taken</th>
+                                            <th>Date & Time Taken</th>
+                                            <th>Duration</th>
                                             <th>Proctoring Flags</th>
                                         </tr>
                                     </thead>
@@ -627,6 +648,9 @@
                 const filteredClasses = proctorClasses;
                 const filteredExamResults = proctorExamResults;
 
+                // Load filters
+                loadFilters(filteredExams, filteredClasses);
+
                 // Normalize role/type accessor
                 const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
 
@@ -770,8 +794,14 @@
                 // set a tooltip or reuse element (here we set 'totalStudents' title)
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
 
+                // Fetch classes for section display
+                const classesResponse = await fetch('/select?collection=classes');
+                const allClasses = await classesResponse.json() || [];
+                const classMap = {};
+                allClasses.forEach(cls => classMap[cls.id] = cls);
+
                 // Load student scores with proctoring flags
-                await loadStudentScoresWithFlags(users, exams, sessions, examResults);
+                await loadStudentScoresWithFlags(users, exams, sessions, examResults, classMap);
 
                 // done
             } catch (err) {
@@ -785,108 +815,235 @@
         // Real-time data updates every 30 seconds
         setInterval(loadDashboardData, 30000);
 
+        // Filter change handlers
+        document.getElementById('examFilter').addEventListener('change', async function() {
+            const selectedExamId = this.value;
+            const selectedClassId = document.getElementById('sectionFilter').value;
+            await applyFilters(selectedExamId, selectedClassId);
+        });
+
+        document.getElementById('sectionFilter').addEventListener('change', async function() {
+            const selectedExamId = document.getElementById('examFilter').value;
+            const selectedClassId = this.value;
+            await applyFilters(selectedExamId, selectedClassId);
+        });
+
+        // Search functionality
+        document.getElementById('studentSearch').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const rows = document.querySelectorAll('#studentScoresTable tr');
+
+            rows.forEach(row => {
+                const studentName = row.getAttribute('data-student-name') || '';
+                if (studentName.toLowerCase().includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
+
+        // Apply filters function
+        async function applyFilters(selectedExamId, selectedClassId) {
+            try {
+                // Get current proctor user ID
+                const userId = sessionStorage.getItem('userId');
+                if (!userId) return;
+
+                // Fetch data
+                const [users, exams, sessions, classes, examResults] = await Promise.all([
+                    fetch('/select?collection=users').then(r => r.json()),
+                    fetch('/select?collection=exams').then(r => r.json()),
+                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
+                    fetch('/select?collection=classes').then(r => r.json()),
+                    fetch('/select?collection=exam_results').then(r => r.json())
+                ]);
+
+                // Filter data based on proctor permissions
+                const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
+                const proctorClassIds = proctorClasses.map(c => c.id);
+                const proctorExams = proctorClassIds.length > 0
+                    ? (exams || []).filter(e => proctorClassIds.includes(e.class_id))
+                    : exams || [];
+                const proctorExamIds = proctorExams.map(e => e.id);
+                const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
+                const proctorExamResults = (examResults || []).filter(r => proctorExamIds.includes(r.exam_id));
+
+                const classMap = {};
+                classes.forEach(cls => classMap[cls.id] = cls);
+
+                // Load filtered student scores
+                await loadStudentScoresWithFlags(users, proctorExams, proctorSessions, proctorExamResults, classMap, proctorClasses, selectedExamId, selectedClassId);
+
+            } catch (err) {
+                console.error('Error applying filters:', err);
+            }
+        }
+
+        // Load filters for exam and section
+        function loadFilters(exams, classes) {
+            const examFilter = document.getElementById('examFilter');
+            const sectionFilter = document.getElementById('sectionFilter');
+
+            // Clear existing options
+            examFilter.innerHTML = '<option value="">All Exams</option>';
+            sectionFilter.innerHTML = '<option value="">All Sections</option>';
+
+            // Add exam options
+            exams.forEach(exam => {
+                const option = document.createElement('option');
+                option.value = exam.id;
+                option.textContent = `${exam.title} (${exam.subject})`;
+                examFilter.appendChild(option);
+            });
+
+            // Add section options
+            classes.forEach(cls => {
+                const option = document.createElement('option');
+                option.value = cls.id;
+                option.textContent = `${cls.course} - ${cls.section}`;
+                sectionFilter.appendChild(option);
+            });
+        }
+
         // Load student scores with proctoring flags
-        async function loadStudentScoresWithFlags(users, exams, sessions, examResults) {
+        async function loadStudentScoresWithFlags(users, exams, sessions, examResults, classMap, allClasses, selectedExamId = null, selectedClassId = null) {
             try {
                 const tbody = document.getElementById('studentScoresTable');
                 tbody.innerHTML = '';
 
-                // If no exam results, show message
-                if (!examResults || examResults.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found. Students will appear here after they complete exams.</td></tr>';
+                // Get students in selected class or all students if no class selected
+                let studentsToShow = [];
+                if (selectedClassId) {
+                    // Get students enrolled in the selected class
+                    // Assuming there's a way to get enrolled students, for now get all students
+                    // In a real implementation, you'd have an enrollment collection
+                    studentsToShow = users.filter(u => u.role === 'student' || u.type === 'student');
+                } else {
+                    // Show all students
+                    studentsToShow = users.filter(u => u.role === 'student' || u.type === 'student');
+                }
+
+                // If no students, show message
+                if (studentsToShow.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No students found in selected section.</td></tr>';
                     return;
                 }
 
-                // Group results by student
-                const studentResults = {};
-
-                examResults.forEach(result => {
-                    // Handle both user_id and student_id fields
-                    const userId = result.user_id || result.student_id;
-                    if (userId) {
-                        if (!studentResults[userId]) {
-                            studentResults[userId] = [];
-                        }
-                        studentResults[userId].push(result);
-                    }
-                });
-
                 // Display results for each student
-                Object.entries(studentResults).forEach(([userId, results]) => {
-                    const student = users.find(u => u.id === userId);
-                    
-                    // Skip if student not found (might be deleted user)
-                    if (!student) {
-                        console.warn('Student not found for userId:', userId);
-                        return;
+                for (const student of studentsToShow) {
+                    const userId = student.id;
+
+                    // Get section display
+                    let sectionDisplay = 'Unknown';
+                    if (selectedClassId && classMap[selectedClassId]) {
+                        const cls = classMap[selectedClassId];
+                        sectionDisplay = `${cls.course} - ${cls.section}`;
+                    } else if (allClasses && allClasses.length > 0) {
+                        // Find student's class (this is a simplification - in real app, student might be in multiple classes)
+                        const studentClass = allClasses.find(cls => cls.proctor_id === sessionStorage.getItem('userId'));
+                        if (studentClass) {
+                            sectionDisplay = `${studentClass.course} - ${studentClass.section}`;
+                        }
                     }
 
-                    results.forEach(result => {
-                        const exam = exams.find(e => e.id === result.exam_id);
+                    // Check if student has taken the selected exam
+                    let examResult = null;
+                    let exam = null;
+                    let session = null;
 
-                        // Skip if exam not found
-                        if (!exam) {
-                            console.warn('Exam not found for exam_id:', result.exam_id);
-                            return;
+                    if (selectedExamId) {
+                        exam = exams.find(e => e.id === selectedExamId);
+                        examResult = examResults.find(r => r.user_id === userId && r.exam_id === selectedExamId);
+                        session = sessions.find(s => (s.user_id === userId || s.student_id === userId) && s.exam_id === selectedExamId);
+                    } else {
+                        // If no exam selected, show latest exam taken by student
+                        const studentResults = examResults.filter(r => r.user_id === userId);
+                        if (studentResults.length > 0) {
+                            // Sort by timestamp, get latest
+                            studentResults.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                            examResult = studentResults[0];
+                            exam = exams.find(e => e.id === examResult.exam_id);
+                            session = sessions.find(s => (s.user_id === userId || s.student_id === userId) && s.exam_id === examResult.exam_id);
                         }
+                    }
 
-                        // Calculate score
-                        let scoreDisplay = 'N/A';
-                        if (exam.questions && result.answers) {
-                            let correctAnswers = 0;
-                            exam.questions.forEach((question, index) => {
-                                if (result.answers && result.answers[index] === question.correctAnswer) {
-                                    correctAnswers++;
-                                }
-                            });
-                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
-                        }
+                    // Determine status
+                    const status = examResult ? 'Taken' : 'Not Taken';
+                    const statusBadge = status === 'Taken' ? 'bg-success' : 'bg-warning';
 
-                        // Get proctoring flags for this session
-                        // Check both user_id and student_id for compatibility
-                        const session = sessions.find(s => 
-                            (s.user_id === userId || s.student_id === userId) && 
-                            s.exam_id === result.exam_id
-                        );
-                        let flagsDisplay = 'None';
-
-                        if (session && session.flags) {
-                            let flagsObj = session.flags;
-                            if (Array.isArray(flagsObj)) {
-                                flagsObj = {};
-                                flagsObj.forEach(f => Object.assign(flagsObj, f));
+                    // Calculate score
+                    let scoreDisplay = 'N/A';
+                    if (examResult && exam && exam.questions && examResult.answers) {
+                        let correctAnswers = 0;
+                        exam.questions.forEach((question, index) => {
+                            if (examResult.answers && examResult.answers[index] === question.correctAnswer) {
+                                correctAnswers++;
                             }
-                            const flags = [];
-                            Object.entries(flagsObj).forEach(([type, alerts]) => {
-                                if (Array.isArray(alerts) && alerts.length > 0) {
-                                    flags.push(`${type}: ${alerts.length}`);
-                                }
-                            });
-                            if (flags.length > 0) {
-                                flagsDisplay = flags.join(', ');
-                            }
-                        }
+                        });
+                        scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                    }
 
-                        const row = `
-                            <tr>
-                                <td><strong>${student.name || 'Unknown'}</strong><br><small class="text-muted">${student.email || ''}</small></td>
-                                <td>${exam.title || 'Unknown'}<br><small class="text-muted">${exam.subject || ''}</small></td>
-                                <td><strong>${scoreDisplay}</strong></td>
-                                <td>${result.timestamp ? new Date(result.timestamp).toLocaleDateString() : 'N/A'}</td>
-                                <td><span class="badge ${flagsDisplay !== 'None' ? 'bg-warning' : 'bg-success'}">${flagsDisplay}</span></td>
-                            </tr>
-                        `;
-                        tbody.innerHTML += row;
-                    });
-                });
-                
-                // Sort by date taken (most recent first)
+                    // Get date and time taken
+                    const dateTimeTaken = examResult && examResult.timestamp ? new Date(examResult.timestamp).toLocaleString() : 'N/A';
+
+                    // Calculate duration
+                    let durationDisplay = 'N/A';
+                    if (session && session.start_time && session.end_time) {
+                        const start = new Date(session.start_time);
+                        const end = new Date(session.end_time);
+                        if (!isNaN(start) && !isNaN(end)) {
+                            const durationMs = end - start;
+                            const durationMinutes = Math.round(durationMs / (1000 * 60));
+                            durationDisplay = `${durationMinutes} min`;
+                        }
+                    }
+
+                    // Get proctoring flags
+                    let flagsDisplay = 'None';
+                    if (session && session.flags) {
+                        let flagsObj = session.flags;
+                        if (Array.isArray(flagsObj)) {
+                            flagsObj = {};
+                            flagsObj.forEach(f => Object.assign(flagsObj, f));
+                        }
+                        const flags = [];
+                        Object.entries(flagsObj).forEach(([type, alerts]) => {
+                            if (Array.isArray(alerts) && alerts.length > 0) {
+                                flags.push(`${type}: ${alerts.length}`);
+                            }
+                        });
+                        if (flags.length > 0) {
+                            flagsDisplay = flags.join(', ');
+                        }
+                    }
+
+                    const row = `
+                        <tr data-student-name="${student.name || 'Unknown'}">
+                            <td><strong>${student.name || 'Unknown'}</strong><br><small class="text-muted">${student.email || ''}</small></td>
+                            <td>${sectionDisplay}</td>
+                            <td><span class="badge ${statusBadge}">${status}</span></td>
+                            <td><strong>${scoreDisplay}</strong></td>
+                            <td>${dateTimeTaken}</td>
+                            <td>${durationDisplay}</td>
+                            <td><span class="badge ${flagsDisplay !== 'None' ? 'bg-warning' : 'bg-success'}">${flagsDisplay}</span></td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                }
+
+                // Sort by status (Not Taken first), then by name
                 if (tbody.children.length > 1) {
                     const rows = Array.from(tbody.children);
                     rows.sort((a, b) => {
-                        const dateA = new Date(a.cells[3].textContent);
-                        const dateB = new Date(b.cells[3].textContent);
-                        return dateB - dateA; // Most recent first
+                        const statusA = a.cells[2].textContent;
+                        const statusB = b.cells[2].textContent;
+                        if (statusA !== statusB) {
+                            return statusA === 'Not Taken' ? -1 : 1;
+                        }
+                        const nameA = a.cells[0].textContent.toLowerCase();
+                        const nameB = b.cells[0].textContent.toLowerCase();
+                        return nameA.localeCompare(nameB);
                     });
                     // Clear and re-append sorted rows
                     tbody.innerHTML = '';
@@ -894,13 +1051,13 @@
                 }
 
                 if (tbody.innerHTML === '') {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No students found</td></tr>';
                 }
 
             } catch (err) {
                 console.error('Error loading student scores:', err);
                 document.getElementById('studentScoresTable').innerHTML =
-                    '<tr><td colspan="5" class="text-center text-danger">Error loading scores</td></tr>';
+                    '<tr><td colspan="6" class="text-center text-danger">Error loading scores</td></tr>';
             }
         }
 

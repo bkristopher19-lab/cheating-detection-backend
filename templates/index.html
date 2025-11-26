@@ -678,6 +678,7 @@
             userId: null,
             answers: [],
             submitted: false,
+            terminated: false, // Flag to indicate if exam was terminated due to violation
             questions: [], // Store exam questions for speech detection
             allAnswers: [] // Store all possible answers for speech detection
         };
@@ -707,6 +708,7 @@
         let totalAlertCount = 0;
         let lastAlertTime = 0;
         const ALERT_COOLDOWN = 5000; // 5 seconds between counting alerts
+        let examTerminated = false; // Flag to prevent multiple terminations
 
         // Initialize exam with session data
         async function initExam() {
@@ -855,29 +857,33 @@
                     try { await alertsSession.videoUploadPromise; } catch(e) { console.warn('video upload failed', e); }
                 }
 
-                // Update user's exam history - mark exam as completed
-                const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
-                const userData = await userResponse.json();
-                const currentExams = userData.exams_taken || [];
-                if (!currentExams.includes(examState.examId)) {
-                    currentExams.push(examState.examId);
-                }
-                
-                // Update user document to mark exam as completed
-                const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        exams_taken: currentExams
-                    })
-                });
-                
-                if (!updateResponse.ok) {
-                    console.error('Failed to update user exams_taken');
+                // Update user's exam history - only mark as completed if not terminated
+                if (!examState.terminated) {
+                    const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
+                    const userData = await userResponse.json();
+                    const currentExams = userData.exams_taken || [];
+                    if (!currentExams.includes(examState.examId)) {
+                        currentExams.push(examState.examId);
+                    }
+
+                    // Update user document to mark exam as completed
+                    const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            exams_taken: currentExams
+                        })
+                    });
+
+                    if (!updateResponse.ok) {
+                        console.error('Failed to update user exams_taken');
+                    } else {
+                        console.log('Exam marked as completed in user profile');
+                    }
                 } else {
-                    console.log('Exam marked as completed in user profile');
+                    console.log('Exam terminated due to violation - not marking as completed');
                 }
 
                 // Save exam results using backend endpoint
@@ -1782,10 +1788,19 @@
 
 
 
-            // 3) Phone detected
+            // 3) Phone detected - IMMEDIATE EXAM TERMINATION
             if (phoneDetections.length > 0) {
                 setAlert(alertPhone, true, `Phone detected (${phoneDetections.length})`);
                 logAlert('phone', `Phone detected (${phoneDetections.length})`);
+                if (!examTerminated) {
+                    examTerminated = true;
+                    examState.terminated = true;
+                    totalAlertCount = 1; // Set alert count to 1 for immediate termination
+                    showExamAlert('🚨 PHONE DETECTED: Exam terminated immediately. Your exam will be marked as incomplete.');
+                    setTimeout(() => {
+                        submitExam();
+                    }, 2000);
+                }
             } else {
                 setAlert(alertPhone, false);
             }
