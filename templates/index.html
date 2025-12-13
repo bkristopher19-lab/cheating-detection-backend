@@ -857,33 +857,26 @@
                     try { await alertsSession.videoUploadPromise; } catch(e) { console.warn('video upload failed', e); }
                 }
 
-                // Update user's exam history - only mark as completed if not terminated
-                if (!examState.terminated) {
-                    const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
-                    const userData = await userResponse.json();
-                    const currentExams = userData.exams_taken || [];
-                    if (!currentExams.includes(examState.examId)) {
-                        currentExams.push(examState.examId);
-                    }
+                // Update user's exam history - mark as taken even if terminated to block retakes
+                const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
+                const userData = await userResponse.json();
+                const currentExams = userData.exams_taken || [];
+                if (!currentExams.includes(examState.examId)) {
+                    currentExams.push(examState.examId);
+                }
 
-                    // Update user document to mark exam as completed
-                    const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            exams_taken: currentExams
-                        })
-                    });
+                const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        exams_taken: currentExams
+                    })
+                });
 
-                    if (!updateResponse.ok) {
-                        console.error('Failed to update user exams_taken');
-                    } else {
-                        console.log('Exam marked as completed in user profile');
-                    }
-                } else {
-                    console.log('Exam terminated due to violation - not marking as completed');
+                if (!updateResponse.ok) {
+                    console.error('Failed to update user exams_taken');
                 }
 
                 // Save exam results using backend endpoint
@@ -896,7 +889,9 @@
                         user_id: examState.userId,
                         exam_id: examState.examId,
                         answers: examState.answers,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        terminated: !!examState.terminated,
+                        forced_score: examState.forceZeroScore ? 0 : undefined
                     })
                 });
 
@@ -1072,21 +1067,39 @@
             document.addEventListener('mozfullscreenchange', handleFullscreenChange);
             document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-            // Tab switch detection
+            // Tab switch detection (with 3s grace handled in visibilitychange)
             document.addEventListener('visibilitychange', handleVisibilityChange);
             
-            // Window blur/focus detection (catches Alt+Tab, clicking outside window, etc.)
+            // Window blur/focus detection (catches Alt+Tab, clicking outside window, etc.) with 3s grace
             let windowBlurTime = null;
             window.addEventListener('blur', () => {
                 windowBlurTime = Date.now();
-                logAlert('tab_switch', 'Window lost focus (Alt+Tab or clicked outside)');
             });
             
             window.addEventListener('focus', () => {
-                if (windowBlurTime && Date.now() - windowBlurTime > 500) {
-                    logAlert('tab_switch', 'Window regained focus after being inactive');
+                if (windowBlurTime) {
+                    const awayMs = Date.now() - windowBlurTime;
+                    if (awayMs >= 3000) {
+                        registerTabSwitch(awayMs);
+                    }
                 }
                 windowBlurTime = null;
+            });
+
+            // Window resize detection (flag resizing attempts)
+            let lastSize = { w: window.innerWidth, h: window.innerHeight };
+            let resizeTimer = null;
+            window.addEventListener('resize', () => {
+                if (resizeTimer) clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    const deltaW = Math.abs(window.innerWidth - lastSize.w);
+                    const deltaH = Math.abs(window.innerHeight - lastSize.h);
+                    if (deltaW > 50 || deltaH > 50) {
+                        logAlert('resize_window', `Window resized (${deltaW}px x ${deltaH}px change)`);
+                        showExamAlert('⚠️ Resizing the window is not allowed during the exam.');
+                    }
+                    lastSize = { w: window.innerWidth, h: window.innerHeight };
+                }, 400);
             });
 
             // Copy-paste prevention
@@ -1117,20 +1130,32 @@
 
         let tabSwitchCount = 0;
         let lastTabSwitchTime = 0;
+        let hiddenStartTime = null;
 
         function handleVisibilityChange() {
             if (document.hidden) {
-                const now = Date.now();
-                // Prevent rapid-fire detection (debounce)
-                if (now - lastTabSwitchTime > 500) {
-                tabSwitchCount++;
-                    lastTabSwitchTime = now;
-                    logAlert('tab_switch', `User switched tabs or minimized window (count: ${tabSwitchCount})`);
-                    
-                    // Show warning after multiple tab switches
-                    if (tabSwitchCount >= 3) {
-                        showExamAlert(`⚠️ Warning: You have switched tabs ${tabSwitchCount} times. Continued tab switching may result in exam termination.`);
+                hiddenStartTime = Date.now();
+            } else {
+                // User came back; measure how long they were away
+                if (hiddenStartTime) {
+                    const awayMs = Date.now() - hiddenStartTime;
+                    hiddenStartTime = null;
+                    if (awayMs >= 3000) { // only flag if away > 3s
+                        registerTabSwitch(awayMs);
                     }
+                }
+            }
+        }
+
+        function registerTabSwitch(awayMs) {
+            const now = Date.now();
+            // additional debounce to avoid double count between visibility/blur handlers
+            if (now - lastTabSwitchTime > 500) {
+                tabSwitchCount++;
+                lastTabSwitchTime = now;
+                logAlert('tab_switch', `User left quiz window for ${Math.round(awayMs/1000)}s (count: ${tabSwitchCount})`);
+                if (tabSwitchCount >= 3) {
+                    showExamAlert(`⚠️ Warning: You have left the quiz window ${tabSwitchCount} times. Continued switching may terminate the exam.`);
                 }
             }
         }
@@ -1405,15 +1430,60 @@
             }, 200);
         }
 
+        // Helper to terminate exam with zero score
+        function terminateExam(message) {
+            if (examState.terminated) return;
+            examState.terminated = true;
+            examState.forceZeroScore = true;
+            showExamAlert(message);
+            setTimeout(() => {
+                submitExam();
+            }, 1500);
+        }
+
+        // Per-violation thresholds
+        const VIOLATION_LIMITS = {
+            phone: 1,
+            twofaces: 3,
+            loud_sound: 3,
+            fullscreen_exit: 3,
+            keyboard_shortcut: 3,
+            right_click: 3,
+            tab_switch: 3,
+            face_absent: 3,
+        };
+
+        // Cooldown to avoid double-counting rapid duplicate events
+        const TYPE_COOLDOWN_MS = 2000;
+        // Per-type pause window after a violation (prevents continuous increments, e.g., face_absent)
+        const PER_TYPE_PAUSE_MS = 5000;
+        const lastPerTypeAlertTime = {};
+        const perTypeBlockUntil = {};
+
         // Modify logAlert function to update immediately and trigger clip recording
         async function logAlert(type, message) {
             if (!alertsSession.sessionId) return;
+
+            const now = Date.now();
+
+            // If this type is currently in a pause window, ignore
+            if (perTypeBlockUntil[type] && now < perTypeBlockUntil[type]) {
+                return;
+            }
+
+            // Debounce per type to prevent double-counting rapid duplicate events
+            if (lastPerTypeAlertTime[type] && (now - lastPerTypeAlertTime[type] < TYPE_COOLDOWN_MS)) {
+                return; // ignore duplicate within cooldown
+            }
+            lastPerTypeAlertTime[type] = now;
 
             // Add timestamp to local flags array
             alertsSession.flags[type].push({
                 timestamp: new Date().toISOString(),
                 message: message
             });
+
+            const perTypeCount = alertsSession.flags[type].length;
 
             // Update student Alert Distribution panel
             updateStudentAlertDistribution(type);
@@ -1423,38 +1493,46 @@
                 startCheatingClip();
             }
 
-            // Alert counting and exam termination logic
-            const now = Date.now();
-            if (now - lastAlertTime > ALERT_COOLDOWN) {
-                totalAlertCount++;
-                lastAlertTime = now;
-
-                if (totalAlertCount === 1) {
-                    // 1st alert: warning
-                    showExamAlert('⚠️ WARNING: Suspicious activity detected! This is your first violation.');
-                } else if (totalAlertCount === 2) {
-                    // 2nd alert: pause exam for 5 seconds
-                    showExamAlert('🚨 SECOND VIOLATION: Exam paused for 5 seconds due to suspicious activity.');
-                    // Disable exam interaction
+            // Per-type enforcement with thresholds
+            const limit = VIOLATION_LIMITS[type];
+            if (limit) {
+                if (type === 'phone') {
+                    // Immediate termination on first phone detection
+                    terminateExam('🚨 PHONE DETECTED: Exam terminated immediately. Your exam will be marked as incomplete (0 points).');
+                } else if (perTypeCount >= limit) {
+                    terminateExam(`🚨 THIRD VIOLATION (${type}): Exam terminated. Marked as incomplete (0 points).`);
+                } else if (perTypeCount === 2) {
+                    // Second violation of this type: pause
+                    showExamAlert(`🚨 SECOND ${type.toUpperCase()} VIOLATION: Exam paused for 5 seconds.`);
+                    perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
                     const examContainer = document.getElementById('examContainer');
                     if (examContainer) {
                         examContainer.style.pointerEvents = 'none';
                         examContainer.style.opacity = '0.5';
                     }
-                    // Re-enable after 5 seconds
                     setTimeout(() => {
                         if (examContainer) {
                             examContainer.style.pointerEvents = 'auto';
                             examContainer.style.opacity = '1';
                         }
                         showExamAlert('Exam resumed. Please continue taking your exam.');
-                    }, 5000);
-                } else if (totalAlertCount >= 3) {
-                    // 3rd alert: automatic finish exam as incomplete
-                    showExamAlert('🚨 THIRD VIOLATION: Exam terminated due to multiple violations. Your exam will be marked as incomplete.');
+                    }, PER_TYPE_PAUSE_MS);
+                } else if (perTypeCount === 1) {
+                    // First violation: pause then resume
+                    showExamAlert(`⚠️ FIRST ${type.replace('_', ' ').toUpperCase()} VIOLATION: Exam paused for 5 seconds.`);
+                    perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
+                    const examContainer = document.getElementById('examContainer');
+                    if (examContainer) {
+                        examContainer.style.pointerEvents = 'none';
+                        examContainer.style.opacity = '0.5';
+                    }
                     setTimeout(() => {
-                        submitExam();
-                    }, 2000);
+                        if (examContainer) {
+                            examContainer.style.pointerEvents = 'auto';
+                            examContainer.style.opacity = '1';
+                        }
+                        showExamAlert('Exam resumed. Please continue taking your exam.');
+                    }, PER_TYPE_PAUSE_MS);
                 }
             }
 
@@ -1576,7 +1654,11 @@
         let useFront = true;
         let running = false;
         let sendInterval = null;
-        let intervalMs = 500;
+        // Server-side processing interval (ms)
+        // For Render free tier: Use 5000-10000ms (5-10 seconds) to avoid overload
+        // For paid hosting: Can use 500-1000ms (0.5-1 second) for real-time detection
+        // Set to 0 to disable server-side processing entirely (use client-side only)
+        let intervalMs = 5000; // Default: 5 seconds (optimized for Render free tier)
 
         // Mobile performance optimizations
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -1817,6 +1899,9 @@
 
         async function sendPreviewToServer(){
             if(!processedImg.src) return;
+            
+            // Skip if server-side processing is disabled (intervalMs = 0)
+            if (intervalMs === 0) return;
 
             // Reduce server upload frequency on mobile
             if (isMobile && frameCount % 3 !== 0) return;
@@ -1827,8 +1912,25 @@
                 const form = new FormData();
                 form.append('frame', blob, 'client.jpg');
                 const sessionId = alertsSession.sessionId ? `?session_id=${encodeURIComponent(alertsSession.sessionId)}` : '';
-                await fetch(`/predict${sessionId}`, {method:'POST', body: form});
-            }catch(e){}
+                
+                // Add timeout for Render free tier (30 second limit)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+                
+                try {
+                    await fetch(`/predict${sessionId}`, {
+                        method:'POST', 
+                        body: form,
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            }catch(e){
+                // Silently fail to avoid disrupting exam flow
+                // Server-side processing is optional (client-side detection still works)
+                console.debug('Server-side processing skipped:', e.message);
+            }
         }
 
         // ================= SPEECH RECOGNITION =================
@@ -2096,8 +2198,13 @@
                     micStatus.innerText = `${Math.round(meterPct*100)}%`;
 
                     // Loud detection thresholds (balanced)
-                    // LS-2 (balanced): alert when meterPct > 0.90 (90%)
-                    const loudDetected = meterPct > 0.90;
+                    // Adjust this value to change sensitivity:
+                    // - 0.60 (60%) = very sensitive, detects background noise
+                    // - 0.75 (75%) = moderate, detects normal talking
+                    // - 0.90 (90%) = less sensitive, mainly shouting
+                    // - 0.95+ (95%+) = only very loud sounds
+                    const LOUD_THRESHOLD = 0.60; // Set to 0.60 for detecting background noise and normal talking
+                    const loudDetected = meterPct > LOUD_THRESHOLD;
                     if (loudDetected) {
                         setAlert(alertLoudSound, true, `Loud sound detected (${Math.round(meterPct*100)}%)`);
                         logAlert('loud_sound', `Loud sound detected (${Math.round(meterPct*100)}%)`);
@@ -2141,10 +2248,9 @@
                 // start recording the full session (use same stream if available)
                 try { startMediaRecorder(stream); } catch(e) { console.warn('startMediaRecorder failed', e); }
 
-                // mic analysis (no sound playback) - reduce frequency on mobile
-                if (!isMobile || Math.random() < 0.7) { // 70% chance to start mic on mobile
-                    startMicAnalysis().catch(e=>console.warn('mic start failed', e));
-                }
+                // mic analysis (no sound playback) - always start on all devices
+                // Audio detection is essential for proctoring, so we always enable it
+                startMicAnalysis().catch(e=>console.warn('mic start failed', e));
 
                 // Start speech recognition with better error handling and longer delays
                 const startDelay = isMobile ? 5000 : 1000; // Even longer delay on mobile

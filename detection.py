@@ -29,6 +29,13 @@ mp_holistic = mp.solutions.holistic
 mp_draw = mp.solutions.drawing_utils
 mp_face_detection = mp.solutions.face_detection
 
+# Audio detection configuration
+AUDIO_LOUD_THRESHOLD = 0.60  # RMS threshold for loud sound detection (0.0 to 1.0)
+                              # Lower = more sensitive (detects quieter sounds)
+                              # Higher = less sensitive (only very loud sounds like shouting)
+                              # Set to 0.60 (60%) to detect background noise and normal talking
+                              # Recommended: 0.60 for background noise, 0.75 for normal talking, 0.90+ for shouting only
+
 
 def mediapipe_detection(image, model):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -152,7 +159,7 @@ def frontend_alert():
 
 # Initialize Firebase (using Render secret file path)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_admin_key.json")
+    cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
     firebase_admin.initialize_app(cred)
     db = firestore.client()
 
@@ -317,8 +324,7 @@ def detect_audio():
 
         # Detect loud sounds (simple RMS threshold)
         rms = np.sqrt(np.mean(samples**2))
-        loud_threshold = 0.1  # adjustable threshold
-        is_loud = rms > loud_threshold
+        is_loud = rms > AUDIO_LOUD_THRESHOLD
 
         # Detect loud sounds only (removed multiple voices detection)
         # Flag session if session_id provided
@@ -358,6 +364,15 @@ def detect_audio():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    """
+    Process video frame for cheating detection.
+    
+    NOTE: For Render free tier hosting:
+    - This endpoint is CPU-intensive (MediaPipe, YOLO, OpenCV)
+    - Frontend is configured to send frames every 5-10 seconds (not every frame)
+    - Consider reducing processing frequency or using client-side detection only
+    - Free tier has 30-second timeout limits - processing should complete quickly
+    """
     session_id = request.args.get('session_id')
 
     file = None
@@ -722,6 +737,25 @@ def take_exam(exam_id):
         elif now > end_date:
             flash('This exam has expired and is no longer available.', 'error')
             return redirect('/student_dashboard')
+
+    # Validate student section (if user_id is provided via query parameter)
+    # Note: In production, use proper session management instead of query parameters
+    user_id = request.args.get('user_id')
+    if user_id and exam_data.get('class_id'):
+        try:
+            user_ref = db.collection('users').document(user_id)
+            user = user_ref.get()
+            if user.exists:
+                user_data = user.to_dict()
+                student_class_id = user_data.get('class_id')
+                
+                # Check if student's class matches exam's class
+                if student_class_id and student_class_id != exam_data.get('class_id'):
+                    flash('You are not authorized to take this exam. This exam is for a different section.', 'error')
+                    return redirect('/student_dashboard')
+        except Exception as e:
+            print(f'Error validating student section: {e}')
+            # Continue anyway if validation fails (for backward compatibility)
 
     return render_template('index.html', exam_id=exam_id)
 

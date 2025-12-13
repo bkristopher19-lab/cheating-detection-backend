@@ -620,14 +620,14 @@
                 ]);
 
                 // Check if proctor has classes assigned
-                const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
-                const proctorClassIds = proctorClasses.map(c => c.id);
+                const proctorClasses = (classes || []).filter(c => String(c.proctor_id) === String(userId));
+                const proctorClassIds = proctorClasses.map(c => String(c.id));
 
                 // If proctor has classes, filter by classes; otherwise show all exams
                 let proctorExams, proctorExamIds;
                 if (proctorClassIds.length > 0) {
                     // Filter exams to those in proctor's classes
-                    proctorExams = (exams || []).filter(e => proctorClassIds.includes(e.class_id));
+                    proctorExams = (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)));
                     proctorExamIds = proctorExams.map(e => e.id);
                 } else {
                     // If no classes assigned, show all exams (admin/proctor can see all)
@@ -666,7 +666,7 @@
 
                 // Proctors: combine explicit proctor users and any proctor_id referenced in classes
                 const proctorUsers = users.filter(u => userRole(u) === 'proctor');
-                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id).filter(Boolean)));
+                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id ? String(c.proctor_id) : null).filter(Boolean)));
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
 
@@ -860,10 +860,10 @@
                 ]);
 
                 // Filter data based on proctor permissions
-                const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
-                const proctorClassIds = proctorClasses.map(c => c.id);
+                const proctorClasses = (classes || []).filter(c => String(c.proctor_id) === String(userId));
+                const proctorClassIds = proctorClasses.map(c => String(c.id));
                 const proctorExams = proctorClassIds.length > 0
-                    ? (exams || []).filter(e => proctorClassIds.includes(e.class_id))
+                    ? (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)))
                     : exams || [];
                 const proctorExamIds = proctorExams.map(e => e.id);
                 const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
