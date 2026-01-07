@@ -179,3 +179,308 @@
             flex: 0 0 260px;
         }
 
+        /* Fullscreen Modal Styles */
+        #fullscreenModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            font-family: Inter, sans-serif;
+            color: white;
+        }
+
+        #fullscreenModal .modal-content {
+            text-align: center;
+            padding: 2rem;
+        }
+
+        #fullscreenModal h2 {
+            margin-bottom: 1rem;
+            color: #ff6b6b;
+        }
+
+        #fullscreenModal p {
+            margin-bottom: 2rem;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        #fullscreenBtn {
+            background: #6ee7b7;
+            color: #032;
+            border: none;
+            padding: 1rem 2rem;
+            font-size: 1.2rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        #fullscreenBtn:hover {
+            background: #4dd0e1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Fullscreen Modal -->
+    <div id="fullscreenModal">
+        <div class="modal-content">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+            <h2>FULLSCREEN REQUIRED</h2>
+            <p>
+                This exam must be taken in fullscreen mode.<br>
+                Click the button below to continue.
+            </p>
+            <button id="fullscreenBtn">Enter Fullscreen Mode</button>
+        </div>
+    </div>
+
+    <!-- Permission Modal -->
+    <div id="permissionModal" class="permission-modal" style="display: none;">
+        <div class="permission-content">
+            <div class="permission-header">
+                <h3>Permissions Required</h3>
+                <p>This exam requires camera and microphone access for proctoring.</p>
+            </div>
+            <div class="permission-details">
+                <div class="permission-item">
+                    <div class="permission-icon">📹</div>
+                    <div>
+                        <strong>Camera Access</strong>
+                        <p>Required for face detection and monitoring</p>
+                    </div>
+                </div>
+                <div class="permission-item">
+                    <div class="permission-icon">🎤</div>
+                    <div>
+                        <strong>Microphone Access</strong>
+                        <p>Required for audio monitoring</p>
+                    </div>
+                </div>
+            </div>
+            <div class="permission-buttons">
+                <button class="btn btn-secondary" onclick="window.location.href='/student_dashboard'">Cancel</button>
+                <button class="btn btn-primary" id="grantPermissionsBtn">Grant Permissions</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Exam Container -->
+    <div id="examContainer" class="exam-container" style="display: none;">
+        <div class="detection-area">
+            <!-- Detection area content -->
+        </div>
+        <div class="exam-questions">
+            <!-- Exam questions will be loaded here -->
+        </div>
+    </div>
+
+    <script>
+        // Fullscreen enforcement functionality
+        let fullscreenModal = document.getElementById('fullscreenModal');
+        let examContainer = document.getElementById('examContainer');
+
+        // Create fullscreen modal if it doesn't exist
+        function createFullscreenModal() {
+            if (!fullscreenModal) {
+                fullscreenModal = document.createElement('div');
+                fullscreenModal.id = 'fullscreenModal';
+                fullscreenModal.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    background: rgba(0,0,0,0.95);
+                    display: none;
+                    z-index: 10000;
+                    align-items: center;
+                    justify-content: center;
+                    flex-direction: column;
+                    font-family: Inter, sans-serif;
+                    color: white;
+                `;
+                fullscreenModal.innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                        <h2 style="margin-bottom: 1rem; color: #ff6b6b;">FULLSCREEN REQUIRED</h2>
+                        <p style="margin-bottom: 2rem; font-size: 1.1rem; line-height: 1.5;">
+                            This exam must be taken in fullscreen mode.<br>
+                            Click the button below to continue.
+                        </p>
+                        <button id="fullscreenBtn" style="
+                            background: #6ee7b7;
+                            color: #032;
+                            border: none;
+                            padding: 1rem 2rem;
+                            font-size: 1.2rem;
+                            font-weight: 600;
+                            border-radius: 8px;
+                            cursor: pointer;
+                            transition: background 0.2s;
+                        ">Enter Fullscreen Mode</button>
+                    </div>
+                `;
+                document.body.appendChild(fullscreenModal);
+            }
+            return fullscreenModal;
+        }
+
+        // Handle fullscreen button click
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'fullscreenBtn') {
+                enterFullscreen();
+            }
+        });
+
+        // Enter fullscreen mode
+        async function enterFullscreen() {
+            try {
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { // Safari
+                    await elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { // IE11
+                    await elem.msRequestFullscreen();
+                } else if (elem.webkitEnterFullscreen) { // iOS Safari
+                    await elem.webkitEnterFullscreen();
+                }
+            } catch (e) {
+                console.warn('Failed to enter fullscreen:', e);
+                alert('Unable to enter fullscreen mode. Please use F11 or browser controls.');
+            }
+        }
+
+        // Check if currently in fullscreen
+        function isFullscreen() {
+            return !!(document.fullscreenElement || 
+                     document.webkitFullscreenElement || 
+                     document.mozFullScreenElement || 
+                     document.msFullscreenElement);
+        }
+
+        // Handle fullscreen change events
+        function handleFullscreenChange() {
+            const isFullscreenNow = isFullscreen();
+            
+            if (!isFullscreenNow) {
+                // User exited fullscreen - show modal and disable exam
+                const modal = createFullscreenModal();
+                modal.style.display = 'flex';
+                
+                if (examContainer) {
+                    examContainer.style.pointerEvents = 'none';
+                    examContainer.style.opacity = '0.3';
+                }
+
+                // Keep checking if user re-enters fullscreen
+                const checkFullscreen = () => {
+                    if (isFullscreen()) {
+                        // User successfully entered fullscreen - hide modal and restore exam
+                        modal.style.display = 'none';
+                        if (examContainer) {
+                            examContainer.style.pointerEvents = 'auto';
+                            examContainer.style.opacity = '1';
+                        }
+                    } else {
+                        // Still not in fullscreen - keep checking
+                        setTimeout(checkFullscreen, 100);
+                    }
+                };
+                checkFullscreen();
+            } else {
+                // User entered fullscreen - hide modal if visible
+                if (fullscreenModal) {
+                    fullscreenModal.style.display = 'none';
+                }
+                if (examContainer) {
+                    examContainer.style.pointerEvents = 'auto';
+                    examContainer.style.opacity = '1';
+                }
+            }
+        }
+
+        // Initialize security features including fullscreen
+        async function initSecurityFeatures() {
+            // Enter fullscreen mode - try harder on mobile
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            
+            try {
+                const elem = document.documentElement;
+                if (elem.requestFullscreen) {
+                    await elem.requestFullscreen();
+                } else if (elem.webkitRequestFullscreen) { // Safari
+                    await elem.webkitRequestFullscreen();
+                } else if (elem.msRequestFullscreen) { // IE11
+                    await elem.msRequestFullscreen();
+                } else if (isMobile && elem.webkitEnterFullscreen) { // iOS specific
+                    await elem.webkitEnterFullscreen();
+                }
+                
+                // Double-check on mobile after a short delay
+                if (isMobile) {
+                    setTimeout(() => {
+                        if (!isFullscreen() && elem.requestFullscreen) {
+                            elem.requestFullscreen().catch(() => {});
+                        }
+                    }, 500);
+                }
+            } catch (err) {
+                console.warn('Fullscreen request failed:', err);
+                if (isMobile) {
+                    // On mobile, don't block the exam if fullscreen fails initially
+                    alert('Fullscreen mode is recommended for this exam. Please rotate to landscape and allow fullscreen when prompted.');
+                } else {
+                    // Show fullscreen modal for desktop
+                    const modal = createFullscreenModal();
+                    modal.style.display = 'flex';
+                }
+            }
+
+            // Prevent exiting fullscreen - add event listeners
+            document.addEventListener('fullscreenchange', handleFullscreenChange);
+            document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+            document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+
+            console.log('Security features initialized - Fullscreen required');
+        }
+
+        // Initialize when page loads
+        window.addEventListener('load', function() {
+            // Show permission modal first (if needed)
+            const permissionModal = document.getElementById('permissionModal');
+            if (permissionModal) {
+                // You can show permission modal here if needed
+                // permissionModal.style.display = 'flex';
+            }
+            
+            // Initialize fullscreen requirement
+            initSecurityFeatures();
+        });
+
+        // Also check fullscreen on visibility change (when user returns to tab)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && !isFullscreen()) {
+                // User returned to tab but not in fullscreen - show modal
+                const modal = createFullscreenModal();
+                modal.style.display = 'flex';
+                if (examContainer) {
+                    examContainer.style.pointerEvents = 'none';
+                    examContainer.style.opacity = '0.3';
+                }
+            }
+        });
+    </script>
+</body>
+</html>
+
