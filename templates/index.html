@@ -1784,13 +1784,19 @@
                     console.debug('Fullscreen request failed (ignored):', e);
                 }
                 // Start speech recognition promptly to satisfy mobile gesture requirements
-                try {
-                    startSpeechRecognition();
-                    if (micStatus) micStatus.innerText = 'Speech recognition active';
-                } catch (e) {
-                    console.warn('Speech recognition start failed:', e);
-                    if (micStatus) micStatus.innerText = 'Speech recognition unavailable';
-                }
+                // Use setTimeout to ensure microphone permissions are fully processed
+                setTimeout(() => {
+                    try {
+                        startSpeechRecognition().catch(e => {
+                            console.warn('Speech recognition start failed:', e);
+                            if (micStatus) micStatus.innerText = 'Speech recognition unavailable';
+                        });
+                        if (micStatus) micStatus.innerText = 'Initializing speech recognition...';
+                    } catch (e) {
+                        console.warn('Speech recognition start failed:', e);
+                        if (micStatus) micStatus.innerText = 'Speech recognition unavailable';
+                    }
+                }, 500); // Small delay to ensure mic permissions are ready
             } catch(err) {
                 labelDiv.innerText = 'Initialization error: '+ (err && err.message ? err.message : String(err));
                 return;
@@ -2148,8 +2154,10 @@
         async function startSpeechRecognition() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
                 console.warn('Speech recognition not supported in this browser');
-                micStatus.innerText = 'Speech recognition not supported';
-                alert('Speech recognition is not supported in this browser. Please use a compatible browser like Chrome or Safari.');
+                if (micStatus) {
+                    micStatus.innerText = 'Speech recognition not supported';
+                }
+                // Don't show alert - allow app to continue without speech recognition
                 return;
             }
 
@@ -2157,6 +2165,20 @@
             if (recognition && (recognition.continuous || recognition.state === 'listening')) {
                 console.log('Speech recognition already running');
                 return;
+            }
+
+            // Try to ensure microphone access is available before starting speech recognition
+            // This can help prevent audio-capture errors on Render
+            try {
+                // Check if we already have microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                // If successful, stop it immediately (we just needed permission check)
+                stream.getTracks().forEach(track => track.stop());
+                console.log('Microphone access verified for speech recognition');
+            } catch (micErr) {
+                console.warn('Microphone access check failed for speech recognition:', micErr);
+                // Continue anyway - speech recognition might still work
+                // Some browsers handle mic access internally
             }
 
             try {
@@ -2305,12 +2327,23 @@
                             }
                             break;
                         case 'audio-capture':
-                            // Audio capture failed - show alert once
+                            // Audio capture failed - common on Render/HTTPS issues
+                            // Try to retry after a delay, but allow graceful degradation
+                            console.warn('Speech recognition audio-capture failed, will retry...');
                             if (micStatus) {
-                                micStatus.innerText = 'Audio capture failed';
+                                micStatus.innerText = 'Audio unavailable, retrying...';
                             }
-                            alert('Audio capture failed. Please check your microphone and refresh the page.');
-                            // Don't retry if audio capture failed
+                            // Retry after delay instead of giving up immediately
+                            setTimeout(() => {
+                                try {
+                                    startSpeechRecognition();
+                                } catch (e) {
+                                    console.warn('Speech recognition retry failed:', e);
+                                    if (micStatus) {
+                                        micStatus.innerText = 'Speech recognition unavailable';
+                                    }
+                                }
+                            }, 5000);
                             break;
                         default:
                             // Other errors - silently retry
@@ -2330,16 +2363,18 @@
                     console.log('Speech recognition ended');
                     if (document.visibilityState === 'visible' && !speechNeedsUserRestart) {
                         // Auto-restart only when page is visible and we don't require a user tap
+                        // Add increased delay for better stability on Render
                         setTimeout(() => {
                             try {
                                 startSpeechRecognition();
                             } catch (e) {
                                 console.warn('Speech recognition restart failed:', e);
                                 if (micStatus) {
-                                    micStatus.innerText = 'Speech recognition stopped';
+                                    micStatus.innerText = 'Speech recognition unavailable';
                                 }
+                                // Don't keep retrying if it consistently fails
                             }
-                        }, 2000);
+                        }, 3000); // Increased delay for better stability
                     } else {
                         if (micStatus) micStatus.innerText = 'Speech paused (tap to resume)';
                     }
@@ -2351,13 +2386,27 @@
                 console.warn('Failed to start speech recognition:', e);
                 const captionsElement = document.getElementById('captions');
                 if (captionsElement) {
-                    captionsElement.textContent = 'Speech recognition failed to start';
+                    captionsElement.textContent = 'Speech recognition unavailable';
                     captionsElement.style.display = 'block';
+                    // Auto-hide after 5 seconds
+                    setTimeout(() => {
+                        if (captionsElement) {
+                            captionsElement.style.display = 'none';
+                        }
+                    }, 5000);
                 }
                 if (micStatus) {
-                micStatus.innerText = 'Failed to start speech recognition';
+                    micStatus.innerText = 'Speech recognition unavailable';
                 }
-                alert('Failed to start speech recognition. Please refresh the page or use a different browser.');
+                // Don't show alert - allow app to continue without speech recognition
+                // Retry after delay
+                setTimeout(() => {
+                    try {
+                        startSpeechRecognition();
+                    } catch (retryErr) {
+                        console.warn('Speech recognition retry failed:', retryErr);
+                    }
+                }, 10000); // Retry after 10 seconds
             }
         }
 
