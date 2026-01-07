@@ -1714,33 +1714,10 @@
         async function requestPermissions() {
             try {
                 // Reduced frame size for Render free tier memory optimization (640x480 instead of 1280x720)
-                // Try to get both video and audio, but allow video-only if audio fails (common on Render)
-                let stream = null;
-                let hasAudio = false;
-                
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'user', width: 640, height: 480 },
-                        audio: true
-                    });
-                    hasAudio = stream.getAudioTracks().length > 0;
-                } catch (err) {
-                    // If combined request fails, try video only
-                    console.warn('Combined video+audio permission failed, trying video only:', err);
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: 'user', width: 640, height: 480 }
-                        });
-                        hasAudio = false;
-                        // Show warning but continue
-                        console.warn('Audio permission unavailable - exam will continue with video only');
-                    } catch (videoErr) {
-                        // If video also fails, show error
-                        alert('Camera access is required to take this exam. Please allow camera access and try again.');
-                        console.error('Video permission denied:', videoErr);
-                        return;
-                    }
-                }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: 640, height: 480 },
+                    audio: true
+                });
 
                 // Stop the test stream
                 stream.getTracks().forEach(track => track.stop());
@@ -1749,17 +1726,12 @@
                 document.getElementById('permissionModal').style.display = 'none';
                 document.getElementById('examContainer').style.display = 'flex';
 
-                // Show notification if audio is unavailable
-                if (!hasAudio && micStatus) {
-                    micStatus.innerText = 'Audio unavailable - exam will continue';
-                }
-
                 // Now start the exam
                 await startExam();
 
             } catch (err) {
-                alert('Camera access is required to take this exam. Please allow access and try again.');
-                console.error('Permission error:', err);
+                alert('Camera and microphone access are required to take this exam. Please allow access and try again.');
+                console.error('Permission denied:', err);
             }
         }
 
@@ -2453,55 +2425,18 @@
         let micDataArray = null;
         let prevSpec = null;
 
-        async function startMicAnalysis(existingStream = null){
-            // Try to reuse audio track from existing stream first (e.g., from video stream)
-            let audioTrack = null;
-            
-            if (existingStream) {
-                const audioTracks = existingStream.getAudioTracks();
-                if (audioTracks.length > 0) {
-                    audioTrack = audioTracks[0];
-                    console.log('Reusing audio track from existing stream');
-                }
-            }
-            
-            // If no existing audio track, request mic access separately
-            if (!audioTrack) {
-                try{
-                    console.log('Requesting separate microphone access...');
-                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                    const tracks = micStream.getAudioTracks();
-                    if (tracks.length > 0) {
-                        audioTrack = tracks[0];
-                    }
-                }catch(e){
-                    micStatus.innerText = 'Microphone unavailable';
-                    console.warn('mic access denied or failed (common on Render/HTTPS issues):', e);
-                    // Don't return - allow app to continue without audio
-                    // Audio is optional for basic proctoring functionality
-                    return;
-                }
-            } else {
-                // Create a new stream with just the audio track from existing stream
-                micStream = new MediaStream([audioTrack]);
+        async function startMicAnalysis(){
+            // request mic access
+            try{
+                micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            }catch(e){
+                micStatus.innerText = 'Microphone blocked';
+                console.warn('mic access denied', e);
+                return;
             }
 
             try{
-                // Check if AudioContext is supported
-                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-                if (!AudioContextClass) {
-                    micStatus.innerText = 'Audio not supported';
-                    console.warn('AudioContext not supported');
-                    return;
-                }
-                
-                audioCtx = new AudioContextClass();
-                
-                // Resume audio context if suspended (required for some browsers)
-                if (audioCtx.state === 'suspended') {
-                    await audioCtx.resume();
-                }
-                
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const src = audioCtx.createMediaStreamSource(micStream);
                 analyser = audioCtx.createAnalyser();
                 analyser.fftSize = 2048; // better resolution for voice
@@ -2516,16 +2451,7 @@
                 const specFloat = new Float32Array(bufferLength);
 
                 function analyzeAudio(){
-                    if(!analyser || !micStream) return;
-                    
-                    // Check if audio track is still active
-                    const tracks = micStream.getAudioTracks();
-                    if (tracks.length === 0 || tracks[0].readyState !== 'live') {
-                        console.warn('Audio track ended, stopping analysis');
-                        micStatus.innerText = 'Audio disconnected';
-                        return;
-                    }
-                    
+                    if(!analyser) return;
                     analyser.getByteFrequencyData(micDataArray);
 
                     // compute RMS-like loudness from freq bins
@@ -2556,13 +2482,14 @@
                         setAlert(alertLoudSound, false);
                     }
 
+
+
                     requestAnimationFrame(analyzeAudio);
                 }
                 analyzeAudio();
             }catch(e){
                 micStatus.innerText = 'Mic error';
                 console.error('startMicAnalysis error', e);
-                // Continue execution - audio failure shouldn't break the app
             }
         }
 
@@ -2580,29 +2507,8 @@
             // try to get permission & preview then start full camera processing
             try{
                 // Reduced frame size for Render free tier memory optimization (640x480)
-                // Try to get both video and audio, but continue even if audio fails
-                let stream = null;
-                let audioAvailable = false;
-                
-                try {
-                    const constraints = { video: { facingMode: useFront ? 'user' : 'environment', width: 640, height: 480 }, audio: true };
-                    stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    audioAvailable = stream.getAudioTracks().length > 0;
-                    console.log('Initial stream obtained - Audio available:', audioAvailable);
-                } catch (err) {
-                    // If combined request fails, try video only (common on Render)
-                    console.warn('Combined video+audio request failed, trying video only:', err);
-                    try {
-                        stream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: useFront ? 'user' : 'environment', width: 640, height: 480 }
-                        });
-                        audioAvailable = false;
-                        console.log('Video-only stream obtained');
-                    } catch (videoErr) {
-                        throw videoErr; // Re-throw if video also fails
-                    }
-                }
-                
+                const constraints = { video: { facingMode: useFront ? 'user' : 'environment', width: 640, height: 480 }, audio: true };
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 if(video.srcObject) stopTracks(video.srcObject);
                 video.srcObject = stream;
                 try{ await video.play(); }catch(e){ console.debug('preview play ignored', e); }
@@ -2613,26 +2519,9 @@
                 // start recording the full session (use same stream if available)
                 try { startMediaRecorder(stream); } catch(e) { console.warn('startMediaRecorder failed', e); }
 
-                // mic analysis - reuse audio track from the initial stream to avoid multiple requests
-                // This prevents audio capture failures on Render and other hosting platforms
-                // Audio detection is essential for proctoring, but we handle failures gracefully
-                if (audioAvailable && stream.getAudioTracks().length > 0) {
-                    // Reuse audio from existing stream
-                    startMicAnalysis(stream).catch(e=>{
-                        console.warn('mic start failed (app will continue without audio):', e);
-                        if (micStatus) {
-                            micStatus.innerText = 'Audio unavailable';
-                        }
-                    });
-                } else {
-                    // Try to get audio separately if not in initial stream
-                    startMicAnalysis(null).catch(e=>{
-                        console.warn('mic start failed (app will continue without audio):', e);
-                        if (micStatus) {
-                            micStatus.innerText = 'Audio unavailable';
-                        }
-                    });
-                }
+                // mic analysis (no sound playback) - always start on all devices
+                // Audio detection is essential for proctoring, so we always enable it
+                startMicAnalysis().catch(e=>console.warn('mic start failed', e));
 
                 // Do not auto-start speech recognition here; it is started from startExam via user gesture
 
