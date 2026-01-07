@@ -29,6 +29,13 @@ mp_holistic = mp.solutions.holistic
 mp_draw = mp.solutions.drawing_utils
 mp_face_detection = mp.solutions.face_detection
 
+# Audio detection configuration
+AUDIO_LOUD_THRESHOLD = 0.60  # RMS threshold for loud sound detection (0.0 to 1.0)
+                              # Lower = more sensitive (detects quieter sounds)
+                              # Higher = less sensitive (only very loud sounds like shouting)
+                              # Set to 0.60 (60%) to detect background noise and normal talking
+                              # Recommended: 0.60 for background noise, 0.75 for normal talking, 0.90+ for shouting only
+
 
 def mediapipe_detection(image, model):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -159,34 +166,51 @@ if not firebase_admin._apps:
 
 def count_faces_bounding_boxes(image, min_confidence=0.4):
     """Return number of faces detected and list of bounding boxes (x,y,w,h) in pixel coords."""
-    with mp_face_detection.FaceDetection(model_selection=0, min_detection_confidence=min_confidence) as fd:
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        res = fd.process(img_rgb)
-        boxes = []
-        if not res.detections:
-            return 0, boxes
-        h, w = image.shape[:2]
-        for det in res.detections:
-            bbox = det.location_data.relative_bounding_box
-            x = int(bbox.xmin * w)
-            y = int(bbox.ymin * h)
-            bw = int(bbox.width * w)
-            bh = int(bbox.height * h)
-            boxes.append((x, y, bw, bh))
-        return len(boxes), boxes
+    # Use global face_detection_model (loaded once, not per request)
+    global face_detection_model
+    img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    res = face_detection_model.process(img_rgb)
+    boxes = []
+    if not res.detections:
+        return 0, boxes
+    h, w = image.shape[:2]
+    for det in res.detections:
+        bbox = det.location_data.relative_bounding_box
+        x = int(bbox.xmin * w)
+        y = int(bbox.ymin * h)
+        bw = int(bbox.width * w)
+        bh = int(bbox.height * h)
+        boxes.append((x, y, bw, bh))
+    return len(boxes), boxes
 
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 YOLO_ONNX = os.path.join(MODEL_DIR, 'yolov5s.onnx')
+
+# Load ML models once at startup (not per request) - CRITICAL for Render free tier memory optimization
+yolo_net = None
 if os.path.exists(YOLO_ONNX):
     try:
         yolo_net = cv2.dnn.readNet(YOLO_ONNX)
         yolo_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
         yolo_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-    except Exception:
+        print("YOLO model loaded successfully")
+    except Exception as e:
+        print(f"Failed to load YOLO model: {e}")
         yolo_net = None
-else:
-    yolo_net = None
+
+# Initialize MediaPipe models once (not per request) - CRITICAL for memory optimization
+# These are thread-safe and can be reused across requests
+holistic_model = mp_holistic.Holistic(
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5,
+    static_image_mode=False  # Video mode for better performance
+)
+face_detection_model = mp_face_detection.FaceDetection(
+    model_selection=0,  # 0 = short-range, 1 = full-range (0 is faster)
+    min_detection_confidence=0.4
+)
+print("MediaPipe models initialized (loaded once, reused per request)")
 
 
 def estimate_head_pose_from_mesh(results, image):
@@ -317,8 +341,7 @@ def detect_audio():
 
         # Detect loud sounds (simple RMS threshold)
         rms = np.sqrt(np.mean(samples**2))
-        loud_threshold = 0.1  # adjustable threshold
-        is_loud = rms > loud_threshold
+        is_loud = rms > AUDIO_LOUD_THRESHOLD
 
         # Detect loud sounds only (removed multiple voices detection)
         # Flag session if session_id provided
@@ -358,6 +381,15 @@ def detect_audio():
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    """
+    Process video frame for cheating detection.
+    
+    NOTE: For Render free tier hosting:
+    - This endpoint is CPU-intensive (MediaPipe, YOLO, OpenCV)
+    - Frontend is configured to send frames every 5-10 seconds (not every frame)
+    - Consider reducing processing frequency or using client-side detection only
+    - Free tier has 30-second timeout limits - processing should complete quickly
+    """
     session_id = request.args.get('session_id')
 
     file = None
@@ -432,35 +464,51 @@ def predict():
     face_count, face_boxes = count_faces_bounding_boxes(frame, min_confidence=0.4)
 
     # 2) process with Mediapipe face mesh / hands via Holistic to draw landmarks and estimate pose
-    with mp_holistic.Holistic(min_detection_confidence=0.5, min_tracking_confidence=0.5) as holistic:
-        image, results = mediapipe_detection(frame, holistic)
-        draw_styled_landmarks(image, results)
+    # Use global holistic_model (loaded once, not per request) - CRITICAL for memory optimization
+    global holistic_model
+    image, results = mediapipe_detection(frame, holistic_model)
+    draw_styled_landmarks(image, results)
 
-        # estimate head pose / gaze
-        looking, angles = estimate_head_pose_from_mesh(results, image)
+    # estimate head pose / gaze
+    looking, angles = estimate_head_pose_from_mesh(results, image)
 
-        # Extract keypoints for potential ML model integration
-        keypoints = extract_keypoints(results)
+    # Extract keypoints for potential ML model integration
+    keypoints = extract_keypoints(results)
 
     # 3) Object detection using YOLO for phones and other objects
+    # Resize frame to 640x640 for YOLO (reduces memory usage)
+    # Original frame is kept for display, but YOLO processes smaller version
     detected_objects = []
     if yolo_net is not None:
         try:
-            blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (640, 640), swapRB=True, crop=False)
+            # Resize frame to 640x640 for YOLO processing (memory optimization)
+            h, w = frame.shape[:2]
+            if h > 640 or w > 640:
+                scale = min(640 / h, 640 / w)
+                new_w, new_h = int(w * scale), int(h * scale)
+                frame_resized = cv2.resize(frame, (new_w, new_h))
+            else:
+                frame_resized = frame
+                new_w, new_h = w, h
+            
+            blob = cv2.dnn.blobFromImage(frame_resized, 1 / 255.0, (640, 640), swapRB=True, crop=False)
             yolo_net.setInput(blob)
             outputs = yolo_net.forward(yolo_net.getUnconnectedOutLayersNames())
 
-            h, w = frame.shape[:2]
+            # Use resized dimensions for YOLO output, then scale back to original
+            yolo_h, yolo_w = 640, 640
+            scale_x = w / yolo_w
+            scale_y = h / yolo_h
             for output in outputs:
                 for detection in output:
                     scores = detection[5:]
                     class_id = np.argmax(scores)
                     confidence = scores[class_id]
                     if confidence > 0.5:  # confidence threshold
-                        center_x = int(detection[0] * w)
-                        center_y = int(detection[1] * h)
-                        width = int(detection[2] * w)
-                        height = int(detection[3] * h)
+                        center_x = int(detection[0] * yolo_w * scale_x)
+                        center_y = int(detection[1] * yolo_h * scale_y)
+                        width = int(detection[2] * yolo_w * scale_x)
+                        height = int(detection[3] * yolo_h * scale_y)
                         x = int(center_x - width / 2)
                         y = int(center_y - height / 2)
 
@@ -722,6 +770,25 @@ def take_exam(exam_id):
         elif now > end_date:
             flash('This exam has expired and is no longer available.', 'error')
             return redirect('/student_dashboard')
+
+    # Validate student section (if user_id is provided via query parameter)
+    # Note: In production, use proper session management instead of query parameters
+    user_id = request.args.get('user_id')
+    if user_id and exam_data.get('class_id'):
+        try:
+            user_ref = db.collection('users').document(user_id)
+            user = user_ref.get()
+            if user.exists:
+                user_data = user.to_dict()
+                student_class_id = user_data.get('class_id')
+                
+                # Check if student's class matches exam's class
+                if student_class_id and student_class_id != exam_data.get('class_id'):
+                    flash('You are not authorized to take this exam. This exam is for a different section.', 'error')
+                    return redirect('/student_dashboard')
+        except Exception as e:
+            print(f'Error validating student section: {e}')
+            # Continue anyway if validation fails (for backward compatibility)
 
     return render_template('index.html', exam_id=exam_id)
 
@@ -1080,6 +1147,84 @@ def get_session_status():
         session_data['id'] = doc.id
 
         return jsonify(session_data), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/get_or_create_session', methods=['POST'])
+def get_or_create_session():
+    """
+    Get an existing active/paused proctoring session for a given student+exam,
+    or create a new one if none exists.
+
+    This is used so that violation flags (proctoring_sessions.flags) are
+    preserved even if the student closes the browser and reopens the exam.
+
+    Expects JSON:
+    {
+        "student_id": "...",
+        "exam_id": "..."
+    }
+
+    Returns JSON:
+    {
+        "session_id": "...",
+        "created": true|false,
+        "session": { ...session_doc... }
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        student_id = data.get('student_id')
+        exam_id = data.get('exam_id')
+
+        if not student_id or not exam_id:
+            return jsonify({'error': 'student_id and exam_id are required'}), 400
+
+        sessions_ref = db.collection('proctoring_sessions')
+
+        # Look for an existing session for this student+exam that is not completed/terminated
+        query = (sessions_ref
+                 .where('student_id', '==', student_id)
+                 .where('exam_id', '==', exam_id)
+                 .where('status', 'in', ['active', 'paused']))
+
+        existing = list(query.stream())
+
+        if existing:
+            # Reuse the first matching session
+            doc = existing[0]
+            session_data = doc.to_dict()
+            session_data['id'] = doc.id
+            return jsonify({
+                'created': False,
+                'session_id': doc.id,
+                'session': session_data
+            }), 200
+
+        # No existing active/paused session → create a new one
+        session_data = {
+            'student_id': student_id,
+            'exam_id': exam_id,
+            'start_time': datetime.utcnow().isoformat(),
+            'status': 'active',
+            # Keep flags empty so we only accumulate violations from this point
+            'flags': {},
+            'video_path': None,
+            'clip_path': None
+        }
+
+        doc_ref = sessions_ref.add(session_data)
+        session_id = doc_ref[1].id
+
+        session_data['id'] = session_id
+
+        return jsonify({
+            'created': True,
+            'session_id': session_id,
+            'session': session_data
+        }), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

@@ -79,7 +79,10 @@
                     <li class="nav-item me-3">
                         <span class="navbar-text" id="userInfo">
                             <strong id="userName"></strong><br>
-                            <small id="userEmail"></small>
+                            <small id="userEmail"></small><br>
+                            <small class="text-muted" id="userSection" style="font-size: 0.85rem;">
+                                <i class='bx bx-group'></i> <span id="sectionDisplay">Loading section...</span>
+                            </small>
                         </span>
                     </li>
                     <li class="nav-item dropdown">
@@ -105,7 +108,27 @@
     </nav>
 
     <div class="container py-4">
-        <h2 class="mb-4">Available Exams</h2>
+        <!-- Join class by code -->
+        <div class="card mb-4">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center gap-3">
+                <div>
+                    <h5 class="mb-1">Join a Section with Code</h5>
+                    <p class="mb-0 text-muted small">Enter the join code shared by your proctor/admin to link to a section.</p>
+                </div>
+                <div class="ms-md-auto d-flex gap-2 w-100 w-md-auto">
+                    <input type="text" id="joinCodeInput" class="form-control" placeholder="e.g., ABC123" maxlength="10" style="text-transform: uppercase;">
+                    <button class="btn btn-primary" id="joinCodeBtn">Join</button>
+                </div>
+                <div id="joinCodeMessage" class="small"></div>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="mb-0">Available Exams</h2>
+            <div class="alert alert-info mb-0" style="padding: 0.5rem 1rem;">
+                <small><i class='bx bx-info-circle'></i> Showing exams for your section only</small>
+            </div>
+        </div>
 
         <div class="row" id="examsList">
             <!-- Exams will be loaded here dynamically -->
@@ -174,15 +197,104 @@
     <script>
         let selectedExamId = null;
 
-        // Load available exams
+        // Load available exams (filtered by student's section)
         async function loadExams() {
-            const response = await fetch('/select?collection=exams');
-            const exams = await response.json();
-            const userResponse = await fetch('/select?collection=users&id=' + sessionStorage.getItem('userId'));
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) return;
+
+            // Load user, classes, exams, and proctoring sessions in parallel
+            const [userResponse, classesResponse, examsResponse, sessionsResponse] = await Promise.all([
+                fetch('/select?collection=users&id=' + userId),
+                fetch('/select?collection=classes'),
+                fetch('/select?collection=exams'),
+                fetch('/select?collection=proctoring_sessions')
+            ]);
+
+            if (!userResponse.ok || !classesResponse.ok || !examsResponse.ok || !sessionsResponse.ok) {
+                console.error('Failed to load user, classes, exams, or sessions');
+                return;
+            }
+
             const user = await userResponse.json();
+            const classes = await classesResponse.json();
+            const allExams = await examsResponse.json();
+            const allSessions = await sessionsResponse.json();
+
+            // Get student's class_id
+            const studentClassId = user.class_id;
+            
+            // Build class lookup
+            const classMap = {};
+            classes.forEach(cls => classMap[cls.id] = cls);
+
+            // Display student's section
+            if (studentClassId && classMap[studentClassId]) {
+                const studentClass = classMap[studentClassId];
+                document.getElementById('sectionDisplay').textContent = `${studentClass.course} - ${studentClass.section}`;
+            } else {
+                document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                document.getElementById('sectionDisplay').style.color = '#dc3545';
+            }
+
+            // Filter exams to only show exams for student's section
+            const exams = studentClassId 
+                ? allExams.filter(exam => exam.class_id === studentClassId)
+                : []; // If student has no class_id, show no exams
 
             const examsList = document.getElementById('examsList');
             examsList.innerHTML = '';
+
+            if (exams.length === 0 && !studentClassId) {
+                examsList.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <i class='bx bx-info-circle'></i> You are not assigned to any section. Please contact your administrator or join with a code below.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (exams.length === 0) {
+                examsList.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class='bx bx-info-circle'></i> No exams available for your section at this time.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Build a quick lookup for prior violation info per exam for this user
+            const violationInfoByExam = {};
+            const userSessions = (allSessions || []).filter(s =>
+                s &&
+                (s.student_id === user.id || s.user_id === user.id) &&
+                s.exam_id
+            );
+
+            userSessions.forEach(s => {
+                const examId = s.exam_id;
+                if (!examId) return;
+                const flags = s.flags || {};
+                const hasPhone =
+                    (flags.phone && flags.phone.length > 0) ||
+                    (flags.object_detected_cell_phone && flags.object_detected_cell_phone.length > 0);
+                const terminated = (s.status && s.status.toString().toLowerCase() === 'terminated');
+
+                if (!violationInfoByExam[examId]) {
+                    violationInfoByExam[examId] = {
+                        hasPhone: false,
+                        terminated: false
+                    };
+                }
+
+                violationInfoByExam[examId].hasPhone =
+                    violationInfoByExam[examId].hasPhone || hasPhone;
+                violationInfoByExam[examId].terminated =
+                    violationInfoByExam[examId].terminated || terminated;
+            });
 
             const now = new Date();
 
@@ -208,9 +320,20 @@
                     }
                 }
 
+                const vInfo = violationInfoByExam[exam.id];
+                const blockedForViolations = vInfo && (vInfo.terminated || vInfo.hasPhone);
+
                 let buttonHtml = '';
+                let violationNoteHtml = '';
                 if (taken) {
                     buttonHtml = '<button class="btn btn-secondary" disabled>Completed</button>';
+                } else if (blockedForViolations) {
+                    buttonHtml = '<button class="btn btn-danger" disabled>Blocked (prior violations)</button>';
+                    if (vInfo && vInfo.hasPhone) {
+                        violationNoteHtml = '<p class="card-text small text-danger mb-0">Previous attempt blocked: phone detected.</p>';
+                    } else if (vInfo && vInfo.terminated) {
+                        violationNoteHtml = '<p class="card-text small text-danger mb-0">Previous attempt terminated due to violations.</p>';
+                    }
                 } else if (deadlineStatus === 'not-started') {
                     buttonHtml = '<button class="btn btn-warning" disabled>Not Started</button>';
                 } else if (deadlineStatus === 'expired') {
@@ -228,6 +351,7 @@
                                 <p class="card-text">Duration: ${exam.duration} minutes</p>
                                 <p class="card-text">Questions: ${exam.questions.length}</p>
                                 <p class="card-text small text-muted">${deadlineText}</p>
+                                ${violationNoteHtml}
                                 ${buttonHtml}
                             </div>
                         </div>
@@ -252,7 +376,74 @@
         // Handle exam start
         document.getElementById('startExamBtn').addEventListener('click', function() {
             if (selectedExamId) {
-                window.location.href = `/take_exam/${selectedExamId}`;
+                const userId = sessionStorage.getItem('userId');
+                window.location.href = `/take_exam/${selectedExamId}?user_id=${userId}`;
+            }
+        });
+
+        // Join class by code
+        document.getElementById('joinCodeBtn').addEventListener('click', async function() {
+            const codeInput = document.getElementById('joinCodeInput');
+            const msgEl = document.getElementById('joinCodeMessage');
+            msgEl.textContent = '';
+            msgEl.className = 'small';
+
+            const rawCode = (codeInput.value || '').trim().toUpperCase();
+            if (!rawCode) {
+                msgEl.textContent = 'Please enter a join code.';
+                msgEl.classList.add('text-danger');
+                return;
+            }
+
+            try {
+                // Load classes and find by join_code (case-insensitive match)
+                const classesResponse = await fetch('/select?collection=classes');
+                const classes = await classesResponse.json();
+                const targetClass = classes.find(cls => (cls.join_code || '').toUpperCase() === rawCode);
+
+                if (!targetClass) {
+                    msgEl.textContent = 'Invalid join code.';
+                    msgEl.classList.add('text-danger');
+                    return;
+                }
+
+                // Update user with class_id
+                const userId = sessionStorage.getItem('userId');
+                if (!userId) {
+                    msgEl.textContent = 'You must be logged in to join a section.';
+                    msgEl.classList.add('text-danger');
+                    return;
+                }
+
+                const updateRes = await fetch(`/edit/${userId}?collection=users`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ class_id: targetClass.id })
+                });
+
+                if (!updateRes.ok) {
+                    let errText = 'Failed to join section. Please try again.';
+                    try {
+                        const errJson = await updateRes.json();
+                        if (errJson && errJson.error) {
+                            errText = `Failed to join section: ${errJson.error}`;
+                        }
+                    } catch (_) {}
+                    msgEl.textContent = errText;
+                    msgEl.classList.add('text-danger');
+                    return;
+                }
+
+                msgEl.textContent = `Joined section: ${targetClass.course} - ${targetClass.section}`;
+                msgEl.classList.add('text-success');
+
+                // Refresh UI
+                loadExams();
+                loadUserInfo();
+            } catch (err) {
+                console.error('Join code error:', err);
+                msgEl.textContent = 'Error joining section. Please try again.';
+                msgEl.classList.add('text-danger');
             }
         });
 
@@ -301,10 +492,28 @@
         }
 
         // Load user information
-        function loadUserInfo() {
-            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+        async function loadUserInfo() {
+            const userId = sessionStorage.getItem('userId');
+            const userResponse = await fetch('/select?collection=users&id=' + userId);
+            const user = await userResponse.json();
+            
             document.getElementById('userName').textContent = user.name || 'Student';
             document.getElementById('userEmail').textContent = user.email || '';
+
+            // Load student's section
+            if (user.class_id) {
+                const classesResponse = await fetch('/select?collection=classes');
+                const classes = await classesResponse.json();
+                const studentClass = classes.find(cls => cls.id === user.class_id);
+                if (studentClass) {
+                    document.getElementById('sectionDisplay').textContent = `${studentClass.course} - ${studentClass.section}`;
+                } else {
+                    document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                }
+            } else {
+                document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                document.getElementById('sectionDisplay').style.color = '#dc3545';
+            }
 
             // Load dark mode preference
             const darkMode = localStorage.getItem('darkMode') === 'true';
@@ -355,15 +564,23 @@
 
                         let scoreDisplay = 'N/A';
                         let dateTaken = 'N/A';
+                        let statusBadge = '';
 
-                        if (userResult && exam.questions) {
-                            let correctAnswers = 0;
-                            exam.questions.forEach((question, index) => {
-                                if (userResult.answers && userResult.answers[index] === question.correctAnswer) {
-                                    correctAnswers++;
-                                }
-                            });
-                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                        if (userResult) {
+                            // Show forced/terminated as 0
+                            if (userResult.forced_score === 0 || userResult.terminated) {
+                                scoreDisplay = '0 (terminated)';
+                                statusBadge = '<span class="badge bg-danger">Terminated</span>';
+                            } else if (exam.questions) {
+                                let correctAnswers = 0;
+                                exam.questions.forEach((question, index) => {
+                                    if (userResult.answers && userResult.answers[index] === question.correctAnswer) {
+                                        correctAnswers++;
+                                    }
+                                });
+                                scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                                statusBadge = '<span class="badge bg-success">Completed</span>';
+                            }
                             dateTaken = userResult.timestamp ? new Date(userResult.timestamp).toLocaleDateString() : 'N/A';
                         }
 
@@ -371,7 +588,7 @@
                             <tr>
                                 <td>${user.name || 'Unknown'}</td>
                                 <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
-                                <td>${scoreDisplay}</td>
+                                <td>${scoreDisplay} ${statusBadge}</td>
                                 <td>${dateTaken}</td>
                             </tr>
                         `;

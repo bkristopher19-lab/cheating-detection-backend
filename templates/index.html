@@ -62,8 +62,10 @@
 .detection-area.collapsed .proctor-header {
   display: none !important;
 }
+/* Keep alert distribution visible even when collapsed */
 
-/* Keep video element hidden but functional when collapsed */
+
+ /* Keep video element hidden but functional when collapsed */
 .detection-area.collapsed .media {
   position: absolute;
   opacity: 0;
@@ -537,6 +539,10 @@
             <div class="title">Proctoring Active</div>
         </div>
 
+
+
+
+
         <div class="viewer">
             <!-- Alerts area -->
             <div id="alerts" aria-live="polite">
@@ -578,46 +584,46 @@
                     <div style="font-weight:600; font-size:0.95rem; margin-bottom:10px; color:#e6eef8; display:flex; align-items:center; gap:8px;">
                         <span>⚠️</span>
                         <span>Your Violations</span>
-            </div>
+                    </div>
                     <div class="alert-dist-list" style="display:flex; flex-direction:column; gap:6px; font-size:0.85rem;">
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffd59a;">Multiple Faces</span>
                             <span class="badge" id="student-alert-twofaces" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-        </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffb3b3;">Loud Sound</span>
                             <span class="badge" id="student-alert-loud-sound" style="background:rgba(255,80,80,0.2); color:#ffb3b3; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffd59a;">Phone Detected</span>
                             <span class="badge" id="student-alert-phone" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                    </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffb3b3;">Fullscreen Exit</span>
                             <span class="badge" id="student-alert-fullscreen-exit" style="background:rgba(255,80,80,0.2); color:#ffb3b3; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                    </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffd59a;">Keyboard Shortcut</span>
                             <span class="badge" id="student-alert-keyboard-shortcut" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                    </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffd59a;">Right Click</span>
                             <span class="badge" id="student-alert-right-click" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                    </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffd59a;">Tab Switch</span>
                             <span class="badge" id="student-alert-tab-switch" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                    </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffd59a;">Speech Detected</span>
                             <span class="badge" id="student-alert-captions" style="background:rgba(255,165,0,0.2); color:#ffd59a; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
-                    </div>
+                        </div>
                         <div class="alert-dist-item" style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;">
                             <span style="color:#ffb3b3;">Face Absent</span>
                             <span class="badge" id="student-alert-face-absent" style="background:rgba(255,80,80,0.2); color:#ffb3b3; padding:2px 8px; border-radius:4px; font-weight:600; min-width:30px; text-align:center;">0</span>
+                        </div>
                     </div>
-                    </div>
-                    </div>
+                </div>
                 </div>
 </div>
 
@@ -636,7 +642,8 @@
     </div>
 </div>
 
-    <canvas id="canvas" width="640" height="360" style="display:none;"></canvas>
+    <!-- Reduced canvas size for Render free tier memory optimization (640x480) -->
+    <canvas id="canvas" width="640" height="480" style="display:none;"></canvas>
 
     <script>
 
@@ -671,6 +678,8 @@
                 }
         }, 3000);
     }
+
+
 
         // Exam state
         let examState = {
@@ -857,33 +866,26 @@
                     try { await alertsSession.videoUploadPromise; } catch(e) { console.warn('video upload failed', e); }
                 }
 
-                // Update user's exam history - only mark as completed if not terminated
-                if (!examState.terminated) {
-                    const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
-                    const userData = await userResponse.json();
-                    const currentExams = userData.exams_taken || [];
-                    if (!currentExams.includes(examState.examId)) {
-                        currentExams.push(examState.examId);
-                    }
+                // Update user's exam history - mark as taken even if terminated to block retakes
+                const userResponse = await fetch(`/select?collection=users&id=${examState.userId}`);
+                const userData = await userResponse.json();
+                const currentExams = userData.exams_taken || [];
+                if (!currentExams.includes(examState.examId)) {
+                    currentExams.push(examState.examId);
+                }
 
-                    // Update user document to mark exam as completed
-                    const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            exams_taken: currentExams
-                        })
-                    });
+                const updateResponse = await fetch(`/edit/${examState.userId}?collection=users`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        exams_taken: currentExams
+                    })
+                });
 
-                    if (!updateResponse.ok) {
-                        console.error('Failed to update user exams_taken');
-                    } else {
-                        console.log('Exam marked as completed in user profile');
-                    }
-                } else {
-                    console.log('Exam terminated due to violation - not marking as completed');
+                if (!updateResponse.ok) {
+                    console.error('Failed to update user exams_taken');
                 }
 
                 // Save exam results using backend endpoint
@@ -896,7 +898,9 @@
                         user_id: examState.userId,
                         exam_id: examState.examId,
                         answers: examState.answers,
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        terminated: !!examState.terminated,
+                        forced_score: examState.forceZeroScore ? 0 : undefined
                     })
                 });
 
@@ -946,47 +950,59 @@
 
         // Modified initAlertsSession function
         async function initAlertsSession() {
-            // Verify authentication before creating session
+            // Verify authentication before creating/reusing session
             if (!examState.userId || !sessionStorage.getItem('userId')) {
                 console.error('Cannot create proctoring session: User not authenticated');
                 return;
             }
 
             try {
-                const response = await fetch('/add?collection=proctoring_sessions', {
+                // Ask backend to get an existing active/paused session
+                // for this student+exam, or create a new one if none exists.
+                const response = await fetch('/get_or_create_session', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        user_id: examState.userId,
-                        exam_id: examState.examId,
-                        start_time: new Date().toISOString(),
-                        status: 'active',
-                        flags: {
-                            face_absent: [],
-                            twofaces: [],
-                            loud_sound: [],
-                            phone: [],
-                            fullscreen_exit: [],
-                            keyboard_shortcut: [],
-                            right_click: [],
-                            tab_switch: [],
-                            captions: []
-                        }
+                        student_id: examState.userId,
+                        exam_id: examState.examId
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Failed to create proctoring session');
+                    throw new Error('Failed to initialize proctoring session');
                 }
-                
+
                 const data = await response.json();
-                alertsSession.sessionId = data.id;
+                alertsSession.sessionId = data.session_id;
                 alertsSession.userId = examState.userId;
                 alertsSession.examId = examState.examId;
+
+                // If session already exists and has flags in Firestore, merge them into alertsSession.flags
+                if (data.session && data.session.flags && alertsSession.flags) {
+                    const serverFlags = data.session.flags || {};
+                    for (const [flagType, flagList] of Object.entries(serverFlags)) {
+                        if (!Array.isArray(flagList)) continue;
+                        alertsSession.flags[flagType] = alertsSession.flags[flagType] || [];
+                        // Avoid duplicating entries on repeated init calls by only adding new ones
+                        const existing = alertsSession.flags[flagType];
+                        flagList.forEach(f => {
+                            // Simple duplicate check by timestamp+message if present
+                            const keyTs = f.timestamp || f.time || '';
+                            const keyMsg = f.message || f.text || '';
+                            const already = existing.some(e =>
+                                (e.timestamp || e.time || '') === keyTs &&
+                                (e.message || e.text || '') === keyMsg
+                            );
+                            if (!already) {
+                                existing.push(f);
+                            }
+                        });
+                    }
+                }
             } catch (err) {
-                console.error('Error creating proctoring session:', err);
+                console.error('Error initializing proctoring session:', err);
             }
         }
 
@@ -1055,6 +1071,16 @@
                 } else if (isMobile && elem.webkitEnterFullscreen) { // iOS specific
                     await elem.webkitEnterFullscreen();
                 }
+                // Double-check on mobile after a short delay to ensure fullscreen sticks
+                if (isMobile) {
+                    setTimeout(() => {
+                        if (!document.fullscreenElement &&
+                            !(document.webkitFullscreenElement) &&
+                            elem.requestFullscreen) {
+                            elem.requestFullscreen().catch(() => {});
+                        }
+                    }, 500);
+                }
             } catch (err) {
                 console.warn('Fullscreen request failed:', err);
                 if (isMobile) {
@@ -1072,21 +1098,39 @@
             document.addEventListener('mozfullscreenchange', handleFullscreenChange);
             document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-            // Tab switch detection
+            // Tab switch detection (with 3s grace handled in visibilitychange)
             document.addEventListener('visibilitychange', handleVisibilityChange);
             
-            // Window blur/focus detection (catches Alt+Tab, clicking outside window, etc.)
+            // Window blur/focus detection (catches Alt+Tab, clicking outside window, etc.) with 3s grace
             let windowBlurTime = null;
             window.addEventListener('blur', () => {
                 windowBlurTime = Date.now();
-                logAlert('tab_switch', 'Window lost focus (Alt+Tab or clicked outside)');
             });
             
             window.addEventListener('focus', () => {
-                if (windowBlurTime && Date.now() - windowBlurTime > 500) {
-                    logAlert('tab_switch', 'Window regained focus after being inactive');
+                if (windowBlurTime) {
+                    const awayMs = Date.now() - windowBlurTime;
+                    if (awayMs >= 3000) {
+                        registerTabSwitch(awayMs);
+                    }
                 }
                 windowBlurTime = null;
+            });
+
+            // Window resize detection (flag resizing attempts)
+            let lastSize = { w: window.innerWidth, h: window.innerHeight };
+            let resizeTimer = null;
+            window.addEventListener('resize', () => {
+                if (resizeTimer) clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    const deltaW = Math.abs(window.innerWidth - lastSize.w);
+                    const deltaH = Math.abs(window.innerHeight - lastSize.h);
+                    if (deltaW > 50 || deltaH > 50) {
+                        logAlert('resize_window', `Window resized (${deltaW}px x ${deltaH}px change)`);
+                        showExamAlert('⚠️ Resizing the window is not allowed during the exam.');
+                    }
+                    lastSize = { w: window.innerWidth, h: window.innerHeight };
+                }, 400);
             });
 
             // Copy-paste prevention
@@ -1095,42 +1139,142 @@
             console.log('Security features initialized');
         }
 
-        function handleFullscreenChange() {
-            if (!document.fullscreenElement && !document.webkitFullscreenElement &&
-                !document.mozFullScreenElement && !document.msFullscreenElement) {
-                // User exited fullscreen - flag as cheating
-                logAlert('fullscreen_exit', 'User exited fullscreen mode');
-                alert('Fullscreen mode is required. Please return to fullscreen to continue the exam.');
-                // Automatically put back to fullscreen mode
-                setTimeout(() => {
+        // Fullscreen enforcement modal
+        let fullscreenModal = null;
+
+        function createFullscreenModal() {
+            if (fullscreenModal) return fullscreenModal;
+
+            fullscreenModal = document.createElement('div');
+            fullscreenModal.id = 'fullscreenModal';
+            fullscreenModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0,0,0,0.95);
+                display: none;
+                z-index: 10000;
+                align-items: center;
+                justify-content: center;
+                flex-direction: column;
+                font-family: Inter, sans-serif;
+                color: white;
+            `;
+
+            fullscreenModal.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">⚠️</div>
+                    <h2 style="margin-bottom: 1rem; color: #ff6b6b;">FULLSCREEN REQUIRED</h2>
+                    <p style="margin-bottom: 2rem; font-size: 1.1rem; line-height: 1.5;">
+                        This exam must be taken in fullscreen mode.<br>
+                        Click the button below to continue.
+                    </p>
+                    <button id="fullscreenBtn" style="
+                        background: #6ee7b7;
+                        color: #032;
+                        border: none;
+                        padding: 1rem 2rem;
+                        font-size: 1.2rem;
+                        font-weight: 600;
+                        border-radius: 8px;
+                        cursor: pointer;
+                        transition: background 0.2s;
+                    ">Enter Fullscreen Mode</button>
+                </div>
+            `;
+
+            document.body.appendChild(fullscreenModal);
+
+            // Add click handler for the fullscreen button
+            document.getElementById('fullscreenBtn').onclick = async () => {
+                try {
                     const elem = document.documentElement;
                     if (elem.requestFullscreen) {
-                        elem.requestFullscreen();
+                        await elem.requestFullscreen();
                     } else if (elem.webkitRequestFullscreen) { // Safari
-                        elem.webkitRequestFullscreen();
+                        await elem.webkitRequestFullscreen();
                     } else if (elem.msRequestFullscreen) { // IE11
-                        elem.msRequestFullscreen();
+                        await elem.msRequestFullscreen();
+                    } else if (elem.webkitEnterFullscreen) { // iOS Safari
+                        await elem.webkitEnterFullscreen();
                     }
-                }, 1000);
+                } catch (e) {
+                    console.warn('Failed to enter fullscreen:', e);
+                    alert('Unable to enter fullscreen mode. Please use F11 or browser controls.');
+                }
+            };
+
+            return fullscreenModal;
+        }
+
+        function handleFullscreenChange() {
+            const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement ||
+                               document.mozFullScreenElement || document.msFullscreenElement;
+
+            if (!isFullscreen) {
+                // User exited fullscreen - flag as cheating and show modal
+                logAlert('fullscreen_exit', 'User exited fullscreen mode');
+
+                const modal = createFullscreenModal();
+                modal.style.display = 'flex';
+
+                // Disable exam interaction while modal is shown
+                const examContainer = document.getElementById('examContainer');
+                if (examContainer) {
+                    examContainer.style.pointerEvents = 'none';
+                    examContainer.style.opacity = '0.3';
+                }
+
+                // Keep checking if user re-enters fullscreen
+                const checkFullscreen = () => {
+                    const nowFullscreen = document.fullscreenElement || document.webkitFullscreenElement ||
+                                        document.mozFullScreenElement || document.msFullscreenElement;
+                    if (nowFullscreen) {
+                        // User successfully entered fullscreen - hide modal and restore exam
+                        modal.style.display = 'none';
+                        if (examContainer) {
+                            examContainer.style.pointerEvents = 'auto';
+                            examContainer.style.opacity = '1';
+                        }
+                    } else {
+                        // Still not in fullscreen - keep checking
+                        setTimeout(checkFullscreen, 100);
+                    }
+                };
+                checkFullscreen();
             }
         }
 
         let tabSwitchCount = 0;
         let lastTabSwitchTime = 0;
+        let hiddenStartTime = null;
 
         function handleVisibilityChange() {
             if (document.hidden) {
-                const now = Date.now();
-                // Prevent rapid-fire detection (debounce)
-                if (now - lastTabSwitchTime > 500) {
-                tabSwitchCount++;
-                    lastTabSwitchTime = now;
-                    logAlert('tab_switch', `User switched tabs or minimized window (count: ${tabSwitchCount})`);
-                    
-                    // Show warning after multiple tab switches
-                    if (tabSwitchCount >= 3) {
-                        showExamAlert(`⚠️ Warning: You have switched tabs ${tabSwitchCount} times. Continued tab switching may result in exam termination.`);
+                hiddenStartTime = Date.now();
+            } else {
+                // User came back; measure how long they were away
+                if (hiddenStartTime) {
+                    const awayMs = Date.now() - hiddenStartTime;
+                    hiddenStartTime = null;
+                    if (awayMs >= 3000) { // only flag if away > 3s
+                        registerTabSwitch(awayMs);
                     }
+                }
+            }
+        }
+
+        function registerTabSwitch(awayMs) {
+            const now = Date.now();
+            // additional debounce to avoid double count between visibility/blur handlers
+            if (now - lastTabSwitchTime > 500) {
+                tabSwitchCount++;
+                lastTabSwitchTime = now;
+                logAlert('tab_switch', `User left quiz window for ${Math.round(awayMs/1000)}s (count: ${tabSwitchCount})`);
+                if (tabSwitchCount >= 3) {
+                    showExamAlert(`⚠️ Warning: You have left the quiz window ${tabSwitchCount} times. Continued switching may terminate the exam.`);
                 }
             }
         }
@@ -1239,10 +1383,15 @@
                     }
                 }
                 
-                // Print Screen
-                else if (e.key === 'PrintScreen' || (e.keyCode === 44)) {
+                // Screenshot / Print Screen attempts (best-effort)
+                const keyLower = (e.key || '').toLowerCase();
+                const isPrintScreen = keyLower === 'printscreen' || e.keyCode === 44;
+                const isMacScreenshot = (e.metaKey && e.shiftKey && (keyLower === '3' || keyLower === '4' || keyLower === '5' || keyLower === '6'));
+                const isCtrlShiftShot = (e.ctrlKey && e.shiftKey && (keyLower === 's' || keyLower === '4' || keyLower === '3'));
+
+                if (isPrintScreen || isMacScreenshot || isCtrlShiftShot) {
                     shortcutDetected = true;
-                    shortcutName = 'Print Screen';
+                    shortcutName = 'Screenshot / Print Screen';
                 }
                 
                 // Alt+Tab detection (system shortcut, can't be prevented but can be detected)
@@ -1270,14 +1419,23 @@
                 }
             }, true);
 
-            // Prevent Ctrl+Shift+Delete (Clear browsing data)
+        // Prevent Ctrl+Shift+Delete (Clear browsing data) and add keyup guard for PrintScreen
             document.addEventListener('keyup', (e) => {
-                if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Delete') {
+            const keyLower = (e.key || '').toLowerCase();
+            const isPrintScreen = keyLower === 'printscreen' || e.keyCode === 44;
+            if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Delete') {
                     e.preventDefault();
                     logAlert('keyboard_shortcut', 'Keyboard shortcut attempted: Ctrl+Shift+Delete');
                     showExamAlert('⚠️ Keyboard shortcut blocked: Ctrl+Shift+Delete');
                     return false;
                 }
+            if (isPrintScreen) {
+                e.preventDefault();
+                e.stopPropagation();
+                logAlert('keyboard_shortcut', 'Keyboard shortcut attempted: Print Screen');
+                showExamAlert('⚠️ Screenshot shortcuts are disabled during the exam.');
+                return false;
+            }
             }, true);
         }
 
@@ -1397,7 +1555,7 @@
 
             const current = parseInt(badge.textContent || '0', 10);
             badge.textContent = current + 1;
-            
+
             // Add animation effect when count updates
             badge.style.transform = 'scale(1.2)';
             setTimeout(() => {
@@ -1405,15 +1563,83 @@
             }, 200);
         }
 
+        // Helper to terminate exam with zero score
+        function terminateExam(message) {
+            if (examState.terminated) return;
+            examState.terminated = true;
+            examState.forceZeroScore = true;
+
+            // Stop further processing to avoid extra violations after exam ends
+            try {
+                running = false;
+                if (sendInterval) clearInterval(sendInterval);
+                sendInterval = null;
+                stopSpeechRecognition && stopSpeechRecognition();
+                if (audioCtx && audioCtx.state !== 'closed') {
+                    audioCtx.close().catch(() => {});
+                }
+                if (micStream) {
+                    micStream.getTracks().forEach(t => t.stop());
+                }
+                if (video && video.srcObject) {
+                    video.srcObject.getTracks().forEach(t => t.stop());
+                    video.srcObject = null;
+                }
+            } catch (e) {
+                console.warn('Cleanup after termination failed:', e);
+            }
+
+            showExamAlert(message);
+            setTimeout(() => {
+                submitExam();
+            }, 1500);
+        }
+
+        // Per-violation thresholds
+        const VIOLATION_LIMITS = {
+            phone: 1,
+            twofaces: 3,
+            loud_sound: 3,
+            fullscreen_exit: 3,
+            keyboard_shortcut: 3,
+            right_click: 3,
+            tab_switch: 3,
+            face_absent: 3,
+        };
+
+        // Cooldown to avoid double-counting rapid duplicate events
+        const TYPE_COOLDOWN_MS = 2000;
+        // Per-type pause window after a violation (prevents continuous increments, e.g., face_absent)
+        const PER_TYPE_PAUSE_MS = 5000;
+        const lastPerTypeAlertTime = {};
+        const perTypeBlockUntil = {};
+
         // Modify logAlert function to update immediately and trigger clip recording
         async function logAlert(type, message) {
+            // Stop counting once exam is completed/terminated to avoid extra violations
+            if (examState.terminated || examState.completed) return;
             if (!alertsSession.sessionId) return;
+
+            const now = Date.now();
+
+            // If this type is currently in a pause window, ignore
+            if (perTypeBlockUntil[type] && now < perTypeBlockUntil[type]) {
+                return;
+            }
+
+            // Debounce per type to prevent double-counting rapid duplicate events
+            if (lastPerTypeAlertTime[type] && (now - lastPerTypeAlertTime[type] < TYPE_COOLDOWN_MS)) {
+                return; // ignore duplicate within cooldown
+            }
+            lastPerTypeAlertTime[type] = now;
 
             // Add timestamp to local flags array
             alertsSession.flags[type].push({
                 timestamp: new Date().toISOString(),
                 message: message
             });
+
+            const perTypeCount = alertsSession.flags[type].length;
 
             // Update student Alert Distribution panel
             updateStudentAlertDistribution(type);
@@ -1423,38 +1649,46 @@
                 startCheatingClip();
             }
 
-            // Alert counting and exam termination logic
-            const now = Date.now();
-            if (now - lastAlertTime > ALERT_COOLDOWN) {
-                totalAlertCount++;
-                lastAlertTime = now;
-
-                if (totalAlertCount === 1) {
-                    // 1st alert: warning
-                    showExamAlert('⚠️ WARNING: Suspicious activity detected! This is your first violation.');
-                } else if (totalAlertCount === 2) {
-                    // 2nd alert: pause exam for 5 seconds
-                    showExamAlert('🚨 SECOND VIOLATION: Exam paused for 5 seconds due to suspicious activity.');
-                    // Disable exam interaction
+            // Per-type enforcement with thresholds
+            const limit = VIOLATION_LIMITS[type];
+            if (limit) {
+                if (type === 'phone') {
+                    // Immediate termination on first phone detection
+                    terminateExam('🚨 PHONE DETECTED: Exam terminated immediately. Your exam will be marked as incomplete (0 points).');
+                } else if (perTypeCount >= limit) {
+                    terminateExam(`🚨 THIRD VIOLATION (${type}): Exam terminated. Marked as incomplete (0 points).`);
+                } else if (perTypeCount === 2) {
+                    // Second violation of this type: pause
+                    showExamAlert(`🚨 SECOND ${type.toUpperCase()} VIOLATION: Exam paused for 5 seconds.`);
+                    perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
                     const examContainer = document.getElementById('examContainer');
                     if (examContainer) {
                         examContainer.style.pointerEvents = 'none';
                         examContainer.style.opacity = '0.5';
                     }
-                    // Re-enable after 5 seconds
                     setTimeout(() => {
                         if (examContainer) {
                             examContainer.style.pointerEvents = 'auto';
                             examContainer.style.opacity = '1';
                         }
                         showExamAlert('Exam resumed. Please continue taking your exam.');
-                    }, 5000);
-                } else if (totalAlertCount >= 3) {
-                    // 3rd alert: automatic finish exam as incomplete
-                    showExamAlert('🚨 THIRD VIOLATION: Exam terminated due to multiple violations. Your exam will be marked as incomplete.');
+                    }, PER_TYPE_PAUSE_MS);
+                } else if (perTypeCount === 1) {
+                    // First violation: pause then resume
+                    showExamAlert(`⚠️ FIRST ${type.replace('_', ' ').toUpperCase()} VIOLATION: Exam paused for 5 seconds.`);
+                    perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
+                    const examContainer = document.getElementById('examContainer');
+                    if (examContainer) {
+                        examContainer.style.pointerEvents = 'none';
+                        examContainer.style.opacity = '0.5';
+                    }
                     setTimeout(() => {
-                        submitExam();
-                    }, 2000);
+                        if (examContainer) {
+                            examContainer.style.pointerEvents = 'auto';
+                            examContainer.style.opacity = '1';
+                        }
+                        showExamAlert('Exam resumed. Please continue taking your exam.');
+                    }, PER_TYPE_PAUSE_MS);
                 }
             }
 
@@ -1479,8 +1713,9 @@
 
         async function requestPermissions() {
             try {
+                // Reduced frame size for Render free tier memory optimization (640x480 instead of 1280x720)
                 const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: 1280, height: 720 },
+                    video: { facingMode: 'user', width: 640, height: 480 },
                     audio: true
                 });
 
@@ -1511,11 +1746,29 @@
                 await initAlertsSession();
                 await initModels();
                 await initSecurityFeatures(); // Add security features
+                // Try to enter fullscreen (best effort, requires user gesture)
+                try {
+                    const el = document.documentElement || document.body;
+                    if (el.requestFullscreen) el.requestFullscreen().catch(()=>{});
+                    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+                    else if (el.msRequestFullscreen) el.msRequestFullscreen();
+                } catch (e) {
+                    console.debug('Fullscreen request failed (ignored):', e);
+                }
+                // Start speech recognition promptly to satisfy mobile gesture requirements
+                try {
+                    startSpeechRecognition();
+                    if (micStatus) micStatus.innerText = 'Speech recognition active';
+                } catch (e) {
+                    console.warn('Speech recognition start failed:', e);
+                    if (micStatus) micStatus.innerText = 'Speech recognition unavailable';
+                }
             } catch(err) {
                 labelDiv.innerText = 'Initialization error: '+ (err && err.message ? err.message : String(err));
                 return;
             }
             // Keep existing detection initialization
+            examState.active = true;
         }
 
         // Start exam when page loads
@@ -1576,13 +1829,17 @@
         let useFront = true;
         let running = false;
         let sendInterval = null;
-        let intervalMs = 500;
+        // Server-side processing interval (ms)
+        // For Render free tier: Use 10000-15000ms (10-15 seconds) to avoid overload
+        // For paid hosting: Can use 500-1000ms (0.5-1 second) for real-time detection
+        // Set to 0 to disable server-side processing entirely (use client-side only)
+        let intervalMs = 15000; // Default: 15 seconds (PC and mobile use similar light server load)
 
-        // Mobile performance optimizations
+        // Performance optimizations (same for mobile and PC)
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         let frameCount = 0;
         let lastProcessedTime = 0;
-        const targetFPS = isMobile ? 10 : 20; // Lower FPS on mobile
+        const targetFPS = 10; // Consistent 10 FPS for all devices
         const frameInterval = 1000 / targetFPS;
 
         // Models
@@ -1742,12 +1999,12 @@
             });
 
             let phoneDetections = [];
-            // Reduce object detection frequency on mobile to improve performance
-            if(cocoModel && (!isMobile || frameCount % 5 === 0)){
+            // Reduce object detection frequency on ALL devices to improve performance
+            if(cocoModel && frameCount % 5 === 0){
                 try{
                     detCtx.clearRect(0,0,DET_W,DET_H);
                     detCtx.drawImage(video, 0, 0, DET_W, DET_H);
-                    const detections = await cocoModel.detect(detCanvas, isMobile ? 5 : 10); // Lower threshold on mobile
+                    const detections = await cocoModel.detect(detCanvas, 5); // Consistent low threshold for all devices
                     phoneDetections = detections.filter(d => {
                         const cls = String(d.class).toLowerCase();
                         return cls.includes('cell') && cls.includes('phone') || cls === 'cell phone' || cls === 'mobile phone' || cls === 'phone';
@@ -1817,9 +2074,12 @@
 
         async function sendPreviewToServer(){
             if(!processedImg.src) return;
+            
+            // Skip if server-side processing is disabled (intervalMs = 0)
+            if (intervalMs === 0) return;
 
-            // Reduce server upload frequency on mobile
-            if (isMobile && frameCount % 3 !== 0) return;
+            // Reduce server upload frequency on ALL devices
+            if (frameCount % 3 !== 0) return;
 
             try{
                 const res = await fetch(processedImg.src);
@@ -1827,13 +2087,32 @@
                 const form = new FormData();
                 form.append('frame', blob, 'client.jpg');
                 const sessionId = alertsSession.sessionId ? `?session_id=${encodeURIComponent(alertsSession.sessionId)}` : '';
-                await fetch(`/predict${sessionId}`, {method:'POST', body: form});
-            }catch(e){}
+                
+                // Add timeout for Render free tier (30 second limit)
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 second timeout
+                
+                try {
+                    await fetch(`/predict${sessionId}`, {
+                        method:'POST', 
+                        body: form,
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+            }catch(e){
+                // Silently fail to avoid disrupting exam flow
+                // Server-side processing is optional (client-side detection still works)
+                console.debug('Server-side processing skipped:', e.message);
+            }
         }
 
         // ================= SPEECH RECOGNITION =================
         let recognition = null;
         let captionsClearTimeout = null;
+        let speechNeedsUserRestart = false;
+        let speechStarted = false;
 
         async function startSpeechRecognition() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -1857,6 +2136,7 @@
                 recognition.lang = 'en-US'; // Can be made configurable
 
                 recognition.onstart = () => {
+                    speechStarted = true;
                     console.log('Speech recognition started');
                     // Show captions area with "Listening..." message
                     const captionsElement = document.getElementById('captions');
@@ -1958,6 +2238,8 @@
                 };
 
                 recognition.onerror = (event) => {
+                    // Always re-fetch the captions element to avoid undefined references
+                    const captionsEl = document.getElementById('captions');
                     console.warn('Speech recognition error:', event.error);
 
                     // Handle specific error types
@@ -2014,19 +2296,22 @@
                 };
 
                 recognition.onend = () => {
-                    console.log('Speech recognition ended - restarting silently');
-                    // Auto-restart speech recognition silently
-                    // This is normal behavior - recognition ends after a timeout and restarts
-                    setTimeout(() => {
-                        try {
-                            startSpeechRecognition();
-                        } catch (e) {
-                            console.warn('Speech recognition restart failed:', e);
-                            if (micStatus) {
-                            micStatus.innerText = 'Speech recognition stopped';
-                        }
-                        }
-                    }, 2000);
+                    console.log('Speech recognition ended');
+                    if (document.visibilityState === 'visible' && !speechNeedsUserRestart) {
+                        // Auto-restart only when page is visible and we don't require a user tap
+                        setTimeout(() => {
+                            try {
+                                startSpeechRecognition();
+                            } catch (e) {
+                                console.warn('Speech recognition restart failed:', e);
+                                if (micStatus) {
+                                    micStatus.innerText = 'Speech recognition stopped';
+                                }
+                            }
+                        }, 2000);
+                    } else {
+                        if (micStatus) micStatus.innerText = 'Speech paused (tap to resume)';
+                    }
                 };
 
                 recognition.start();
@@ -2044,6 +2329,41 @@
                 alert('Failed to start speech recognition. Please refresh the page or use a different browser.');
             }
         }
+
+        function stopSpeechRecognition() {
+            try {
+                if (recognition) {
+                    recognition.onend = null; // prevent auto-restart during manual stop
+                    recognition.stop();
+                }
+            } catch (e) {
+                console.warn('Failed to stop speech recognition:', e);
+            }
+        }
+
+        // Pause speech recognition when the tab is hidden; require user tap to resume
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'hidden') {
+                speechNeedsUserRestart = true;
+                stopSpeechRecognition();
+                if (micStatus) micStatus.innerText = 'Speech paused (app hidden)';
+            } else {
+                // Wait for explicit user gesture to resume (see click handler below)
+                if (micStatus) micStatus.innerText = 'Tap mic to resume speech';
+            }
+        });
+
+        // Simple user gesture handler to resume speech recognition
+        document.addEventListener('click', () => {
+            if (!speechNeedsUserRestart) return;
+            speechNeedsUserRestart = false;
+            try {
+                startSpeechRecognition();
+            } catch (e) {
+                console.warn('Speech resume failed:', e);
+                speechNeedsUserRestart = true;
+            }
+        }, { passive: true });
 
         // ================= AUDIO (MIC) DETECTION =================
         // Balanced thresholds by default (suitable for classroom)
@@ -2096,8 +2416,13 @@
                     micStatus.innerText = `${Math.round(meterPct*100)}%`;
 
                     // Loud detection thresholds (balanced)
-                    // LS-2 (balanced): alert when meterPct > 0.90 (90%)
-                    const loudDetected = meterPct > 0.90;
+                    // Adjust this value to change sensitivity:
+                    // - 0.60 (60%) = very sensitive, detects background noise
+                    // - 0.75 (75%) = moderate, detects normal talking
+                    // - 0.90 (90%) = less sensitive, mainly shouting
+                    // - 0.95+ (95%+) = only very loud sounds
+                    const LOUD_THRESHOLD = 0.60; // Set to 0.60 for detecting background noise and normal talking
+                    const loudDetected = meterPct > LOUD_THRESHOLD;
                     if (loudDetected) {
                         setAlert(alertLoudSound, true, `Loud sound detected (${Math.round(meterPct*100)}%)`);
                         logAlert('loud_sound', `Loud sound detected (${Math.round(meterPct*100)}%)`);
@@ -2129,7 +2454,8 @@
 
             // try to get permission & preview then start full camera processing
             try{
-                const constraints = { video: { facingMode: useFront ? 'user' : 'environment', width: 640, height: 360 }, audio: true };
+                // Reduced frame size for Render free tier memory optimization (640x480)
+                const constraints = { video: { facingMode: useFront ? 'user' : 'environment', width: 640, height: 480 }, audio: true };
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 if(video.srcObject) stopTracks(video.srcObject);
                 video.srcObject = stream;
@@ -2141,27 +2467,16 @@
                 // start recording the full session (use same stream if available)
                 try { startMediaRecorder(stream); } catch(e) { console.warn('startMediaRecorder failed', e); }
 
-                // mic analysis (no sound playback) - reduce frequency on mobile
-                if (!isMobile || Math.random() < 0.7) { // 70% chance to start mic on mobile
-                    startMicAnalysis().catch(e=>console.warn('mic start failed', e));
-                }
+                // mic analysis (no sound playback) - always start on all devices
+                // Audio detection is essential for proctoring, so we always enable it
+                startMicAnalysis().catch(e=>console.warn('mic start failed', e));
 
-                // Start speech recognition with better error handling and longer delays
-                const startDelay = isMobile ? 5000 : 1000; // Even longer delay on mobile
+                // Do not auto-start speech recognition here; it is started from startExam via user gesture
 
-                setTimeout(() => {
-                    try {
-                        startSpeechRecognition();
-                    } catch (e) {
-                        console.warn('Speech recognition auto-start failed:', e);
-                        micStatus.innerText = 'Speech recognition unavailable';
-                    }
-                }, startDelay);
-
-                // mark running and start periodic send (if desired) - reduce frequency on mobile
+                // mark running and start periodic send (if desired) - consistent frequency for all devices
                 running = true;
                 if(sendInterval) clearInterval(sendInterval);
-                const sendIntervalMs = isMobile ? intervalMs * 3 : intervalMs; // Send less frequently on mobile
+                const sendIntervalMs = intervalMs * 3; // Consistent 45-second interval for all devices
                 sendInterval = setInterval(sendPreviewToServer, sendIntervalMs);
 
             }catch(e){

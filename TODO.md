@@ -9,6 +9,9 @@
 - [x] Ensure proctor permissions are respected (only show their classes/exams)
 - [x] Test filtering by exam and section
 
+## Cleanup Tasks
+- [x] Removed redundant AI training code
+
 ## Information Gathered
 - Proctor dashboard shows student scores only for those who have completed exams.
 - Classes have sections, proctors are assigned to classes.

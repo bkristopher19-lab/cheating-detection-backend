@@ -34,6 +34,7 @@
                             <tr>
                                 <th>Course</th>
                                 <th>Section</th>
+                                <th>Join Code</th>
                                 <th>Assigned Proctor</th>
                                 <th>Actions</th>
                             </tr>
@@ -69,6 +70,14 @@
                             <select class="form-control" id="proctorSelect" required>
                                 <option value="">-- Select Proctor or Admin --</option>
                             </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Join Code</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="joinCode" readonly>
+                                <button class="btn btn-outline-secondary" type="button" id="regenJoinCode">Regenerate</button>
+                            </div>
+                            <small class="text-muted">Share this code with students so they can join the section.</small>
                         </div>
                     </form>
                 </div>
@@ -107,6 +116,16 @@
             }
         }
 
+        // Generate a 6-character join code
+        function generateJoinCode() {
+            const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
         // Load Classes
         async function loadClasses() {
             const response = await fetch('/select?collection=classes');
@@ -122,6 +141,7 @@
                 classesTable.row.add([
                     c.course,
                     c.section,
+                    c.join_code || '<span class="text-muted">None</span>',
                     userMap[c.proctor_id] || 'Unassigned',
                     `<button onclick="editClass('${c.id}')" class="btn btn-sm btn-warning me-1">
                         <i class='bx bx-edit'></i>
@@ -144,7 +164,8 @@
             const classData = {
                 course: $('#course').val(),
                 section: $('#section').val(),
-                proctor_id: $('#proctorSelect').val()
+                proctor_id: $('#proctorSelect').val(),
+                join_code: $('#joinCode').val() || generateJoinCode()
             };
             const classId = $('#classId').val();
             const url = classId ? `/edit/${classId}?collection=classes` : '/add?collection=classes';
@@ -166,6 +187,7 @@
             $('#classId').val(id);
             $('#course').val(cls.course);
             $('#section').val(cls.section);
+            $('#joinCode').val(cls.join_code || generateJoinCode());
             await loadProctorsInto('#proctorSelect');
             $('#proctorSelect').val(cls.proctor_id || '');
             $('#classModal').modal('show');
@@ -182,6 +204,12 @@
         $('#classModal').on('hidden.bs.modal', function() {
             $('#classForm')[0].reset();
             $('#classId').val('');
+            $('#joinCode').val('');
+        });
+
+        // Regenerate join code
+        $('#regenJoinCode').on('click', function() {
+            $('#joinCode').val(generateJoinCode());
         });
 
         // Initialize
