@@ -1152,6 +1152,84 @@ def get_session_status():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/get_or_create_session', methods=['POST'])
+def get_or_create_session():
+    """
+    Get an existing active/paused proctoring session for a given student+exam,
+    or create a new one if none exists.
+
+    This is used so that violation flags (proctoring_sessions.flags) are
+    preserved even if the student closes the browser and reopens the exam.
+
+    Expects JSON:
+    {
+        "student_id": "...",
+        "exam_id": "..."
+    }
+
+    Returns JSON:
+    {
+        "session_id": "...",
+        "created": true|false,
+        "session": { ...session_doc... }
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        student_id = data.get('student_id')
+        exam_id = data.get('exam_id')
+
+        if not student_id or not exam_id:
+            return jsonify({'error': 'student_id and exam_id are required'}), 400
+
+        sessions_ref = db.collection('proctoring_sessions')
+
+        # Look for an existing session for this student+exam that is not completed/terminated
+        query = (sessions_ref
+                 .where('student_id', '==', student_id)
+                 .where('exam_id', '==', exam_id)
+                 .where('status', 'in', ['active', 'paused']))
+
+        existing = list(query.stream())
+
+        if existing:
+            # Reuse the first matching session
+            doc = existing[0]
+            session_data = doc.to_dict()
+            session_data['id'] = doc.id
+            return jsonify({
+                'created': False,
+                'session_id': doc.id,
+                'session': session_data
+            }), 200
+
+        # No existing active/paused session → create a new one
+        session_data = {
+            'student_id': student_id,
+            'exam_id': exam_id,
+            'start_time': datetime.utcnow().isoformat(),
+            'status': 'active',
+            # Keep flags empty so we only accumulate violations from this point
+            'flags': {},
+            'video_path': None,
+            'clip_path': None
+        }
+
+        doc_ref = sessions_ref.add(session_data)
+        session_id = doc_ref[1].id
+
+        session_data['id'] = session_id
+
+        return jsonify({
+            'created': True,
+            'session_id': session_id,
+            'session': session_data
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 def cleanup_old_reports():
     """
     Scheduled task to delete proctoring sessions and associated files older than 14 days.
