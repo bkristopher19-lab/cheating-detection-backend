@@ -441,24 +441,8 @@
                     <div class="stat-card card border-left-danger shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
-                            <div class="row g-2">
-                                <div class="col-md-6">
-                                    <label for="cutoffDays" class="form-label small">Delete reports older than (days):</label>
-                                    <input type="number" class="form-control form-control-sm" id="cutoffDays" value="14" min="1" max="365">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="cutoffDate" class="form-label small">Or select specific date:</label>
-                                    <input type="date" class="form-control form-control-sm" id="cutoffDate">
-                                </div>
-                            </div>
                             <div class="mt-2">
-                                <button class="btn btn-danger btn-sm me-2" id="deleteReportsBtn" onclick="deleteOldReports()">
-                                    <i class='bx bx-trash'></i> Delete Old Reports
-                                </button>
-                                <button class="btn btn-outline-secondary btn-sm me-2" onclick="clearDateSelection()">
-                                    <i class='bx bx-x'></i> Clear Date
-                                </button>
-                                <button class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
+                                <button class="btn btn-danger btn-sm me-2" id="deleteAllBtn" onclick="deleteAllReports()">
                                     <i class='bx bx-trash-alt'></i> Delete ALL Reports
                                 </button>
                             </div>
@@ -620,14 +604,14 @@
                 ]);
 
                 // Check if proctor has classes assigned
-                const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
-                const proctorClassIds = proctorClasses.map(c => c.id);
+                const proctorClasses = (classes || []).filter(c => String(c.proctor_id) === String(userId));
+                const proctorClassIds = proctorClasses.map(c => String(c.id));
 
                 // If proctor has classes, filter by classes; otherwise show all exams
                 let proctorExams, proctorExamIds;
                 if (proctorClassIds.length > 0) {
                     // Filter exams to those in proctor's classes
-                    proctorExams = (exams || []).filter(e => proctorClassIds.includes(e.class_id));
+                    proctorExams = (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)));
                     proctorExamIds = proctorExams.map(e => e.id);
                 } else {
                     // If no classes assigned, show all exams (admin/proctor can see all)
@@ -666,7 +650,7 @@
 
                 // Proctors: combine explicit proctor users and any proctor_id referenced in classes
                 const proctorUsers = users.filter(u => userRole(u) === 'proctor');
-                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id).filter(Boolean)));
+                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id ? String(c.proctor_id) : null).filter(Boolean)));
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
 
@@ -860,10 +844,10 @@
                 ]);
 
                 // Filter data based on proctor permissions
-                const proctorClasses = (classes || []).filter(c => c.proctor_id === userId);
-                const proctorClassIds = proctorClasses.map(c => c.id);
+                const proctorClasses = (classes || []).filter(c => String(c.proctor_id) === String(userId));
+                const proctorClassIds = proctorClasses.map(c => String(c.id));
                 const proctorExams = proctorClassIds.length > 0
-                    ? (exams || []).filter(e => proctorClassIds.includes(e.class_id))
+                    ? (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)))
                     : exams || [];
                 const proctorExamIds = proctorExams.map(e => e.id);
                 const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
@@ -1123,50 +1107,7 @@
             document.getElementById('cutoffDate').value = '';
         }
 
-        // Function to delete ALL reports (admin only)
-        async function deleteAllReports() {
-            const confirmationText = prompt('Type "CONFIRM DELETION" to delete ALL reports permanently:');
-            if (confirmationText !== 'CONFIRM DELETION') {
-                alert('Deletion cancelled. You must type "CONFIRM DELETION" exactly.');
-                return;
-            }
 
-            if (!confirm('⚠️ WARNING: This will delete ALL proctoring reports and associated files permanently. This action CANNOT be undone. Are you absolutely sure?')) {
-                return;
-            }
-
-            try {
-                const btn = document.getElementById('deleteAllBtn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
-                btn.disabled = true;
-
-                const response = await fetch('/delete_old_reports', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ delete_all: true })
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(result.message);
-                    // Reload dashboard data
-                    loadDashboardData();
-                } else {
-                    alert('Error: ' + (result.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Delete all reports error:', error);
-                alert('Failed to delete reports. Please try again.');
-            } finally {
-                const btn = document.getElementById('deleteAllBtn');
-                btn.innerHTML = '<i class="bx bx-trash-alt"></i> Delete ALL Reports';
-                btn.disabled = false;
-            }
-        }
     </script>
 
 </body>

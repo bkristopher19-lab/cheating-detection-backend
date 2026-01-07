@@ -53,6 +53,11 @@
 
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul class="navbar-nav ms-auto">
+                        <li class="nav-item me-2 d-none" id="installNavItem">
+                            <button class="btn btn-outline-primary btn-sm" id="installBtn" type="button">
+                                <i class='bx bx-download'></i> Install App
+                            </button>
+                        </li>
                         <li class="nav-item">
                             <button class="btn btn-link nav-link" id="darkModeToggle" title="Toggle Dark Mode">
                                 <i class='bx bx-moon'></i>
@@ -195,6 +200,11 @@
 
         body.dark-mode .nav-link:hover {
             color: #cccccc !important;
+        }
+
+        /* Install button visibility tweaks */
+        #installNavItem.d-none {
+            display: none !important;
         }
 
         body.dark-mode .dropdown-menu {
@@ -466,6 +476,39 @@ document.getElementById('menu-toggle').addEventListener('click', function() {
 });
 
 
+
+// PWA install prompt handling (dashboards)
+(function() {
+    if (window.__pwaInstallBound) return;
+    window.__pwaInstallBound = true;
+
+    let deferredPrompt = null;
+    const installNavItem = document.getElementById('installNavItem');
+    const installBtn = document.getElementById('installBtn');
+
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (installNavItem) installNavItem.classList.remove('d-none');
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPrompt = null;
+        if (installNavItem) installNavItem.classList.add('d-none');
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async () => {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            try {
+                await deferredPrompt.userChoice;
+            } catch (_) {}
+            deferredPrompt = null;
+            if (installNavItem) installNavItem.classList.add('d-none');
+        });
+    }
+})();
 
 // Load user name when navbar loads
 async function loadUserName() {

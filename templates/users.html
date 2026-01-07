@@ -36,6 +36,7 @@
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Role</th>
+                                <th>Section</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -136,6 +137,13 @@
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Class / Section (optional)</label>
+                            <select class="form-control" id="classSelect">
+                                <option value="">-- Select Class/Section --</option>
+                            </select>
+                            <small class="text-muted">Assign to a class to limit exams by section.</small>
+                        </div>
                     </form>
                 </div>
                 <div class="modal-footer">
@@ -155,18 +163,51 @@
     <script>
         // Initialize DataTable
         let userTable = $('#usersTable').DataTable();
+        let classMap = {};
         
+        // Load classes and populate select + map
+        async function loadClasses() {
+            try {
+                const response = await fetch('/select?collection=classes');
+                const classes = await response.json();
+                classMap = {};
+                classes.forEach(cls => { classMap[cls.id] = cls; });
+
+                const $classSelect = $('#classSelect');
+                const currentValue = $classSelect.val();
+                $classSelect.empty();
+                $classSelect.append('<option value="">-- Select Class/Section --</option>');
+                classes.forEach(cls => {
+                    $classSelect.append(`<option value="${cls.id}">${cls.course} - ${cls.section}</option>`);
+                });
+                if (currentValue) {
+                    $classSelect.val(currentValue);
+                }
+            } catch (err) {
+                console.error('Failed to load classes:', err);
+            }
+        }
+
         // Load Users
         async function loadUsers() {
             const response = await fetch('/select?collection=users');
             const users = await response.json();
             
+            // Ensure we have classes loaded
+            if (!Object.keys(classMap).length) {
+                await loadClasses();
+            }
+
             userTable.clear();
             users.forEach(user => {
+                const cls = user.class_id ? classMap[user.class_id] : null;
+                const sectionDisplay = cls ? `${cls.course} - ${cls.section}` : '<span class="text-muted">Not assigned</span>';
+
                 userTable.row.add([
                     user.name,
                     user.email,
                     user.role || 'student',
+                    sectionDisplay,
                     `<button onclick="viewUserExams('${user.id}', '${user.name}')" class="btn btn-sm btn-info me-1">
                         <i class='bx bx-show'></i> View Exams
                      </button>
@@ -187,7 +228,8 @@
                 name: $('#name').val(),
                 email: $('#email').val(),
                 password: $('#password').val(),
-                role: $('#role').val()
+                role: $('#role').val(),
+                class_id: $('#classSelect').val() || null
             };
 
             const userId = $('#userId').val();
@@ -214,6 +256,7 @@
             $('#email').val(user.email);
             $('#role').val(user.role || 'student');
             $('#password').val(''); // Don't populate password
+            $('#classSelect').val(user.class_id || '');
             
             $('#userModal').modal('show');
         }
@@ -235,10 +278,16 @@
         $('#userModal').on('hidden.bs.modal', function() {
             $('#userForm')[0].reset();
             $('#userId').val('');
+            $('#classSelect').val('');
         });
 
         // Load users on page load
-        loadUsers();
+        loadClasses().then(loadUsers);
+
+        // Refresh classes list when opening modal
+        $('#userModal').on('show.bs.modal', function() {
+            loadClasses();
+        });
 
         // Toggle Sidebar
         document.getElementById('menu-toggle').addEventListener('click', function(e) {
