@@ -1833,7 +1833,7 @@
         // For Render free tier: Use 10000-15000ms (10-15 seconds) to avoid overload
         // For paid hosting: Can use 500-1000ms (0.5-1 second) for real-time detection
         // Set to 0 to disable server-side processing entirely (use client-side only)
-        let intervalMs = 15000; // Default: 15 seconds (PC uses 15s, mobile uses 45s for lighter detection)
+        let intervalMs = 15000; // Default: 15 seconds (PC and mobile use same light server load)
 
         // Performance optimizations (same for mobile and PC)
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -2473,10 +2473,10 @@
 
                 // Do not auto-start speech recognition here; it is started from startExam via user gesture
 
-                // mark running and start periodic send (if desired) - lighter frequency for mobile
+                // mark running and start periodic send (if desired) - same frequency for all devices
                 running = true;
                 if(sendInterval) clearInterval(sendInterval);
-                const sendIntervalMs = isMobile ? intervalMs * 3 : intervalMs; // Mobile: 45s, PC: 15s (lighter detection on mobile)
+                const sendIntervalMs = intervalMs * 3; // Consistent 45-second interval for all devices
                 sendInterval = setInterval(sendPreviewToServer, sendIntervalMs);
 
             }catch(e){
@@ -2490,7 +2490,7 @@
             intervalMs = ms;
             if(sendInterval){
                 clearInterval(sendInterval);
-                const sendIntervalMs = isMobile ? intervalMs * 3 : intervalMs;
+                const sendIntervalMs = intervalMs * 3; // Same for mobile and PC
                 sendInterval = setInterval(sendPreviewToServer, sendIntervalMs);
             }
         };
