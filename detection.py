@@ -30,11 +30,12 @@ mp_draw = mp.solutions.drawing_utils
 mp_face_detection = mp.solutions.face_detection
 
 # Audio detection configuration
-AUDIO_LOUD_THRESHOLD = 0.60  # RMS threshold for loud sound detection (0.0 to 1.0)
+AUDIO_LOUD_THRESHOLD = 0.70  # RMS threshold for loud sound detection (0.0 to 1.0)
                               # Lower = more sensitive (detects quieter sounds)
                               # Higher = less sensitive (only very loud sounds like shouting)
-                              # Set to 0.60 (60%) to detect background noise and normal talking
+                              # Set to 0.90 (90%) to detect only loud noises like shouting
                               # Recommended: 0.60 for background noise, 0.75 for normal talking, 0.90+ for shouting only
+                              # Current setting: 0.75 - detects normal talking and louder sounds
 
 
 def mediapipe_detection(image, model):
@@ -159,7 +160,7 @@ def frontend_alert():
 
 # Initialize Firebase (using Render secret file path)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
+    cred = credentials.Certificate("myapplication-0405566f-firebase-adminsdk-fbsvc-5ee3f6e18a.json")
     firebase_admin.initialize_app(cred)
     db = firestore.client()
 
@@ -294,6 +295,7 @@ def detect_audio():
     """
     try:
         session_id = request.args.get('session_id')
+        user_id = request.args.get('user_id') or request.form.get('user_id')
 
         # Get audio data
         audio_data = None
@@ -358,14 +360,20 @@ def detect_audio():
                     # Get current session data
                     session_ref = db.collection('proctoring_sessions').document(session_id)
                     session_doc = session_ref.get()
-                    if session_doc.exists:
-                        current_flags = session_doc.to_dict().get('flags', {})
-                        # Merge new flags with existing flags
-                        for key, value in flags.items():
-                            if key not in current_flags:
-                                current_flags[key] = []
-                            current_flags[key].extend(value)
-                        session_ref.update({'flags': current_flags})
+                    if not session_doc.exists:
+                        session_ref.set({
+                            'user_id': user_id,
+                            'start_time': datetime.utcnow().isoformat() + "Z",
+                            'status': 'active',
+                            'flags': {}
+                        }, merge=True)
+                    current_flags = session_doc.to_dict().get('flags', {}) if session_doc.exists else {}
+                    # Merge new flags with existing flags
+                    for key, value in flags.items():
+                        if key not in current_flags:
+                            current_flags[key] = []
+                        current_flags[key].extend(value)
+                    session_ref.update({'flags': current_flags})
                 except Exception as e:
                     print('Warning: failed to update session flags:', e)
 
@@ -391,6 +399,7 @@ def predict():
     - Free tier has 30-second timeout limits - processing should complete quickly
     """
     session_id = request.args.get('session_id')
+    user_id = request.form.get('user_id') or request.args.get('user_id')
 
     file = None
     for key in ('frame', 'file', 'image'):
@@ -596,7 +605,16 @@ def predict():
 
             if flags:
                 # Update proctoring_sessions with flags
-                db.collection('proctoring_sessions').document(session_id).update({
+                session_ref = db.collection('proctoring_sessions').document(session_id)
+                if not session_ref.get().exists:
+                    session_ref.set({
+                        'user_id': user_id,
+                        'exam_id': request.args.get('exam_id'),  # if passed
+                        'start_time': datetime.utcnow().isoformat() + "Z",
+                        'status': 'active',
+                        'flags': {}
+                    }, merge=True)
+                session_ref.update({
                     'flags': flags
                 })
         except Exception as e:
@@ -790,7 +808,7 @@ def take_exam(exam_id):
             print(f'Error validating student section: {e}')
             # Continue anyway if validation fails (for backward compatibility)
 
-    return render_template('index.html', exam_id=exam_id)
+    return render_template('index.html', exam_id=exam_id, user_id=user_id)
 
 
 @app.route('/profile')

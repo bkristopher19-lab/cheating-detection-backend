@@ -738,16 +738,16 @@
                 // Top 5 students by total alerts across sessions
                 const studentAlertCounts = {};
                 (sessions || []).forEach(s => {
-                    const uid = s.user_id;
-                    const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
-                    if (!uid) return;
+                    const uid = s.user_id || s.id || 'Unknown';
+                    const count = Object.values(s.flags || {}).reduce((sum, val) => sum + (Array.isArray(val) ? val.length : (typeof val === 'number' ? val : 0)), 0);
+                    if (count === 0) return;
                     studentAlertCounts[uid] = (studentAlertCounts[uid] || 0) + count;
                 });
                 const topStudents = Object.entries(studentAlertCounts)
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 5)
                     .map(([uid, count]) => {
-                        const u = users.find(x => x.id === uid) || { name: uid };
+                        const u = users.find(x => x.id === uid) || users.find(x => x.email === uid) || { name: uid };
                         return `<tr><td>${u.name}</td><td>${count}</td></tr>`;
                     }).join('');
                 document.getElementById('topStudentsByAlerts').innerHTML = topStudents || '<tr><td colspan="2">No data</td></tr>';
@@ -891,6 +891,88 @@
         }
 
         // Load student scores with proctoring flags
+        // Unified utility functions for consistent display across all dashboards
+        
+        // Format proctoring flags with readable names
+        function formatProctoringFlags(flags) {
+            if (!flags) return 'None';
+            
+            let flagsObj = flags;
+            if (Array.isArray(flagsObj)) {
+                flagsObj = {};
+                flagsObj.forEach(f => Object.assign(flagsObj, f));
+            }
+            
+            const flagMap = {
+                'object_detected_cell_phone': 'Phone Detected',
+                'object_detected_laptop': 'Laptop Detected',
+                'object_detected_book': 'Book Detected',
+                'phone': 'Phone Detected',
+                'twofaces': 'Multiple Faces',
+                'loud_sound': 'Loud Sound',
+                'keyboard_shortcut': 'Keyboard Shortcut',
+                'tab_switch': 'Tab Switch',
+                'right_click': 'Right Click',
+                'fullscreen_exit': 'Fullscreen Exit',
+                'face_absent': 'Face Absent',
+                'captions': 'Captions Detected'
+            };
+            
+            const formattedFlags = [];
+            Object.entries(flagsObj).forEach(([type, alerts]) => {
+                if (Array.isArray(alerts) && alerts.length > 0) {
+                    const readableType = flagMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    formattedFlags.push(`${readableType}: ${alerts.length}`);
+                }
+            });
+            
+            return formattedFlags.length > 0 ? formattedFlags.join(', ') : 'None';
+        }
+        
+        // Format date and time consistently
+        function formatDateTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleString(); // Shows both date and time
+        }
+        
+        // Format duration from exam result (prioritizes time_taken_formatted, falls back to calculation)
+        function formatDuration(examResult, session) {
+            if (examResult && examResult.time_taken !== undefined) {
+                // Use formatted time if available (exact match with what was displayed during exam)
+                if (examResult.time_taken_formatted) {
+                    return examResult.time_taken_formatted;
+                } else {
+                    // Calculate from time_taken in seconds
+                    const durationSec = examResult.time_taken;
+                    const hours = Math.floor(durationSec / 3600);
+                    const minutes = Math.floor((durationSec % 3600) / 60);
+                    const seconds = durationSec % 60;
+                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            } else if (session && session.start_time) {
+                // Fallback to session-based calculation if time_taken not available
+                const startTime = new Date(session.start_time);
+                let endTime = null;
+                
+                if (examResult && examResult.timestamp) {
+                    endTime = new Date(examResult.timestamp);
+                } else if (session.end_time) {
+                    endTime = new Date(session.end_time);
+                }
+                
+                if (endTime) {
+                    const durationMs = endTime - startTime;
+                    const durationSec = Math.max(0, Math.floor(durationMs / 1000));
+                    const hours = Math.floor(durationSec / 3600);
+                    const minutes = Math.floor((durationSec % 3600) / 60);
+                    const seconds = durationSec % 60;
+                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }
+            return 'N/A';
+        }
+
         async function loadStudentScoresWithFlags(users, exams, sessions, examResults, classMap, allClasses, selectedExamId = null, selectedClassId = null) {
             try {
                 const tbody = document.getElementById('studentScoresTable');
@@ -910,7 +992,7 @@
 
                 // If no students, show message
                 if (studentsToShow.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No students found in selected section.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No students found in selected section.</td></tr>';
                     return;
                 }
 
@@ -919,13 +1001,16 @@
                     const userId = student.id;
 
                     // Get section display
-                    let sectionDisplay = 'Unknown';
-                    if (selectedClassId && classMap[selectedClassId]) {
+                    let sectionDisplay = 'Not Assigned';
+                    if (student.class_id && classMap[student.class_id]) {
+                        const cls = classMap[student.class_id];
+                        sectionDisplay = `${cls.course} - ${cls.section}`;
+                    } else if (selectedClassId && classMap[selectedClassId]) {
                         const cls = classMap[selectedClassId];
                         sectionDisplay = `${cls.course} - ${cls.section}`;
                     } else if (allClasses && allClasses.length > 0) {
-                        // Find student's class (this is a simplification - in real app, student might be in multiple classes)
-                        const studentClass = allClasses.find(cls => cls.proctor_id === sessionStorage.getItem('userId'));
+                        // Find student's class
+                        const studentClass = allClasses.find(cls => cls.id === student.class_id);
                         if (studentClass) {
                             sectionDisplay = `${studentClass.course} - ${studentClass.section}`;
                         }
@@ -939,7 +1024,11 @@
                     if (selectedExamId) {
                         exam = exams.find(e => e.id === selectedExamId);
                         examResult = examResults.find(r => r.user_id === userId && r.exam_id === selectedExamId);
-                        session = sessions.find(s => (s.user_id === userId || s.student_id === userId) && s.exam_id === selectedExamId);
+                        // Find session - check both student_id and user_id, prioritize student_id
+                        session = sessions.find(s => {
+                            const matchesUser = (s.student_id === userId || s.user_id === userId);
+                            return matchesUser && s.exam_id === selectedExamId;
+                        });
                     } else {
                         // If no exam selected, show latest exam taken by student
                         const studentResults = examResults.filter(r => r.user_id === userId);
@@ -948,7 +1037,11 @@
                             studentResults.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
                             examResult = studentResults[0];
                             exam = exams.find(e => e.id === examResult.exam_id);
-                            session = sessions.find(s => (s.user_id === userId || s.student_id === userId) && s.exam_id === examResult.exam_id);
+                            // Find session - check both student_id and user_id, prioritize student_id
+                            session = sessions.find(s => {
+                                const matchesUser = (s.student_id === userId || s.user_id === userId);
+                                return matchesUser && s.exam_id === examResult.exam_id;
+                            });
                         }
                     }
 
@@ -968,39 +1061,10 @@
                         scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
                     }
 
-                    // Get date and time taken
-                    const dateTimeTaken = examResult && examResult.timestamp ? new Date(examResult.timestamp).toLocaleString() : 'N/A';
-
-                    // Calculate duration
-                    let durationDisplay = 'N/A';
-                    if (session && session.start_time && session.end_time) {
-                        const start = new Date(session.start_time);
-                        const end = new Date(session.end_time);
-                        if (!isNaN(start) && !isNaN(end)) {
-                            const durationMs = end - start;
-                            const durationMinutes = Math.round(durationMs / (1000 * 60));
-                            durationDisplay = `${durationMinutes} min`;
-                        }
-                    }
-
-                    // Get proctoring flags
-                    let flagsDisplay = 'None';
-                    if (session && session.flags) {
-                        let flagsObj = session.flags;
-                        if (Array.isArray(flagsObj)) {
-                            flagsObj = {};
-                            flagsObj.forEach(f => Object.assign(flagsObj, f));
-                        }
-                        const flags = [];
-                        Object.entries(flagsObj).forEach(([type, alerts]) => {
-                            if (Array.isArray(alerts) && alerts.length > 0) {
-                                flags.push(`${type}: ${alerts.length}`);
-                            }
-                        });
-                        if (flags.length > 0) {
-                            flagsDisplay = flags.join(', ');
-                        }
-                    }
+                    // Use unified formatting functions
+                    const dateTimeTaken = formatDateTime(examResult ? examResult.timestamp : null);
+                    const durationDisplay = formatDuration(examResult, session);
+                    const flagsDisplay = formatProctoringFlags(session ? session.flags : null);
 
                     const row = `
                         <tr data-student-name="${student.name || 'Unknown'}">

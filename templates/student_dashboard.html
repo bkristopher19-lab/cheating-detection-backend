@@ -147,6 +147,8 @@
                                     <th>Exam Type</th>
                                     <th>Score</th>
                                     <th>Date Taken</th>
+                                    <th>Time Taken / Exam Duration</th>
+                                    <th>Violations</th>
                                 </tr>
                             </thead>
                             <tbody id="scoresTable">
@@ -348,7 +350,7 @@
                             <div class="card-body">
                                 <h5 class="card-title">${exam.title}</h5>
                                 <p class="card-text">${exam.subject}</p>
-                                <p class="card-text">Duration: ${exam.duration} minutes</p>
+                                <p class="card-text">Duration: ${Math.floor(exam.duration).toString().padStart(2, '0')}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}</p>
                                 <p class="card-text">Questions: ${exam.questions.length}</p>
                                 <p class="card-text small text-muted">${deadlineText}</p>
                                 ${violationNoteHtml}
@@ -537,6 +539,88 @@
             document.getElementById('darkModeText').textContent = isDark ? 'Light Mode' : 'Dark Mode';
         });
 
+        // Unified utility functions for consistent display across all dashboards
+        
+        // Format proctoring flags with readable names
+        function formatProctoringFlags(flags) {
+            if (!flags) return 'None';
+            
+            let flagsObj = flags;
+            if (Array.isArray(flagsObj)) {
+                flagsObj = {};
+                flagsObj.forEach(f => Object.assign(flagsObj, f));
+            }
+            
+            const flagMap = {
+                'object_detected_cell_phone': 'Phone Detected',
+                'object_detected_laptop': 'Laptop Detected',
+                'object_detected_book': 'Book Detected',
+                'phone': 'Phone Detected',
+                'twofaces': 'Multiple Faces',
+                'loud_sound': 'Loud Sound',
+                'keyboard_shortcut': 'Keyboard Shortcut',
+                'tab_switch': 'Tab Switch',
+                'right_click': 'Right Click',
+                'fullscreen_exit': 'Fullscreen Exit',
+                'face_absent': 'Face Absent',
+                'captions': 'Captions Detected'
+            };
+            
+            const formattedFlags = [];
+            Object.entries(flagsObj).forEach(([type, alerts]) => {
+                if (Array.isArray(alerts) && alerts.length > 0) {
+                    const readableType = flagMap[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    formattedFlags.push(`${readableType}: ${alerts.length}`);
+                }
+            });
+            
+            return formattedFlags.length > 0 ? formattedFlags.join(', ') : 'None';
+        }
+        
+        // Format date and time consistently
+        function formatDateTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp);
+            return date.toLocaleString(); // Shows both date and time
+        }
+        
+        // Format duration from exam result (prioritizes time_taken_formatted, falls back to calculation)
+        function formatDuration(examResult, session) {
+            if (examResult && examResult.time_taken !== undefined) {
+                // Use formatted time if available (exact match with what was displayed during exam)
+                if (examResult.time_taken_formatted) {
+                    return examResult.time_taken_formatted;
+                } else {
+                    // Calculate from time_taken in seconds
+                    const durationSec = examResult.time_taken;
+                    const hours = Math.floor(durationSec / 3600);
+                    const minutes = Math.floor((durationSec % 3600) / 60);
+                    const seconds = durationSec % 60;
+                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            } else if (session && session.start_time) {
+                // Fallback to session-based calculation if time_taken not available
+                const startTime = new Date(session.start_time);
+                let endTime = null;
+                
+                if (examResult && examResult.timestamp) {
+                    endTime = new Date(examResult.timestamp);
+                } else if (session.end_time) {
+                    endTime = new Date(session.end_time);
+                }
+                
+                if (endTime) {
+                    const durationMs = endTime - startTime;
+                    const durationSec = Math.max(0, Math.floor(durationMs / 1000));
+                    const hours = Math.floor(durationSec / 3600);
+                    const minutes = Math.floor((durationSec % 3600) / 60);
+                    const seconds = durationSec % 60;
+                    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                }
+            }
+            return 'N/A';
+        }
+
         // Load student scores
         async function loadStudentScores() {
             const userId = sessionStorage.getItem('userId');
@@ -547,6 +631,10 @@
             tbody.innerHTML = '';
 
             if (user.exams_taken && user.exams_taken.length > 0) {
+                // Get proctoring sessions for violations
+                const sessionsResponse = await fetch('/select?collection=proctoring_sessions');
+                const allSessions = await sessionsResponse.json();
+
                 for (const examId of user.exams_taken) {
                     try {
                         // Get exam details
@@ -581,8 +669,23 @@
                                 scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
                                 statusBadge = '<span class="badge bg-success">Completed</span>';
                             }
-                            dateTaken = userResult.timestamp ? new Date(userResult.timestamp).toLocaleDateString() : 'N/A';
+                            dateTaken = formatDateTime(userResult.timestamp);
                         }
+
+                        // Find violations for this exam and user
+                        const userSession = allSessions.find(session =>
+                            (session.student_id === userId || session.user_id === userId) &&
+                            session.exam_id === examId
+                        );
+
+                        // Use unified flag formatting function
+                        const violationsDisplay = formatProctoringFlags(userSession ? userSession.flags : null);
+
+                        // Use unified duration formatting function
+                        const durationDisplay = formatDuration(userResult, userSession);
+
+                        // Format exam duration
+                        const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
 
                         const row = `
                             <tr>
@@ -590,6 +693,8 @@
                                 <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
                                 <td>${scoreDisplay} ${statusBadge}</td>
                                 <td>${dateTaken}</td>
+                                <td>${durationDisplay} / ${examDurationDisplay}</td>
+                                <td>${violationsDisplay}</td>
                             </tr>
                         `;
                         tbody.innerHTML += row;
@@ -598,7 +703,7 @@
                     }
                 }
             } else {
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center">No exams taken yet</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No exams taken yet</td></tr>';
             }
         }
 

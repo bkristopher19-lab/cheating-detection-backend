@@ -494,6 +494,171 @@
     </style>
 </head>
 <body>
+    <!-- IMMEDIATE RIGHT-CLICK PREVENTION - Runs before any other scripts -->
+    <script>
+        // Prevent right-click context menu IMMEDIATELY on page load
+        // This must run before any other scripts to prevent context menu from appearing
+        (function() {
+            'use strict';
+            
+            // Violation queue to store violations before logAlert is available
+            window.violationQueue = window.violationQueue || [];
+            
+            // Function to log violations (will be called when logAlert becomes available)
+            function queueViolation(type, message) {
+                window.violationQueue.push({ type: type, message: message, timestamp: Date.now() });
+                // Try to process queue immediately if logAlert is available
+                processViolationQueue();
+            }
+            
+            // Process queued violations once logAlert is available
+            function processViolationQueue() {
+                if (typeof logAlert === 'function' && window.violationQueue.length > 0) {
+                    const queue = window.violationQueue.slice(); // Copy queue
+                    window.violationQueue = []; // Clear queue
+                    queue.forEach(function(violation) {
+                        try {
+                            logAlert(violation.type, violation.message);
+                        } catch (e) {
+                            console.warn('Failed to log violation:', e);
+                            // Re-queue if logging failed
+                            window.violationQueue.push(violation);
+                        }
+                    });
+                }
+            }
+            
+            // Expose processViolationQueue globally so it can be called when logAlert becomes available
+            window.processViolationQueue = processViolationQueue;
+            
+            // Prevent context menu (right-click menu)
+            document.addEventListener('contextmenu', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                queueViolation('right_click', 'Right-click attempted (contextmenu)');
+                return false;
+            }, true);
+            
+            // Prevent right-click via mousedown
+            document.addEventListener('mousedown', function(e) {
+                if (e.button === 2) { // Right mouse button
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    queueViolation('right_click', 'Right-click attempted (mousedown)');
+                    return false;
+                }
+            }, true);
+            
+            // Prevent right-click via mouseup
+            document.addEventListener('mouseup', function(e) {
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    queueViolation('right_click', 'Right-click attempted (mouseup)');
+                    return false;
+                }
+            }, true);
+            
+            // Prevent keyboard shortcuts for developer tools
+            document.addEventListener('keydown', function(e) {
+                let violationType = null;
+                let violationMessage = null;
+                
+                // F12 (Developer Tools)
+                if (e.key === 'F12') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    violationType = 'keyboard_shortcut';
+                    violationMessage = 'F12 pressed (Developer Tools)';
+                }
+                // Ctrl+Shift+I (Developer Tools)
+                else if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    violationType = 'keyboard_shortcut';
+                    violationMessage = 'Ctrl+Shift+I pressed (Developer Tools)';
+                }
+                // Ctrl+Shift+J (Console)
+                else if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    violationType = 'keyboard_shortcut';
+                    violationMessage = 'Ctrl+Shift+J pressed (Console)';
+                }
+                // Ctrl+Shift+C (Inspect Element)
+                else if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    violationType = 'keyboard_shortcut';
+                    violationMessage = 'Ctrl+Shift+C pressed (Inspect Element)';
+                }
+                // Ctrl+U (View Source)
+                else if (e.ctrlKey && e.key === 'U') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    violationType = 'keyboard_shortcut';
+                    violationMessage = 'Ctrl+U pressed (View Source)';
+                }
+                // Ctrl+Shift+P (Command Palette)
+                else if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    violationType = 'keyboard_shortcut';
+                    violationMessage = 'Ctrl+Shift+P pressed (Command Palette)';
+                }
+                
+                if (violationType) {
+                    queueViolation(violationType, violationMessage);
+                    return false;
+                }
+            }, true);
+            
+            // Prevent text selection
+            document.addEventListener('selectstart', function(e) {
+                e.preventDefault();
+                return false;
+            }, true);
+            
+            // Prevent copy, paste, cut
+            document.addEventListener('copy', function(e) {
+                e.preventDefault();
+                if (e.clipboardData) {
+                    e.clipboardData.setData('text/plain', '');
+                }
+                queueViolation('keyboard_shortcut', 'Copy attempted');
+                return false;
+            }, true);
+            
+            document.addEventListener('paste', function(e) {
+                e.preventDefault();
+                if (e.clipboardData) {
+                    e.clipboardData.setData('text/plain', '');
+                }
+                queueViolation('keyboard_shortcut', 'Paste attempted');
+                return false;
+            }, true);
+            
+            document.addEventListener('cut', function(e) {
+                e.preventDefault();
+                if (e.clipboardData) {
+                    e.clipboardData.setData('text/plain', '');
+                }
+                queueViolation('keyboard_shortcut', 'Cut attempted');
+                return false;
+            }, true);
+            
+            // Prevent drag
+            document.addEventListener('dragstart', function(e) {
+                e.preventDefault();
+                return false;
+            }, true);
+            
+            console.log('Right-click prevention activated immediately');
+        })();
+    </script>
     <!-- Permission Request Modal -->
     <div id="permissionModal" class="permission-modal">
         <div class="permission-content">
@@ -520,6 +685,19 @@
             <div class="permission-buttons">
                 <button class="btn btn-secondary" onclick="denyPermissions()">Deny Access</button>
                 <button class="btn btn-primary" onclick="requestPermissions()">Allow Access</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pause Modal -->
+    <div id="pauseModal" class="permission-modal" style="display: none;">
+        <div class="permission-content">
+            <div class="permission-header">
+                <h3>Exam Paused</h3>
+                <p id="pauseMessage">Violation detected. Click Continue to resume the exam.</p>
+            </div>
+            <div class="permission-buttons">
+                <button class="btn btn-primary" onclick="resumeExam()">Continue</button>
             </div>
         </div>
     </div>
@@ -630,6 +808,7 @@
         <!-- Right side: Exam Questions -->
         <div class="exam-questions">
             <div class="timer" id="examTimer">Time Left: 60:00</div>
+            <div class="timer" id="examStopwatch" style="background: rgba(110,231,183,0.1); border-color: var(--accent); margin-top: 0.5rem;">Time Elapsed: 00:00</div>
 
             <h2 id="examTitle">Quiz 1</h2>
             <p class="text-white mb-4" id="examSubject">Subject: CC105</p>
@@ -657,6 +836,12 @@
 
     <!-- Add new script for exam functionality -->
     <script>
+        // Set userId from template
+        const templateUserId = '{{ user_id or "" }}';
+        if (templateUserId) {
+            sessionStorage.setItem('userId', templateUserId);
+        }
+
         // Function to show exam alerts to students
         function showExamAlert(message) {
             // Create or get alert element
@@ -689,8 +874,12 @@
             submitted: false,
             terminated: false, // Flag to indicate if exam was terminated due to violation
             questions: [], // Store exam questions for speech detection
-            allAnswers: [] // Store all possible answers for speech detection
+            allAnswers: [], // Store all possible answers for speech detection
+            finalElapsedTime: null // Store final elapsed time when exam ends
         };
+
+        // Global timer variable
+        let countdownTimer = null;
 
         // Update alertsSession structure to include captions and clip recording
         let alertsSession = {
@@ -718,6 +907,8 @@
         let lastAlertTime = 0;
         const ALERT_COOLDOWN = 5000; // 5 seconds between counting alerts
         let examTerminated = false; // Flag to prevent multiple terminations
+        let currentPausedType = null; // Track currently paused violation type
+        let isExamPaused = false; // Global flag to track if exam is paused (stops all detection)
 
         // Initialize exam with session data
         async function initExam() {
@@ -784,18 +975,37 @@
         }
 
         // Timer functionality
+        let examElapsedTime = 0; // Global variable to track elapsed time (in seconds)
+        let examStartTime = null; // Timestamp when exam started (for precise calculation)
         function startTimer(duration) {
             let timer = duration;
+            examElapsedTime = 0;
+            examStartTime = Date.now(); // Record exact start time
             const timerEl = document.getElementById('examTimer');
-            
-            const countdown = setInterval(() => {
+            const stopwatchEl = document.getElementById('examStopwatch');
+
+            countdownTimer = setInterval(() => {
                 const minutes = Math.floor(timer / 60);
                 const seconds = timer % 60;
-                
-                timerEl.textContent = `Time Left: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-                
+
+                timerEl.textContent = `Time Left: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+
+                // Calculate exact elapsed time from start timestamp
+                const elapsedMs = Date.now() - examStartTime;
+                examElapsedTime = Math.floor(elapsedMs / 1000); // Convert to seconds
+
+                // Update stopwatch with proper HH:MM:SS format
+                const elapsedHours = Math.floor(examElapsedTime / 3600);
+                const elapsedMinutes = Math.floor((examElapsedTime % 3600) / 60);
+                const elapsedSeconds = examElapsedTime % 60;
+                stopwatchEl.textContent = `Time Elapsed: ${elapsedHours.toString().padStart(2, '0')}:${elapsedMinutes.toString().padStart(2, '0')}:${elapsedSeconds.toString().padStart(2, '0')}`;
+
                 if (--timer < 0) {
-                    clearInterval(countdown);
+                    // Calculate final elapsed time when timer expires naturally
+                    const finalElapsedMs = Date.now() - examStartTime;
+                    examState.finalElapsedTime = Math.floor(finalElapsedMs / 1000);
+                    clearInterval(countdownTimer);
+                    countdownTimer = null;
                     submitExam();
                 }
             }, 1000);
@@ -846,12 +1056,32 @@
                 return;
             }
 
+            // Capture elapsed time immediately before clearing timer
+            // Use stored finalElapsedTime if available (from termination), otherwise calculate from start time
+            let finalElapsedTime;
+            if (examState.finalElapsedTime !== null) {
+                finalElapsedTime = examState.finalElapsedTime;
+            } else if (examStartTime !== null) {
+                // Calculate exact elapsed time from start timestamp
+                const elapsedMs = Date.now() - examStartTime;
+                finalElapsedTime = Math.floor(elapsedMs / 1000);
+            } else {
+                // Fallback to counter if start time not available
+                finalElapsedTime = examElapsedTime;
+            }
+
+            // Clear the timer immediately when submitting
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
+
             const answers = [];
             document.querySelectorAll('.question-card').forEach(card => {
                 const selected = card.querySelector('.answer-option.selected');
                 answers.push(selected ? selected.textContent.trim() : null);
             });
-            
+
             examState.answers = answers;
             examState.submitted = true;
 
@@ -888,7 +1118,12 @@
                     console.error('Failed to update user exams_taken');
                 }
 
-                // Save exam results using backend endpoint
+                // Calculate hours, minutes, and seconds from elapsed time
+                const hours = Math.floor(finalElapsedTime / 3600);
+                const minutes = Math.floor((finalElapsedTime % 3600) / 60);
+                const seconds = finalElapsedTime % 60;
+
+                // Save exam results using backend endpoint with time taken in seconds
                 await fetch('/add?collection=exam_results', {
                     method: 'POST',
                     headers: {
@@ -900,7 +1135,9 @@
                         answers: examState.answers,
                         timestamp: new Date().toISOString(),
                         terminated: !!examState.terminated,
-                        forced_score: examState.forceZeroScore ? 0 : undefined
+                        forced_score: examState.forceZeroScore ? 0 : undefined,
+                        time_taken: finalElapsedTime, // Time taken in seconds
+                        time_taken_formatted: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}` // Formatted as HH:MM:SS
                     })
                 });
 
@@ -950,6 +1187,12 @@
 
         // Modified initAlertsSession function
         async function initAlertsSession() {
+            // Process any queued violations from immediate prevention script once session is initialized
+            setTimeout(() => {
+                if (typeof window.processViolationQueue === 'function') {
+                    window.processViolationQueue();
+                }
+            }, 100);
             // Verify authentication before creating/reusing session
             if (!examState.userId || !sessionStorage.getItem('userId')) {
                 console.error('Cannot create proctoring session: User not authenticated');
@@ -1104,10 +1347,15 @@
             // Window blur/focus detection (catches Alt+Tab, clicking outside window, etc.) with 3s grace
             let windowBlurTime = null;
             window.addEventListener('blur', () => {
+                // Stop detection when exam is paused
+                if (isExamPaused) return;
                 windowBlurTime = Date.now();
             });
             
             window.addEventListener('focus', () => {
+                // Stop detection when exam is paused
+                if (isExamPaused) return;
+                
                 if (windowBlurTime) {
                     const awayMs = Date.now() - windowBlurTime;
                     if (awayMs >= 3000) {
@@ -1210,6 +1458,9 @@
         }
 
         function handleFullscreenChange() {
+            // Stop detection when exam is paused
+            if (isExamPaused) return;
+            
             const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement ||
                                document.mozFullScreenElement || document.msFullscreenElement;
 
@@ -1252,6 +1503,9 @@
         let hiddenStartTime = null;
 
         function handleVisibilityChange() {
+            // Stop detection when exam is paused
+            if (isExamPaused) return;
+            
             if (document.hidden) {
                 hiddenStartTime = Date.now();
             } else {
@@ -1267,6 +1521,9 @@
         }
 
         function registerTabSwitch(awayMs) {
+            // Stop detection when exam is paused
+            if (isExamPaused) return;
+            
             const now = Date.now();
             // additional debounce to avoid double count between visibility/blur handlers
             if (now - lastTabSwitchTime > 500) {
@@ -1279,35 +1536,202 @@
             }
         }
 
-        function disableCopyPaste() {
-            // Disable right-click context menu
-            document.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
+        // Global right-click prevention - applied immediately on page load
+        // This prevents right-click from the very start, before exam begins
+        function preventRightClickGlobal(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            // Show alert if exam is active, otherwise just prevent silently
+            if (typeof logAlert === 'function' && typeof isExamPaused !== 'undefined' && !isExamPaused) {
                 logAlert('right_click', 'Right-click attempted');
-                showExamAlert('⚠️ Right-click is disabled during the exam.');
+                if (typeof showExamAlert === 'function') {
+                    showExamAlert('⚠️ Right-click is disabled during the exam.');
+                }
+            } else {
+                // Before exam starts, just prevent silently
+                console.log('Right-click disabled');
+            }
+            return false;
+        }
+
+        function disableCopyPaste() {
+            // Disable right-click context menu - CRITICAL for preventing inspection and fullscreen exit
+            // Note: Global prevention is already applied, this adds exam-specific logging
+            document.addEventListener('contextmenu', (e) => {
+                // Stop detection when exam is paused
+                if (typeof isExamPaused !== 'undefined' && isExamPaused) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                if (typeof logAlert === 'function') {
+                    logAlert('right_click', 'Right-click attempted');
+                }
+                if (typeof showExamAlert === 'function') {
+                    showExamAlert('⚠️ Right-click is disabled during the exam.');
+                }
                 return false;
             }, true);
 
-            // Also prevent right-click on specific elements
+            // Also prevent right-click on specific elements (mousedown)
             document.addEventListener('mousedown', (e) => {
+                // Stop detection when exam is paused
+                if (isExamPaused) return;
+                
                 if (e.button === 2) { // Right mouse button
                     e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
                     logAlert('right_click', 'Right-click attempted (mousedown)');
+                    showExamAlert('⚠️ Right-click is disabled during the exam.');
                     return false;
+                }
+            }, true);
+
+            // Prevent right-click via mouseup as well
+            document.addEventListener('mouseup', (e) => {
+                if (isExamPaused) return;
+                if (e.button === 2) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    return false;
+                }
+            }, true);
+
+            // Prevent keyboard shortcuts that could open dev tools or exit fullscreen
+            document.addEventListener('keydown', (e) => {
+                if (isExamPaused) return;
+                
+                // Prevent F12 (Developer Tools)
+                if (e.key === 'F12') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', 'F12 pressed (Developer Tools)');
+                    showExamAlert('⚠️ Developer tools are disabled during the exam.');
+                    return false;
+                }
+                
+                // Prevent Ctrl+Shift+I (Developer Tools)
+                if (e.ctrlKey && e.shiftKey && e.key === 'I') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', 'Ctrl+Shift+I pressed (Developer Tools)');
+                    showExamAlert('⚠️ Developer tools are disabled during the exam.');
+                    return false;
+                }
+                
+                // Prevent Ctrl+Shift+J (Console)
+                if (e.ctrlKey && e.shiftKey && e.key === 'J') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', 'Ctrl+Shift+J pressed (Console)');
+                    showExamAlert('⚠️ Developer tools are disabled during the exam.');
+                    return false;
+                }
+                
+                // Prevent Ctrl+Shift+C (Inspect Element)
+                if (e.ctrlKey && e.shiftKey && e.key === 'C') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', 'Ctrl+Shift+C pressed (Inspect Element)');
+                    showExamAlert('⚠️ Developer tools are disabled during the exam.');
+                    return false;
+                }
+                
+                // Prevent Ctrl+U (View Source)
+                if (e.ctrlKey && e.key === 'U') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', 'Ctrl+U pressed (View Source)');
+                    showExamAlert('⚠️ View source is disabled during the exam.');
+                    return false;
+                }
+                
+                // Prevent Ctrl+Shift+P (Command Palette in some browsers)
+                if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    logAlert('keyboard_shortcut', 'Ctrl+Shift+P pressed');
+                    return false;
+                }
+                
+                // Try to prevent Escape key from exiting fullscreen
+                // Note: Browsers may still allow Escape to exit fullscreen, but we'll try to prevent it
+                if (e.key === 'Escape' || e.keyCode === 27) {
+                    const isInFullscreen = !!(document.fullscreenElement || 
+                                             document.webkitFullscreenElement || 
+                                             document.mozFullScreenElement || 
+                                             document.msFullscreenElement);
+                    if (isInFullscreen) {
+                        // Try to prevent fullscreen exit
+                        e.preventDefault();
+                        e.stopPropagation();
+                        logAlert('fullscreen_exit', 'Escape key pressed (attempted fullscreen exit)');
+                        showExamAlert('⚠️ Fullscreen mode must remain active during the exam.');
+                        // Re-enter fullscreen after a short delay if it was exited
+                        setTimeout(() => {
+                            const stillInFullscreen = !!(document.fullscreenElement || 
+                                                         document.webkitFullscreenElement || 
+                                                         document.mozFullScreenElement || 
+                                                         document.msFullscreenElement);
+                            if (!stillInFullscreen) {
+                                // Try to re-enter fullscreen
+                                const elem = document.documentElement;
+                                if (elem.requestFullscreen) {
+                                    elem.requestFullscreen().catch(() => {});
+                                } else if (elem.webkitRequestFullscreen) {
+                                    elem.webkitRequestFullscreen();
+                                } else if (elem.msRequestFullscreen) {
+                                    elem.msRequestFullscreen();
+                                }
+                            }
+                        }, 100);
+                        return false;
+                    }
                 }
             }, true);
 
             // Disable text selection on entire page during exam
             document.addEventListener('selectstart', (e) => {
+                if (isExamPaused) return;
                 e.preventDefault();
                 return false;
-            });
+            }, true);
 
             // Disable drag
             document.addEventListener('dragstart', (e) => {
+                if (isExamPaused) return;
                 e.preventDefault();
                 return false;
-            });
+            }, true);
+
+            // Prevent copy (Ctrl+C, Cmd+C)
+            document.addEventListener('copy', (e) => {
+                if (isExamPaused) return;
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', '');
+                logAlert('keyboard_shortcut', 'Copy attempted');
+                return false;
+            }, true);
+
+            // Prevent paste (Ctrl+V, Cmd+V)
+            document.addEventListener('paste', (e) => {
+                if (isExamPaused) return;
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', '');
+                logAlert('keyboard_shortcut', 'Paste attempted');
+                return false;
+            }, true);
+
+            // Prevent cut (Ctrl+X, Cmd+X)
+            document.addEventListener('cut', (e) => {
+                if (isExamPaused) return;
+                e.preventDefault();
+                e.clipboardData.setData('text/plain', '');
+                logAlert('keyboard_shortcut', 'Cut attempted');
+                return false;
+            }, true);
 
             // Disable text selection on questions
             const questionContainer = document.getElementById('questionsContainer');
@@ -1320,6 +1744,9 @@
 
             // Prevent keyboard shortcuts - comprehensive list
             document.addEventListener('keydown', (e) => {
+                // Stop detection when exam is paused
+                if (isExamPaused) return;
+                
                 let shortcutDetected = false;
                 let shortcutName = '';
 
@@ -1421,6 +1848,8 @@
 
         // Prevent Ctrl+Shift+Delete (Clear browsing data) and add keyup guard for PrintScreen
             document.addEventListener('keyup', (e) => {
+                // Stop detection when exam is paused
+                if (isExamPaused) return;
             const keyLower = (e.key || '').toLowerCase();
             const isPrintScreen = keyLower === 'printscreen' || e.keyCode === 44;
             if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Delete') {
@@ -1568,6 +1997,24 @@
             if (examState.terminated) return;
             examState.terminated = true;
             examState.forceZeroScore = true;
+            
+            // Stop all detection immediately
+            isExamPaused = true;
+
+            // Capture elapsed time immediately before clearing timer and store it in examState
+            // Calculate exact elapsed time from start timestamp
+            if (examStartTime !== null) {
+                const elapsedMs = Date.now() - examStartTime;
+                examState.finalElapsedTime = Math.floor(elapsedMs / 1000);
+            } else {
+                examState.finalElapsedTime = examElapsedTime;
+            }
+
+            // Clear the timer immediately when terminating
+            if (countdownTimer) {
+                clearInterval(countdownTimer);
+                countdownTimer = null;
+            }
 
             // Stop further processing to avoid extra violations after exam ends
             try {
@@ -1595,6 +2042,45 @@
             }, 1500);
         }
 
+        // Function to resume exam after pause
+        function resumeExam() {
+            const pauseModal = document.getElementById('pauseModal');
+            const examContainer = document.getElementById('examContainer');
+
+            // Hide the pause modal
+            if (pauseModal) {
+                pauseModal.style.display = 'none';
+            }
+
+            // Re-enable the exam container
+            if (examContainer) {
+                examContainer.style.pointerEvents = 'auto';
+                examContainer.style.opacity = '1';
+            }
+
+            // Resume all detection
+            isExamPaused = false;
+            currentPausedType = null;
+            
+            // Resume sending frames to server
+            if (running && !sendInterval && intervalMs > 0) {
+                const sendIntervalMs = intervalMs * 3;
+                sendInterval = setInterval(sendPreviewToServer, sendIntervalMs);
+            }
+            
+            // Resume speech recognition if it was running
+            if (speechStarted && recognition && recognition.state === 'inactive') {
+                try {
+                    recognition.start();
+                } catch(e) {
+                    console.debug('Speech recognition resume failed:', e);
+                }
+            }
+
+            // Show resume messsage
+            showExamAlert('Exam resumed. Please continue taking your exam.');
+        }
+
         // Per-violation thresholds
         const VIOLATION_LIMITS = {
             phone: 1,
@@ -1610,15 +2096,23 @@
         // Cooldown to avoid double-counting rapid duplicate events
         const TYPE_COOLDOWN_MS = 2000;
         // Per-type pause window after a violation (prevents continuous increments, e.g., face_absent)
-        const PER_TYPE_PAUSE_MS = 5000;
+        const PER_TYPE_PAUSE_MS = 10000;
         const lastPerTypeAlertTime = {};
         const perTypeBlockUntil = {};
 
         // Modify logAlert function to update immediately and trigger clip recording
         async function logAlert(type, message) {
+            // Process any queued violations from immediate prevention script
+            if (typeof window.processViolationQueue === 'function') {
+                window.processViolationQueue();
+            }
+            
             // Stop counting once exam is completed/terminated to avoid extra violations
             if (examState.terminated || examState.completed) return;
             if (!alertsSession.sessionId) return;
+            
+            // Stop all detection when exam is paused
+            if (isExamPaused) return;
 
             const now = Date.now();
 
@@ -1652,44 +2146,79 @@
             // Per-type enforcement with thresholds
             const limit = VIOLATION_LIMITS[type];
             if (limit) {
-                if (type === 'phone') {
-                    // Immediate termination on first phone detection
-                    terminateExam('🚨 PHONE DETECTED: Exam terminated immediately. Your exam will be marked as incomplete (0 points).');
-                } else if (perTypeCount >= limit) {
+                if (perTypeCount >= limit) {
                     terminateExam(`🚨 THIRD VIOLATION (${type}): Exam terminated. Marked as incomplete (0 points).`);
-                } else if (perTypeCount === 2) {
-                    // Second violation of this type: pause
-                    showExamAlert(`🚨 SECOND ${type.toUpperCase()} VIOLATION: Exam paused for 5 seconds.`);
-                    perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
-                    const examContainer = document.getElementById('examContainer');
-                    if (examContainer) {
-                        examContainer.style.pointerEvents = 'none';
-                        examContainer.style.opacity = '0.5';
-                    }
-                    setTimeout(() => {
-                        if (examContainer) {
-                            examContainer.style.pointerEvents = 'auto';
-                            examContainer.style.opacity = '1';
-                        }
-                        showExamAlert('Exam resumed. Please continue taking your exam.');
-                    }, PER_TYPE_PAUSE_MS);
-                } else if (perTypeCount === 1) {
-                    // First violation: pause then resume
-                    showExamAlert(`⚠️ FIRST ${type.replace('_', ' ').toUpperCase()} VIOLATION: Exam paused for 5 seconds.`);
-                    perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
-                    const examContainer = document.getElementById('examContainer');
-                    if (examContainer) {
-                        examContainer.style.pointerEvents = 'none';
-                        examContainer.style.opacity = '0.5';
-                    }
-                    setTimeout(() => {
-                        if (examContainer) {
-                            examContainer.style.pointerEvents = 'auto';
-                            examContainer.style.opacity = '1';
-                        }
-                        showExamAlert('Exam resumed. Please continue taking your exam.');
-                    }, PER_TYPE_PAUSE_MS);
+        } else if (perTypeCount === 2) {
+            // Second violation of this type: pause until continue clicked
+            isExamPaused = true; // Pause all detection
+            currentPausedType = type;
+            
+            // Stop sending frames to server while paused
+            if (sendInterval) {
+                clearInterval(sendInterval);
+                sendInterval = null;
+            }
+            
+            // Stop speech recognition while paused
+            if (recognition && recognition.state !== 'inactive') {
+                try {
+                    recognition.stop();
+                } catch(e) {
+                    console.debug('Speech recognition stop failed:', e);
                 }
+            }
+            
+            showExamAlert(`🚨 SECOND ${type.toUpperCase()} VIOLATION: Exam paused. Click Continue to resume.`);
+            perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
+            const examContainer = document.getElementById('examContainer');
+            if (examContainer) {
+                examContainer.style.pointerEvents = 'none';
+                examContainer.style.opacity = '0.5';
+            }
+            const pauseModal = document.getElementById('pauseModal');
+            const pauseMessage = document.getElementById('pauseMessage');
+            if (pauseMessage) {
+                pauseMessage.textContent = `🚨 SECOND ${type.toUpperCase()} VIOLATION: Click Continue to resume the exam.`;
+            }
+            if (pauseModal) {
+                pauseModal.style.display = 'flex';
+            }
+        } else if (perTypeCount === 1) {
+            // First violation: pause until continue clicked
+            isExamPaused = true; // Pause all detection
+            currentPausedType = type;
+            
+            // Stop sending frames to server while paused
+            if (sendInterval) {
+                clearInterval(sendInterval);
+                sendInterval = null;
+            }
+            
+            // Stop speech recognition while paused
+            if (recognition && recognition.state !== 'inactive') {
+                try {
+                    recognition.stop();
+                } catch(e) {
+                    console.debug('Speech recognition stop failed:', e);
+                }
+            }
+            
+            showExamAlert(`⚠️ FIRST ${type.replace('_', ' ').toUpperCase()} VIOLATION: Exam paused. Click Continue to resume.`);
+            perTypeBlockUntil[type] = Date.now() + PER_TYPE_PAUSE_MS;
+            const examContainer = document.getElementById('examContainer');
+            if (examContainer) {
+                examContainer.style.pointerEvents = 'none';
+                examContainer.style.opacity = '0.5';
+            }
+            const pauseModal = document.getElementById('pauseModal');
+            const pauseMessage = document.getElementById('pauseMessage');
+            if (pauseMessage) {
+                pauseMessage.textContent = `⚠️ FIRST ${type.replace('_', ' ').toUpperCase()} VIOLATION: Click Continue to resume the exam.`;
+            }
+            if (pauseModal) {
+                pauseModal.style.display = 'flex';
+            }
+        }
             }
 
             // Update database immediately
@@ -1755,20 +2284,36 @@
                 } catch (e) {
                     console.debug('Fullscreen request failed (ignored):', e);
                 }
-                // Start speech recognition promptly to satisfy mobile gesture requirements
-                // Use setTimeout to ensure microphone permissions are fully processed
-                setTimeout(() => {
+                // Start speech recognition after ensuring microphone access
+                // Wait longer to ensure microphone permissions are fully processed and stream is ready
+                setTimeout(async () => {
                     try {
-                        startSpeechRecognition().catch(e => {
-                            console.warn('Speech recognition start failed:', e);
-                            if (micStatus) micStatus.innerText = 'Speech recognition unavailable';
-                        });
                         if (micStatus) micStatus.innerText = 'Initializing speech recognition...';
+                        
+                        // Ensure we have microphone access before starting
+                        const stream = await navigator.mediaDevices.getUserMedia({ 
+                            audio: {
+                                echoCancellation: true,
+                                noiseSuppression: true,
+                                autoGainControl: true
+                            },
+                            video: false 
+                        });
+                        audioStreamForSpeech = stream;
+                        
+                        // Start speech recognition after confirming mic access
+                        await startSpeechRecognition();
                     } catch (e) {
-                        console.warn('Speech recognition start failed:', e);
-                        if (micStatus) micStatus.innerText = 'Speech recognition unavailable';
+                        console.warn('Speech recognition initialization failed:', e);
+                        if (micStatus) micStatus.innerText = 'Speech recognition unavailable - retrying...';
+                        // Retry after delay
+                        setTimeout(() => {
+                            startSpeechRecognition().catch(err => {
+                                console.warn('Speech recognition retry failed:', err);
+                            });
+                        }, 3000);
                     }
-                }, 500); // Small delay to ensure mic permissions are ready
+                }, 1000); // Increased delay to ensure mic permissions are ready
             } catch(err) {
                 labelDiv.innerText = 'Initialization error: '+ (err && err.message ? err.message : String(err));
                 return;
@@ -1981,6 +2526,9 @@
         }
 
         async function onFaceResults(results){
+            // Stop all detection processing when exam is paused
+            if (isExamPaused) return;
+            
             const faces = results.multiFaceLandmarks || [];
 
             // Skip processing if no faces and we're on mobile (reduce CPU usage)
@@ -2061,6 +2609,14 @@
                 if (!examTerminated) {
                     examTerminated = true;
                     examState.terminated = true;
+                    examState.forceZeroScore = true;
+                    // Capture elapsed time immediately before termination
+                    if (examStartTime !== null) {
+                        const elapsedMs = Date.now() - examStartTime;
+                        examState.finalElapsedTime = Math.floor(elapsedMs / 1000);
+                    } else {
+                        examState.finalElapsedTime = examElapsedTime;
+                    }
                     totalAlertCount = 1; // Set alert count to 1 for immediate termination
                     showExamAlert('🚨 PHONE DETECTED: Exam terminated immediately. Your exam will be marked as incomplete.');
                     setTimeout(() => {
@@ -2086,6 +2642,9 @@
             
             // Skip if server-side processing is disabled (intervalMs = 0)
             if (intervalMs === 0) return;
+            
+            // Stop sending frames when exam is paused
+            if (isExamPaused) return;
 
             // Reduce server upload frequency on ALL devices
             if (frameCount % 3 !== 0) return;
@@ -2095,6 +2654,9 @@
                 const blob = await res.blob();
                 const form = new FormData();
                 form.append('frame', blob, 'client.jpg');
+                if (alertsSession.userId) {
+                    form.append('user_id', alertsSession.userId);
+                }
                 const sessionId = alertsSession.sessionId ? `?session_id=${encodeURIComponent(alertsSession.sessionId)}` : '';
                 
                 // Add timeout for Render free tier (30 second limit)
@@ -2122,6 +2684,9 @@
         let captionsClearTimeout = null;
         let speechNeedsUserRestart = false;
         let speechStarted = false;
+        let audioStreamForSpeech = null; // Store audio stream for speech recognition
+        let speechRetryCount = 0;
+        const MAX_SPEECH_RETRIES = 5;
 
         async function startSpeechRecognition() {
             if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -2133,58 +2698,122 @@
                 return;
             }
 
-            // Check if already running
-            if (recognition && (recognition.continuous || recognition.state === 'listening')) {
-                console.log('Speech recognition already running');
+            // Check if already running - use state property if available
+            if (recognition) {
+                const state = recognition.state || (recognition.continuous ? 'listening' : 'inactive');
+                if (state === 'listening' || state === 'starting') {
+                    console.log('Speech recognition already running');
+                    return;
+                }
+            }
+
+            // Ensure microphone access is available before starting speech recognition
+            // This is critical for Render hosting and prevents audio-capture errors
+            try {
+                // Check if we have an active audio stream
+                if (!audioStreamForSpeech || audioStreamForSpeech.getAudioTracks().length === 0 || 
+                    audioStreamForSpeech.getAudioTracks().every(track => track.readyState === 'ended')) {
+                    
+                    if (micStatus) {
+                        micStatus.innerText = 'Requesting microphone access...';
+                    }
+                    
+                    // Request microphone access explicitly for speech recognition
+                    // Use a short timeout to avoid blocking
+                    const micPromise = navigator.mediaDevices.getUserMedia({ 
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true
+                        },
+                        video: false 
+                    });
+                    
+                    const timeoutPromise = new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Microphone access timeout')), 5000)
+                    );
+                    
+                    audioStreamForSpeech = await Promise.race([micPromise, timeoutPromise]);
+                    
+                    console.log('Microphone access granted for speech recognition');
+                    
+                    // Keep the stream alive for speech recognition
+                    audioStreamForSpeech.getAudioTracks().forEach(track => {
+                        track.addEventListener('ended', () => {
+                            console.warn('Audio track ended, will retry speech recognition');
+                            audioStreamForSpeech = null;
+                            if (speechRetryCount < MAX_SPEECH_RETRIES) {
+                                speechRetryCount++;
+                                setTimeout(() => startSpeechRecognition(), 2000);
+                            }
+                        });
+                    });
+                }
+            } catch (micErr) {
+                console.warn('Microphone access check failed for speech recognition:', micErr);
+                speechRetryCount++;
+                
+                if (speechRetryCount >= MAX_SPEECH_RETRIES) {
+                    if (micStatus) {
+                        micStatus.innerText = 'Microphone access unavailable';
+                    }
+                    console.error('Max retries reached for microphone access');
+                    return;
+                }
+                
+                // Retry with exponential backoff
+                const retryDelay = Math.min(1000 * Math.pow(2, speechRetryCount), 10000);
+                if (micStatus) {
+                    micStatus.innerText = `Retrying microphone access (${speechRetryCount}/${MAX_SPEECH_RETRIES})...`;
+                }
+                setTimeout(() => startSpeechRecognition(), retryDelay);
                 return;
             }
 
-            // Try to ensure microphone access is available before starting speech recognition
-            // This can help prevent audio-capture errors on Render
-            try {
-                // Check if we already have microphone access
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
-                // If successful, stop it immediately (we just needed permission check)
-                stream.getTracks().forEach(track => track.stop());
-                console.log('Microphone access verified for speech recognition');
-            } catch (micErr) {
-                console.warn('Microphone access check failed for speech recognition:', micErr);
-                // Continue anyway - speech recognition might still work
-                // Some browsers handle mic access internally
-            }
+            // Reset retry count on successful mic access
+            speechRetryCount = 0;
 
             try {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                // Create new instance each time to avoid state issues
                 recognition = new SpeechRecognition();
                 recognition.continuous = true;
                 recognition.interimResults = true;
                 recognition.lang = 'en-US'; // Can be made configurable
+                recognition.maxAlternatives = 1; // Reduce processing overhead
+                // Enable better speech detection
+                recognition.serviceURI = ''; // Use default service
 
                 recognition.onstart = () => {
                     speechStarted = true;
-                    console.log('Speech recognition started');
+                    speechRetryCount = 0; // Reset retry count on successful start
+                    console.log('Speech recognition started successfully');
                     // Show captions area with "Listening..." message
                     const captionsElement = document.getElementById('captions');
                     if (captionsElement) {
                         captionsElement.style.display = 'block';
                         captionsElement.textContent = 'Listening...';
+                        captionsElement.style.background = 'rgba(0,0,0,0.5)';
+                        captionsElement.style.border = 'none';
+                        captionsElement.style.color = '#e6eef8';
+                        captionsElement.style.fontWeight = 'normal';
                         console.log('Captions element found and displayed');
                         
-                        // Clear "Listening..." after 3 seconds if no speech detected
+                        // Clear "Listening..." after 5 seconds if no speech detected (longer timeout)
                         if (captionsClearTimeout) {
                             clearTimeout(captionsClearTimeout);
                         }
                         captionsClearTimeout = setTimeout(() => {
                             if (captionsElement && captionsElement.textContent === 'Listening...') {
-                                captionsElement.textContent = '';
-                                captionsElement.style.display = 'none';
+                                // Keep showing "Listening..." but make it less prominent
+                                captionsElement.style.opacity = '0.6';
                             }
-                        }, 3000);
+                        }, 5000);
                     } else {
                         console.error('Captions element not found!');
                     }
                     if (micStatus) {
-                        micStatus.innerText = 'Listening...';
+                        micStatus.innerText = 'Listening for speech...';
                     }
                 };
 
@@ -2194,10 +2823,15 @@
 
                     for (let i = event.resultIndex; i < event.results.length; i++) {
                         const transcript = event.results[i][0].transcript;
-                        if (event.results[i].isFinal) {
-                            finalTranscript += transcript + ' ';
-                        } else {
-                            interimTranscript += transcript + ' ';
+                        const confidence = event.results[i][0].confidence || 0.5;
+                        
+                        // Only process transcripts with reasonable confidence (>= 0.3)
+                        if (confidence >= 0.3) {
+                            if (event.results[i].isFinal) {
+                                finalTranscript += transcript + ' ';
+                            } else {
+                                interimTranscript += transcript + ' ';
+                            }
                         }
                     }
 
@@ -2243,19 +2877,26 @@
                     }
 
                     // Check for exam content on both interim and final transcripts
+                    // This is critical for detecting when students read answers/choices
                     const fullTranscript = (finalTranscript + ' ' + interimTranscript).trim();
-                    if (fullTranscript) {
+                    if (fullTranscript && fullTranscript.length >= 3) {
                         // Check if speech contains exam questions or answers
+                        // This will detect if student is reading exam content aloud
                         checkForExamContent(fullTranscript);
                     }
 
-                    // Log final transcripts to alerts session
+                    // Log final transcripts to alerts session (even if not exam content)
+                    // This helps track all speech during the exam
                     if (finalTranscript.trim()) {
                         if (alertsSession && alertsSession.flags) {
-                        alertsSession.flags.captions.push({
-                            timestamp: new Date().toISOString(),
+                            // Initialize captions array if it doesn't exist
+                            if (!alertsSession.flags.captions) {
+                                alertsSession.flags.captions = [];
+                            }
+                            alertsSession.flags.captions.push({
+                                timestamp: new Date().toISOString(),
                                 text: finalTranscript.trim()
-                        });
+                            });
                         }
                         // Update student alert distribution
                         updateStudentAlertDistribution('captions');
@@ -2300,12 +2941,27 @@
                             break;
                         case 'audio-capture':
                             // Audio capture failed - common on Render/HTTPS issues
-                            // Try to retry after a delay, but allow graceful degradation
-                            console.warn('Speech recognition audio-capture failed, will retry...');
-                            if (micStatus) {
-                                micStatus.innerText = 'Audio unavailable, retrying...';
+                            // Reset audio stream and retry
+                            console.warn('Speech recognition audio-capture failed, resetting audio stream...');
+                            if (audioStreamForSpeech) {
+                                audioStreamForSpeech.getAudioTracks().forEach(track => track.stop());
+                                audioStreamForSpeech = null;
                             }
-                            // Retry after delay instead of giving up immediately
+                            
+                            speechRetryCount++;
+                            if (speechRetryCount >= MAX_SPEECH_RETRIES) {
+                                if (micStatus) {
+                                    micStatus.innerText = 'Audio capture unavailable';
+                                }
+                                console.error('Max retries reached for audio-capture');
+                                break;
+                            }
+                            
+                            if (micStatus) {
+                                micStatus.innerText = `Audio unavailable, retrying (${speechRetryCount}/${MAX_SPEECH_RETRIES})...`;
+                            }
+                            // Retry with exponential backoff
+                            const retryDelay = Math.min(2000 * Math.pow(2, speechRetryCount), 10000);
                             setTimeout(() => {
                                 try {
                                     startSpeechRecognition();
@@ -2315,7 +2971,7 @@
                                         micStatus.innerText = 'Speech recognition unavailable';
                                     }
                                 }
-                            }, 5000);
+                            }, retryDelay);
                             break;
                         default:
                             // Other errors - silently retry
@@ -2428,7 +3084,16 @@
         async function startMicAnalysis(){
             // request mic access
             try{
-                micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                // Reuse audio stream if available (from main getUserMedia call)
+                if (!micStream && audioStreamForSpeech) {
+                    micStream = audioStreamForSpeech;
+                } else if (!micStream) {
+                    micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+                    // Store for speech recognition if not already stored
+                    if (!audioStreamForSpeech) {
+                        audioStreamForSpeech = micStream;
+                    }
+                }
             }catch(e){
                 micStatus.innerText = 'Microphone blocked';
                 console.warn('mic access denied', e);
@@ -2452,6 +3117,13 @@
 
                 function analyzeAudio(){
                     if(!analyser) return;
+                    
+                    // Stop audio detection when exam is paused
+                    if (isExamPaused) {
+                        requestAnimationFrame(analyzeAudio);
+                        return;
+                    }
+                    
                     analyser.getByteFrequencyData(micDataArray);
 
                     // compute RMS-like loudness from freq bins
@@ -2467,13 +3139,13 @@
                     micFillEl.style.width = `${Math.round(meterPct*100)}%`;
                     micStatus.innerText = `${Math.round(meterPct*100)}%`;
 
-                    // Loud detection thresholds (balanced)
+                    // Loud detection thresholds - CONFIGURED FOR LOUD SOUND DETECTION
                     // Adjust this value to change sensitivity:
                     // - 0.60 (60%) = very sensitive, detects background noise
-                    // - 0.75 (75%) = moderate, detects normal talking
-                    // - 0.90 (90%) = less sensitive, mainly shouting
+                    // - 0.75 (75%) = moderate, detects normal talking (CURRENT SETTING)
+                    // - 0.90 (90%) = less sensitive, mainly loud sounds
                     // - 0.95+ (95%+) = only very loud sounds
-                    const LOUD_THRESHOLD = 0.60; // Set to 0.60 for detecting background noise and normal talking
+                    const LOUD_THRESHOLD = 0.70; // Set to 0.75 to detect normal talking and louder sounds
                     const loudDetected = meterPct > LOUD_THRESHOLD;
                     if (loudDetected) {
                         setAlert(alertLoudSound, true, `Loud sound detected (${Math.round(meterPct*100)}%)`);

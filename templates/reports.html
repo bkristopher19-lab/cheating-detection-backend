@@ -213,18 +213,34 @@
 
         async function loadExamSessions(studentId, examId) {
             const response = await fetch('/select?collection=proctoring_sessions');
-            sessions = (await response.json())
-                .filter(s => s.user_id === studentId && s.exam_id === examId && allowedExamIds.includes(s.exam_id));
+            const allSessions = await response.json();
+            
+            // Filter sessions - check both student_id and user_id fields
+            sessions = allSessions.filter(s => {
+                const matchesStudent = (s.student_id === studentId || s.user_id === studentId);
+                const matchesExam = s.exam_id === examId;
+                const isAllowed = allowedExamIds.includes(s.exam_id);
+                const hasStartTime = s.start_time; // Ensure session has start_time
+                return matchesStudent && matchesExam && isAllowed && hasStartTime;
+            });
 
             const select = document.getElementById('sessionSelect');
+            
+            if (sessions.length === 0) {
+                select.innerHTML = '<option value="">No sessions found</option>';
+                select.disabled = true;
+                return;
+            }
+            
             select.innerHTML = '<option value="">Select session</option>' +
                 sessions.map(s => {
-                    const date = new Date(s.start_time);
-                    return `<option value="${s.id}">${date.toLocaleString()}</option>`;
-                }).sort((a, b) => {
-                    const dateA = new Date(a.start_time);
-                    const dateB = new Date(b.start_time);
-                    return dateB - dateA; // Newest first
+                    try {
+                        const date = s.start_time ? new Date(s.start_time) : new Date();
+                        return `<option value="${s.id}">${date.toLocaleString()}</option>`;
+                    } catch (e) {
+                        console.warn('Invalid start_time for session:', s.id, e);
+                        return `<option value="${s.id}">Session ${s.id.substring(0, 8)}...</option>`;
+                    }
                 }).join('');
             select.disabled = false;
         }
@@ -233,10 +249,26 @@
             document.getElementById('noDataMessage').style.display = 'none';
             document.getElementById('reportContent').style.display = 'block';
 
-            document.getElementById('sessionStart').textContent = new Date(session.start_time).toLocaleString();
-            document.getElementById('sessionEnd').textContent = new Date(session.end_time).toLocaleString();
-            const duration = Math.round((new Date(session.end_time) - new Date(session.start_time)) / 60000);
-            document.getElementById('sessionDuration').textContent = `${duration} minutes`;
+            // Handle missing or invalid dates gracefully
+            try {
+                const startTime = session.start_time ? new Date(session.start_time).toLocaleString() : 'N/A';
+                const endTime = session.end_time ? new Date(session.end_time).toLocaleString() : 'N/A';
+                document.getElementById('sessionStart').textContent = startTime;
+                document.getElementById('sessionEnd').textContent = endTime;
+                
+                // Calculate duration safely
+                if (session.start_time && session.end_time) {
+                    const duration = Math.round((new Date(session.end_time) - new Date(session.start_time)) / 60000);
+                    document.getElementById('sessionDuration').textContent = `${duration} minutes`;
+                } else {
+                    document.getElementById('sessionDuration').textContent = 'N/A';
+                }
+            } catch (e) {
+                console.error('Error parsing session dates:', e);
+                document.getElementById('sessionStart').textContent = 'N/A';
+                document.getElementById('sessionEnd').textContent = 'N/A';
+                document.getElementById('sessionDuration').textContent = 'N/A';
+            }
 
             const stats = {
                 twofaces: 0,
