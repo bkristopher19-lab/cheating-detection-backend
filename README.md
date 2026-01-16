@@ -2,6 +2,30 @@
 
 A Flask-based web application for real-time proctoring and cheating detection using computer vision and audio analysis. Optimized for Render free tier hosting with memory-efficient processing.
 
+## If you want to debug in flask in line 160+ detection py
+# Initialize Firebase
+if not firebase_admin._apps:
+    # Use environment variable for key path, default to local file for development
+    key_path = os.getenv('FIREBASE_KEY_PATH', 'firebase_admin_key.json')
+    cred = credentials.Certificate(key_path)
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+
+## If you want to finally commit and push to git
+if not firebase_admin._apps:
+    cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
+    firebase_admin.initialize_app(cred)
+    db = firestore.client()
+
+
+git ls-files | findstr firebase_admin_key.json
+git ls-files | findstr adminsdk
+
+git add .
+git commit -m "Update backend for Render"
+git pull --rebase origin main
+git push origin main
+
 ## Features
 
 ### Detection Capabilities
