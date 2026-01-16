@@ -529,11 +529,152 @@
             }
         }
 
-        // Initialize security features including fullscreen
+        // Mobile app exit detection variables
+        let mobileAppExitCount = 0;
+        let lastMobileExitTime = 0;
+        let isMobileAppExit = false;
+        let mobileExitStartTime = null;
+
+        // Handle mobile app exit detection
+        function handleMobileAppExit() {
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+            if (!isMobile) return;
+
+            if (document.hidden) {
+                // User might have exited the app (home button, app switch, etc.)
+                mobileExitStartTime = Date.now();
+                isMobileAppExit = false;
+
+                // Check if this is a genuine app exit after 2 seconds
+                setTimeout(() => {
+                    if (document.hidden && !isMobileAppExit) {
+                        isMobileAppExit = true;
+                        mobileAppExitCount++;
+                        lastMobileExitTime = Date.now();
+
+                        // Log the violation
+                        console.warn('Mobile app exit detected:', mobileAppExitCount);
+
+                        // Show alert to user
+                        showMobileExitAlert(mobileAppExitCount);
+
+                        // If too many exits, terminate exam
+                        if (mobileAppExitCount >= 3) {
+                            terminateExamForMobileExit();
+                        }
+                    }
+                }, 2000); // 2 second delay to distinguish from tab switches
+            } else {
+                // User returned to the app
+                if (mobileExitStartTime && isMobileAppExit) {
+                    const awayTime = Date.now() - mobileExitStartTime;
+                    console.log('User returned from mobile app exit, away for:', awayTime, 'ms');
+                }
+                mobileExitStartTime = null;
+                isMobileAppExit = false;
+            }
+        }
+
+        // Show alert for mobile app exit
+        function showMobileExitAlert(count) {
+            const messages = [
+                '⚠️ App exit detected. Please stay within the exam application.',
+                '🚨 SECOND app exit detected. Continued exits may terminate the exam.',
+                '🚨 THIRD app exit detected. Exam will be terminated.'
+            ];
+
+            const message = messages[Math.min(count - 1, messages.length - 1)] || messages[messages.length - 1];
+
+            // Create or update alert
+            let alertDiv = document.getElementById('mobileExitAlert');
+            if (!alertDiv) {
+                alertDiv = document.createElement('div');
+                alertDiv.id = 'mobileExitAlert';
+                alertDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(255, 193, 7, 0.95);
+                    color: #000;
+                    padding: 15px 20px;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    z-index: 10001;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                    max-width: 500px;
+                    text-align: center;
+                    font-size: 14px;
+                `;
+                document.body.appendChild(alertDiv);
+            }
+
+            alertDiv.textContent = message;
+            alertDiv.style.display = 'block';
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                if (alertDiv) {
+                    alertDiv.style.display = 'none';
+                }
+            }, 5000);
+        }
+
+        // Terminate exam for excessive mobile exits
+        function terminateExamForMobileExit() {
+            // Create termination modal
+            const terminateModal = document.createElement('div');
+            terminateModal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background: rgba(0,0,0,0.95);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10002;
+                flex-direction: column;
+                font-family: Inter, sans-serif;
+                color: white;
+            `;
+
+            terminateModal.innerHTML = `
+                <div style="text-align: center; padding: 2rem;">
+                    <div style="font-size: 4rem; margin-bottom: 1rem;">🚫</div>
+                    <h2 style="margin-bottom: 1rem; color: #ff6b6b;">EXAM TERMINATED</h2>
+                    <p style="margin-bottom: 2rem; font-size: 1.1rem; line-height: 1.5;">
+                        You have exited the exam application too many times.<br>
+                        The exam has been terminated and marked as incomplete.
+                    </p>
+                    <button onclick="window.location.href='/student_dashboard'" style="
+                        background: #6ee7b7;
+                        color: #032;
+                        border: none;
+                        padding: 1rem 2rem;
+                        font-size: 1.2rem;
+                        font-weight: 600;
+                        border-radius: 8px;
+                        cursor: pointer;
+                    ">Return to Dashboard</button>
+                </div>
+            `;
+
+            document.body.appendChild(terminateModal);
+
+            // Disable all interactions
+            document.body.style.pointerEvents = 'none';
+
+            console.error('Exam terminated due to excessive mobile app exits');
+        }
+
+        // Initialize security features including fullscreen and mobile detection
         async function initSecurityFeatures() {
             // Enter fullscreen mode - try harder on mobile
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
+
             try {
                 const elem = document.documentElement;
                 if (elem.requestFullscreen) {
@@ -545,7 +686,7 @@
                 } else if (isMobile && elem.webkitEnterFullscreen) { // iOS specific
                     await elem.webkitEnterFullscreen();
                 }
-                
+
                 // Double-check on mobile after a short delay
                 if (isMobile) {
                     setTimeout(() => {
@@ -558,7 +699,27 @@
                 console.warn('Fullscreen request failed:', err);
                 if (isMobile) {
                     // On mobile, don't block the exam if fullscreen fails initially
-                    alert('Fullscreen mode is recommended for this exam. Please rotate to landscape and allow fullscreen when prompted.');
+                    // Just show a warning
+                    showMobileExitAlert(0); // Show initial warning
+                    setTimeout(() => {
+                        const warningDiv = document.createElement('div');
+                        warningDiv.style.cssText = `
+                            position: fixed;
+                            top: 10px;
+                            left: 50%;
+                            transform: translateX(-50%);
+                            background: rgba(110, 231, 183, 0.9);
+                            color: #032;
+                            padding: 10px 15px;
+                            border-radius: 6px;
+                            font-weight: 600;
+                            z-index: 10000;
+                            font-size: 12px;
+                        `;
+                        warningDiv.textContent = '📱 Fullscreen recommended for best proctoring experience';
+                        document.body.appendChild(warningDiv);
+                        setTimeout(() => warningDiv.remove(), 3000);
+                    }, 1000);
                 } else {
                     // Show fullscreen modal for desktop
                     const modal = createFullscreenModal();
@@ -572,7 +733,10 @@
             document.addEventListener('mozfullscreenchange', handleFullscreenChange);
             document.addEventListener('MSFullscreenChange', handleFullscreenChange);
 
-            console.log('Security features initialized - Fullscreen required');
+            // Add mobile app exit detection
+            document.addEventListener('visibilitychange', handleMobileAppExit);
+
+            console.log('Security features initialized - Fullscreen and mobile exit detection active');
         }
 
         // Initialize when page loads

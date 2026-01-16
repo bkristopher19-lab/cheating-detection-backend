@@ -1501,37 +1501,73 @@
         let tabSwitchCount = 0;
         let lastTabSwitchTime = 0;
         let hiddenStartTime = null;
+        let isMobileAppExit = false;
+        let mobileExitGracePeriod = false;
 
         function handleVisibilityChange() {
             // Stop detection when exam is paused
             if (isExamPaused) return;
-            
+
+            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
             if (document.hidden) {
                 hiddenStartTime = Date.now();
+                isMobileAppExit = false;
+
+                // On mobile, check if this might be an app exit (home button, app switch)
+                if (isMobile) {
+                    // Set a flag to indicate potential mobile app exit
+                    // We'll check this when visibility returns
+                    setTimeout(() => {
+                        if (document.hidden && !isMobileAppExit) {
+                            isMobileAppExit = true;
+                            logAlert('tab_switch', 'Mobile app potentially exited (home button or app switch detected)');
+                            showExamAlert('⚠️ App exit detected. Please return to the exam immediately.');
+                        }
+                    }, 1000); // Check after 1 second of being hidden
+                }
             } else {
                 // User came back; measure how long they were away
                 if (hiddenStartTime) {
                     const awayMs = Date.now() - hiddenStartTime;
                     hiddenStartTime = null;
-                    if (awayMs >= 3000) { // only flag if away > 3s
-                        registerTabSwitch(awayMs);
+
+                    // On mobile, if we detected an app exit, always flag it
+                    if (isMobile && isMobileAppExit) {
+                        registerTabSwitch(awayMs, true); // Force flag as mobile app exit
+                        isMobileAppExit = false;
+                    } else if (awayMs >= 3000) { // only flag if away > 3s for regular tab switches
+                        registerTabSwitch(awayMs, false);
+                    }
+
+                    // Give mobile devices a grace period after returning to prevent false face detection
+                    if (isMobile) {
+                        mobileExitGracePeriod = true;
+                        setTimeout(() => {
+                            mobileExitGracePeriod = false;
+                        }, 3000); // 3 second grace period for camera to stabilize
                     }
                 }
+                isMobileAppExit = false;
             }
         }
 
-        function registerTabSwitch(awayMs) {
+        function registerTabSwitch(awayMs, forceFlag = false) {
             // Stop detection when exam is paused
             if (isExamPaused) return;
-            
+
             const now = Date.now();
             // additional debounce to avoid double count between visibility/blur handlers
             if (now - lastTabSwitchTime > 500) {
                 tabSwitchCount++;
                 lastTabSwitchTime = now;
-                logAlert('tab_switch', `User left quiz window for ${Math.round(awayMs/1000)}s (count: ${tabSwitchCount})`);
+
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const exitType = forceFlag ? 'mobile app exit' : (isMobile ? 'mobile tab switch' : 'tab switch');
+
+                logAlert('tab_switch', `User ${exitType} for ${Math.round(awayMs/1000)}s (count: ${tabSwitchCount})`);
                 if (tabSwitchCount >= 3) {
-                    showExamAlert(`⚠️ Warning: You have left the quiz window ${tabSwitchCount} times. Continued switching may terminate the exam.`);
+                    showExamAlert(`⚠️ Warning: You have left the exam window ${tabSwitchCount} times. Continued exits may terminate the exam.`);
                 }
             }
         }
@@ -2584,10 +2620,20 @@
             }
 
             // Alerts logic
-            // 0) No face
+            // 0) No face - with mobile grace period handling
             if (faces.length === 0) {
-                setAlert(alertNoFace, true, 'No face detected!');
-                logAlert('face_absent', 'No face detected!');
+                // On mobile, skip face_absent alerts during grace period after returning from app switch
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                const skipFaceAlert = isMobile && mobileExitGracePeriod;
+
+                if (!skipFaceAlert) {
+                    setAlert(alertNoFace, true, 'No face detected!');
+                    logAlert('face_absent', 'No face detected!');
+                } else {
+                    // During mobile grace period, just show a subtle indicator without alerting
+                    setAlert(alertNoFace, true, 'Camera stabilizing...');
+                    console.log('Face detection skipped during mobile grace period');
+                }
             } else {
                 setAlert(alertNoFace, false);
             }
@@ -3145,7 +3191,7 @@
                     // - 0.75 (75%) = moderate, detects normal talking (CURRENT SETTING)
                     // - 0.90 (90%) = less sensitive, mainly loud sounds
                     // - 0.95+ (95%+) = only very loud sounds
-                    const LOUD_THRESHOLD = 0.70; // Set to 0.75 to detect normal talking and louder sounds
+                    const LOUD_THRESHOLD = 0.75; // Set to 0.75 to detect normal talking and louder sounds
                     const loudDetected = meterPct > LOUD_THRESHOLD;
                     if (loudDetected) {
                         setAlert(alertLoudSound, true, `Loud sound detected (${Math.round(meterPct*100)}%)`);

@@ -30,7 +30,7 @@ mp_draw = mp.solutions.drawing_utils
 mp_face_detection = mp.solutions.face_detection
 
 # Audio detection configuration
-AUDIO_LOUD_THRESHOLD = 0.70  # RMS threshold for loud sound detection (0.0 to 1.0)
+AUDIO_LOUD_THRESHOLD = 0.75  # RMS threshold for loud sound detection (0.0 to 1.0)
                               # Lower = more sensitive (detects quieter sounds)
                               # Higher = less sensitive (only very loud sounds like shouting)
                               # Set to 0.90 (90%) to detect only loud noises like shouting
