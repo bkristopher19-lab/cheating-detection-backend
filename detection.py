@@ -160,7 +160,7 @@ def frontend_alert():
 
 # Initialize Firebase (using Render secret file path)
 if not firebase_admin._apps:
-    cred = credentials.Certificate("myapplication-0405566f-firebase-adminsdk-fbsvc-5ee3f6e18a.json")
+    cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
     firebase_admin.initialize_app(cred)
     db = firestore.client()
 
