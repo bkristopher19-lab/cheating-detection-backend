@@ -547,23 +547,7 @@
 
             <!-- Top Lists -->
             <div class="row">
-                <div class="col-lg-6 mb-4">
-                    <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Top 5 Students by Alerts</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead><tr><th>Student</th><th>Alerts</th></tr></thead>
-                                    <tbody id="topStudentsByAlerts"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-6 mb-4">
+                <div class="col-lg-12 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
                             <h6 class="m-0 fw-bold">Top 5 Exams by Alert Rate</h6>
@@ -734,23 +718,6 @@
                 // Avg alerts per session
                 const avgAlertsPerSession = sessions && sessions.length ? (totalAlerts / sessions.length).toFixed(2) : 0;
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
-
-                // Top 5 students by total alerts across sessions
-                const studentAlertCounts = {};
-                (sessions || []).forEach(s => {
-                    const uid = s.user_id || s.id || 'Unknown';
-                    const count = Object.values(s.flags || {}).reduce((sum, val) => sum + (Array.isArray(val) ? val.length : (typeof val === 'number' ? val : 0)), 0);
-                    if (count === 0) return;
-                    studentAlertCounts[uid] = (studentAlertCounts[uid] || 0) + count;
-                });
-                const topStudents = Object.entries(studentAlertCounts)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 5)
-                    .map(([uid, count]) => {
-                        const u = users.find(x => x.id === uid) || users.find(x => x.email === uid) || { name: uid };
-                        return `<tr><td>${u.name}</td><td>${count}</td></tr>`;
-                    }).join('');
-                document.getElementById('topStudentsByAlerts').innerHTML = topStudents || '<tr><td colspan="2">No data</td></tr>';
 
                 // Top 5 exams by alerts per session
                 const examStats = {};
