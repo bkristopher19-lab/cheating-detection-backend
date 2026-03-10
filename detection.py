@@ -851,30 +851,65 @@ OTP_EXPIRY_MINUTES = 5
 OTP_LENGTH = 6
 
 
-def _send_otp_email(to_email: str, otp: str) -> bool:
-    """Send OTP via SMTP. Uses env SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS. Returns True on success."""
+def _smtp_send_email(subject: str, to_email: str, text_body: str) -> bool:
+    """
+    Send a plain-text email via SMTP.
+
+    Env vars:
+      - SMTP_HOST (required)
+      - SMTP_PORT (default 587)
+      - SMTP_USER (required)
+      - SMTP_PASS (required)  # For Gmail, use an App Password (requires 2FA)
+      - SMTP_FROM (optional, defaults to SMTP_USER)
+      - SMTP_USE_SSL (optional: "1"/"true" to force SMTP_SSL; auto-true for port 465)
+      - SMTP_TIMEOUT (optional, seconds; default 20)
+    """
     host = os.environ.get('SMTP_HOST')
     port = int(os.environ.get('SMTP_PORT', '587'))
     user = os.environ.get('SMTP_USER')
     password = os.environ.get('SMTP_PASS')
+    from_email = os.environ.get('SMTP_FROM') or user
+    timeout_s = int(os.environ.get('SMTP_TIMEOUT', '20'))
+    use_ssl_env = (os.environ.get('SMTP_USE_SSL') or '').strip().lower()
+    use_ssl = (port == 465) or use_ssl_env in {'1', 'true', 'yes', 'on'}
+
     if not host or not user or not password:
-        print(f"[OTP] SMTP not configured. OTP for {to_email}: {otp}")
+        print(f"[SMTP] Not configured (missing SMTP_HOST/SMTP_USER/SMTP_PASS). Would send to {to_email}.")
         return True
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = from_email
+    msg['To'] = to_email
+    msg.attach(MIMEText(text_body, 'plain'))
+
     try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Your verification code'
-        msg['From'] = user
-        msg['To'] = to_email
-        text = f'Your verification code is: {otp}\n\nValid for {OTP_EXPIRY_MINUTES} minutes.'
-        msg.attach(MIMEText(text, 'plain'))
-        with smtplib.SMTP(host, port) as s:
-            s.starttls(context=ssl.create_default_context())
-            s.login(user, password)
-            s.sendmail(user, to_email, msg.as_string())
+        context = ssl.create_default_context()
+        if use_ssl:
+            with smtplib.SMTP_SSL(host, port, timeout=timeout_s, context=context) as s:
+                s.ehlo()
+                s.login(user, password)
+                s.sendmail(from_email, to_email, msg.as_string())
+        else:
+            with smtplib.SMTP(host, port, timeout=timeout_s) as s:
+                s.ehlo()
+                s.starttls(context=context)
+                s.ehlo()
+                s.login(user, password)
+                s.sendmail(from_email, to_email, msg.as_string())
         return True
     except Exception as e:
-        print(f"[OTP] Email send failed: {e}")
+        print(f"[SMTP] Send failed to {to_email}: {e}")
         return False
+
+
+def _send_otp_email(to_email: str, otp: str) -> bool:
+    """Send OTP via SMTP. Returns True on success."""
+    text = f'Your verification code is: {otp}\n\nValid for {OTP_EXPIRY_MINUTES} minutes.'
+    ok = _smtp_send_email('Your verification code', to_email, text)
+    if not ok:
+        print("[OTP] Email send failed (see [SMTP] log above).")
+    return ok
 
 
 @app.route('/send_otp', methods=['POST'])
@@ -929,13 +964,6 @@ PHONE_VIOLATION_FLAGS = {'phone', 'object_detected_cell_phone'}
 def _send_violation_email_to_program_chair(to_email: str, student_name: str, student_email: str,
                                            exam_title: str, session_date: str, session_id: str) -> bool:
     """Send academic integrity incident email to program chair. Returns True on success."""
-    host = os.environ.get('SMTP_HOST')
-    port = int(os.environ.get('SMTP_PORT', '587'))
-    user = os.environ.get('SMTP_USER')
-    password = os.environ.get('SMTP_PASS')
-    if not host or not user or not password:
-        print(f"[Program Chair] SMTP not configured. Would send to {to_email} for session {session_id}")
-        return True
     try:
         subject = 'Academic Integrity Incident – Phone Violation During Proctored Exam'
         body = f"""Dear Program Chair,
@@ -958,16 +986,10 @@ Please advise on next steps per your academic integrity procedures.
 
 Best regards,
 Proctoring System"""
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = subject
-        msg['From'] = user
-        msg['To'] = to_email
-        msg.attach(MIMEText(body, 'plain'))
-        with smtplib.SMTP(host, port) as s:
-            s.starttls(context=ssl.create_default_context())
-            s.login(user, password)
-            s.sendmail(user, to_email, msg.as_string())
-        return True
+        ok = _smtp_send_email(subject, to_email, body)
+        if not ok:
+            print(f"[Program Chair] Email send failed for session {session_id} (see [SMTP] log above).")
+        return ok
     except Exception as e:
         print(f"[Program Chair] Email send failed: {e}")
         return False
