@@ -1,12 +1,16 @@
-# Timer Fix Progress
+# Theme Change to Lime, Green, Olive, Mint Colors
 
-## Completed Tasks
-- [x] Added global countdownTimer variable to templates/index.html
-- [x] Modified startTimer function to use global timer variable and clear it properly
-- [x] Improved stopwatch display to show proper HH:MM:SS format
-- [x] Modified submitExam function to clear timer immediately when submitting
-- [x] Modified terminateExam function to clear timer immediately when terminating
-- [x] Removed duration cap in student_dashboard.html to show actual elapsed time instead of capping at exam duration
+## Tasks
+- [x] Update dashboard.html: Add CSS variables for Bootstrap colors (lime primary, green success, mint info, olive warning)
+- [x] Update dashboard.html: Modify dark mode color overrides to match new theme
+- [x] Update sidebar.html: Change sidebar background to dark green
+- [x] Update index.html: Change --accent to mint and adjust background gradient to green tones
+- [x] Test the changes by running the app
 
-## Summary
-The timer issue has been fixed. The exam timer now properly tracks elapsed time and saves it correctly when exams are submitted or terminated. The dashboard now displays the actual time taken instead of showing a fixed "01:00:00" value.
+## Color Mapping
+- Primary: Lime (#00FF00)
+- Success: Green (#008000)
+- Info: Mint (#00FF7F)
+- Warning: Olive (#808000)
+- Danger: Red (#FF0000)
+- Secondary: Gray (#6c757d)

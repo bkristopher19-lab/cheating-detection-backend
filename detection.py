@@ -1,14 +1,21 @@
 import os
+import subprocess
+import tempfile
 import cv2
 import numpy as np
 import mediapipe as mp
 import base64
 import math
+import smtplib
+import ssl
+import secrets
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 
 # Web server
-from flask import Flask, render_template, Response, request, jsonify, redirect, url_for, flash
+from flask import Flask, render_template, Response, request, jsonify, redirect, url_for, flash, send_from_directory
 
 # Firebase
 from firebase_admin import credentials, firestore
@@ -24,18 +31,25 @@ import io
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
+# Data validation
+from validators import (
+    validate_email, validate_otp, validate_name, validate_password, validate_collection,
+    validate_firestore_id, validate_alert_type, validate_video_filename, validate_user_data,
+    validate_session_id, validate_cutoff_days, validate_manual_violation_type
+)
+
 # Mediapipe setup
 mp_holistic = mp.solutions.holistic
 mp_draw = mp.solutions.drawing_utils
 mp_face_detection = mp.solutions.face_detection
 
-# Audio detection configuration
-AUDIO_LOUD_THRESHOLD = 0.75  # RMS threshold for loud sound detection (0.0 to 1.0)
-                              # Lower = more sensitive (detects quieter sounds)
-                              # Higher = less sensitive (only very loud sounds like shouting)
-                              # Set to 0.90 (90%) to detect only loud noises like shouting
-                              # Recommended: 0.60 for background noise, 0.75 for normal talking, 0.90+ for shouting only
-                              # Current setting: 0.75 - detects normal talking and louder sounds
+# Audio detection configuration - Device-specific thresholds
+AUDIO_LOUD_THRESHOLD_DESKTOP = 0.75  # Desktop: RMS threshold for loud sound detection
+AUDIO_LOUD_THRESHOLD_MOBILE = 0.45   # Mobile: Lower threshold (more sensitive) for better detection
+                                      # Lower = more sensitive (detects quieter sounds)
+                                      # Higher = less sensitive (only very loud sounds like shouting)
+                                      # Desktop: 0.75 - detects normal talking and louder sounds
+                                      # Mobile: 0.45 - detects quieter sounds for better mobile monitoring
 
 
 def mediapipe_detection(image, model):
@@ -86,6 +100,10 @@ def extract_keypoints(results):
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Required for session management
+
+# Dedicated local folder for all saved recordings
+RECORDINGS_DIR = os.path.join(os.path.dirname(__file__), 'recordings')
+WEB_RECORDINGS_PREFIX = '/recordings/'
 # -----------------------------------------------
 # FRONTEND ALERT → FIRESTORE (proctoring_sessions)
 # -----------------------------------------------
@@ -111,14 +129,15 @@ def frontend_alert():
         user_id = data.get("user_id")
         session_id = data.get("session_id")
 
-        if not alert_type or not session_id:
-            return jsonify({"error": "Missing type or session_id"}), 400
+        valid, err = validate_alert_type(alert_type if alert_type else "")
+        if not valid:
+            return jsonify({"error": err}), 400
+        valid, err = validate_session_id(session_id if session_id else "")
+        if not valid:
+            return jsonify({"error": err}), 400
 
         # Convert frontend type → flags key
         flag_key = FRONTEND_TYPE_MAP.get(alert_type)
-        if not flag_key:
-            # Unknown type, you can ignore or still log under "other"
-            return jsonify({"error": f"Unknown alert type: {alert_type}"}), 400
 
         # Build the flag entry
         flag_entry = {
@@ -158,7 +177,56 @@ def frontend_alert():
         print("Error in /frontend_alert:", e)
         return jsonify({"error": str(e)}), 500
 
-# Initialize Firebase (using Render secret file path)
+
+@app.route('/add_manual_violation', methods=['POST'])
+def add_manual_violation():
+    """
+    Add a manually tagged violation while reviewing session video.
+    Expects JSON: session_id, type (violation type), message (optional), video_timestamp (optional, seconds into video).
+    Appends to proctoring_sessions.flags with source: 'manual'.
+    """
+    try:
+        data = request.get_json(force=True) or {}
+        session_id = data.get('session_id')
+        violation_type = data.get('type')
+        message = (data.get('message') or '').strip()[:500]  # optional, max 500 chars
+        video_timestamp = data.get('video_timestamp')  # optional, seconds into video
+
+        valid, err = validate_session_id(session_id or '')
+        if not valid:
+            return jsonify({'error': err}), 400
+        valid, err = validate_manual_violation_type(violation_type or '')
+        if not valid:
+            return jsonify({'error': err}), 400
+
+        db_client = firestore.client()
+        session_ref = db_client.collection('proctoring_sessions').document(session_id)
+        session_doc = session_ref.get()
+        if not session_doc.exists:
+            return jsonify({'error': 'Session not found'}), 404
+
+        flag_entry = {
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'type': violation_type,
+            'source': 'manual',
+            'message': message or f'Manual tag: {violation_type}',
+        }
+        if video_timestamp is not None and isinstance(video_timestamp, (int, float)):
+            flag_entry['video_timestamp'] = float(video_timestamp)
+
+        # Map violation type to flags key (same key as auto-detected)
+        flag_key = violation_type
+        session_ref.update({
+            f'flags.{flag_key}': firestore.ArrayUnion([flag_entry])
+        })
+
+        return jsonify({'status': 'ok', 'stored_as': flag_key}), 200
+    except Exception as e:
+        print('Error in /add_manual_violation:', e)
+        return jsonify({'error': str(e)}), 500
+
+
+# Initialize Firebase
 if not firebase_admin._apps:
     cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
     firebase_admin.initialize_app(cred)
@@ -290,6 +358,7 @@ def detect_audio():
     """
     Process audio data for loud sounds detection.
     Expects multipart/form-data with 'audio' file or base64 encoded audio in JSON/form.
+    Can also accept 'rms_level' parameter directly for client-side calculated RMS.
     Query param: session_id (optional) for flagging
     Returns: {'loud_sound': bool, 'multiple_voices': bool, 'confidence': float}
     """
@@ -297,53 +366,72 @@ def detect_audio():
         session_id = request.args.get('session_id')
         user_id = request.args.get('user_id') or request.form.get('user_id')
 
-        # Get audio data
-        audio_data = None
-        if 'audio' in request.files:
-            audio_file = request.files['audio']
-            audio_data = audio_file.read()
-        elif request.is_json:
-            data = request.get_json()
-            b64_audio = data.get('audio') or data.get('audio_b64')
-            if b64_audio:
-                if b64_audio.startswith('data:'):
-                    _, b64_audio = b64_audio.split(',', 1)
-                audio_data = base64.b64decode(b64_audio)
-        elif request.form:
-            b64_audio = request.form.get('audio') or request.form.get('audio_b64')
-            if b64_audio:
-                if b64_audio.startswith('data:'):
-                    _, b64_audio = b64_audio.split(',', 1)
-                audio_data = base64.b64decode(b64_audio)
+        # Check if RMS level is provided directly (for client-side calculation)
+        rms_level_param = request.form.get('rms_level')
+        if rms_level_param:
+            try:
+                rms = float(rms_level_param)
+            except (ValueError, TypeError):
+                return jsonify({'error': 'Invalid rms_level parameter'}), 400
+        else:
+            # Get audio data for server-side calculation
+            audio_data = None
+            if 'audio' in request.files:
+                audio_file = request.files['audio']
+                audio_data = audio_file.read()
+            elif request.is_json:
+                data = request.get_json()
+                b64_audio = data.get('audio') or data.get('audio_b64')
+                if b64_audio:
+                    if b64_audio.startswith('data:'):
+                        _, b64_audio = b64_audio.split(',', 1)
+                    audio_data = base64.b64decode(b64_audio)
+            elif request.form:
+                b64_audio = request.form.get('audio') or request.form.get('audio_b64')
+                if b64_audio:
+                    if b64_audio.startswith('data:'):
+                        _, b64_audio = b64_audio.split(',', 1)
+                    audio_data = base64.b64decode(b64_audio)
 
-        if not audio_data:
-            return jsonify({'error': 'No audio data provided'}), 400
+            if not audio_data:
+                return jsonify({'error': 'No audio data or rms_level provided'}), 400
 
-        # Convert audio data to numpy array
-        try:
-            # Try to load as WAV/PCM first
-            audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
-            samples = np.array(audio_segment.get_array_of_samples())
-            if audio_segment.channels == 2:
-                samples = samples.reshape((-1, 2))
-            sample_rate = audio_segment.frame_rate
-        except Exception:
-            # Fallback: assume raw PCM data
-            samples = np.frombuffer(audio_data, dtype=np.int16)
-            sample_rate = 44100  # default assumption
+            # Convert audio data to numpy array
+            try:
+                # Try to load as WAV/PCM first
+                audio_segment = AudioSegment.from_file(io.BytesIO(audio_data))
+                samples = np.array(audio_segment.get_array_of_samples())
+                if audio_segment.channels == 2:
+                    samples = samples.reshape((-1, 2))
+                sample_rate = audio_segment.frame_rate
+            except Exception:
+                # Fallback: assume raw PCM data
+                samples = np.frombuffer(audio_data, dtype=np.int16)
+                sample_rate = 44100  # default assumption
 
-        # Convert to mono if stereo
-        if len(samples.shape) > 1:
-            samples = samples.mean(axis=1)
+            # Convert to mono if stereo
+            if len(samples.shape) > 1:
+                samples = samples.mean(axis=1)
 
-        # Convert to float
-        samples = samples.astype(np.float32)
-        if samples.max() > 1.0:
-            samples = samples / 32768.0  # normalize 16-bit
+            # Convert to float
+            samples = samples.astype(np.float32)
+            if samples.max() > 1.0:
+                samples = samples / 32768.0  # normalize 16-bit
 
-        # Detect loud sounds (simple RMS threshold)
-        rms = np.sqrt(np.mean(samples**2))
-        is_loud = rms > AUDIO_LOUD_THRESHOLD
+            # Detect loud sounds (simple RMS threshold)
+            rms = np.sqrt(np.mean(samples**2))
+
+        # Check if request is from mobile device
+        user_agent = request.headers.get('User-Agent', '').lower()
+        is_mobile = any(keyword in user_agent for keyword in [
+            'android', 'webos', 'iphone', 'ipad', 'ipod', 'blackberry', 'iemobile', 'opera mini'
+        ])
+
+        # Use appropriate threshold based on device type
+        threshold = AUDIO_LOUD_THRESHOLD_MOBILE if is_mobile else AUDIO_LOUD_THRESHOLD_DESKTOP
+        is_loud = rms > threshold
+
+        print(f"Audio detection - RMS: {rms:.3f}, Threshold: {threshold:.3f}, Mobile: {is_mobile}, Loud: {is_loud}")
 
         # Detect loud sounds only (removed multiple voices detection)
         # Flag session if session_id provided
@@ -643,7 +731,16 @@ def predict():
 def add():
     try:
         collection = request.args.get('collection', 'users')
+        valid, err = validate_collection(collection)
+        if not valid:
+            return jsonify({'error': err}), 400
         data = request.json
+        if not data or not isinstance(data, dict):
+            return jsonify({'error': 'Request body must be a JSON object'}), 400
+        if collection == 'users':
+            valid, err = validate_user_data(data)
+            if not valid:
+                return jsonify({'error': err}), 400
         doc_ref = db.collection(collection).add(data)
         return jsonify({'id': doc_ref[1].id}), 200
     except Exception as e:
@@ -654,6 +751,9 @@ def add():
 def select():
     try:
         collection = request.args.get('collection', 'users')
+        valid, err = validate_collection(collection)
+        if not valid:
+            return jsonify({'error': err}), 400
         doc_id = request.args.get('id')
 
         if doc_id:
@@ -680,7 +780,16 @@ def select():
 def edit(id):
     try:
         collection = request.args.get('collection', 'users')
-        db.collection(collection).document(id).update(request.json)
+        valid, err = validate_collection(collection)
+        if not valid:
+            return jsonify({'error': err}), 400
+        valid, err = validate_firestore_id(id, 'id')
+        if not valid:
+            return jsonify({'error': err}), 400
+        data = request.json
+        if not data or not isinstance(data, dict):
+            return jsonify({'error': 'Request body must be a JSON object'}), 400
+        db.collection(collection).document(id).update(data)
         return jsonify({'message': 'Updated'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -690,6 +799,12 @@ def edit(id):
 def delete(id):
     try:
         collection = request.args.get('collection', 'users')
+        valid, err = validate_collection(collection)
+        if not valid:
+            return jsonify({'error': err}), 400
+        valid, err = validate_firestore_id(id, 'id')
+        if not valid:
+            return jsonify({'error': err}), 400
         db.collection(collection).document(id).delete()
         return jsonify({'message': 'Deleted'}), 200
     except Exception as e:
@@ -730,6 +845,205 @@ def detection():
     return render_template('index.html')
 
 
+# OTP store: {email: {"otp": str, "expires": datetime}}
+_otp_store = {}
+OTP_EXPIRY_MINUTES = 5
+OTP_LENGTH = 6
+
+
+def _send_otp_email(to_email: str, otp: str) -> bool:
+    """Send OTP via SMTP. Uses env SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS. Returns True on success."""
+    host = os.environ.get('SMTP_HOST')
+    port = int(os.environ.get('SMTP_PORT', '587'))
+    user = os.environ.get('SMTP_USER')
+    password = os.environ.get('SMTP_PASS')
+    if not host or not user or not password:
+        print(f"[OTP] SMTP not configured. OTP for {to_email}: {otp}")
+        return True
+    try:
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = 'Your verification code'
+        msg['From'] = user
+        msg['To'] = to_email
+        text = f'Your verification code is: {otp}\n\nValid for {OTP_EXPIRY_MINUTES} minutes.'
+        msg.attach(MIMEText(text, 'plain'))
+        with smtplib.SMTP(host, port) as s:
+            s.starttls(context=ssl.create_default_context())
+            s.login(user, password)
+            s.sendmail(user, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"[OTP] Email send failed: {e}")
+        return False
+
+
+@app.route('/send_otp', methods=['POST'])
+def send_otp():
+    """Generate OTP, store it, and send via email. Expects JSON: {email: str}."""
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        valid, err = validate_email(email)
+        if not valid:
+            return jsonify({'error': err}), 400
+        otp = ''.join(secrets.choice('0123456789') for _ in range(OTP_LENGTH))
+        expires = datetime.utcnow() + timedelta(minutes=OTP_EXPIRY_MINUTES)
+        _otp_store[email] = {'otp': otp, 'expires': expires}
+        if not _send_otp_email(email, otp):
+            return jsonify({'error': 'Failed to send email'}), 500
+        return jsonify({'status': 'ok', 'message': 'OTP sent to your email'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/verify_otp', methods=['POST'])
+def verify_otp():
+    """Verify OTP for an email. Expects JSON: {email: str, otp: str}. Returns 200 if valid."""
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').strip().lower()
+        otp = (data.get('otp') or '').strip()
+        valid, err = validate_email(email)
+        if not valid:
+            return jsonify({'valid': False, 'error': err}), 400
+        valid, err = validate_otp(otp)
+        if not valid:
+            return jsonify({'valid': False, 'error': err}), 400
+        stored = _otp_store.get(email)
+        if not stored:
+            return jsonify({'valid': False, 'error': 'No OTP found. Request a new code.'}), 400
+        if datetime.utcnow() > stored['expires']:
+            del _otp_store[email]
+            return jsonify({'valid': False, 'error': 'OTP expired. Request a new code.'}), 400
+        if stored['otp'] != otp:
+            return jsonify({'valid': False, 'error': 'Invalid OTP'}), 400
+        del _otp_store[email]
+        return jsonify({'valid': True, 'status': 'ok'}), 200
+    except Exception as e:
+        return jsonify({'valid': False, 'error': str(e)}), 500
+
+
+PHONE_VIOLATION_FLAGS = {'phone', 'object_detected_cell_phone'}
+
+
+def _send_violation_email_to_program_chair(to_email: str, student_name: str, student_email: str,
+                                           exam_title: str, session_date: str, session_id: str) -> bool:
+    """Send academic integrity incident email to program chair. Returns True on success."""
+    host = os.environ.get('SMTP_HOST')
+    port = int(os.environ.get('SMTP_PORT', '587'))
+    user = os.environ.get('SMTP_USER')
+    password = os.environ.get('SMTP_PASS')
+    if not host or not user or not password:
+        print(f"[Program Chair] SMTP not configured. Would send to {to_email} for session {session_id}")
+        return True
+    try:
+        subject = 'Academic Integrity Incident – Phone Violation During Proctored Exam'
+        body = f"""Dear Program Chair,
+
+This email reports an academic integrity incident that occurred during a proctored exam.
+
+**Student Information**
+• Name: {student_name}
+• Email: {student_email}
+• Course/Exam: {exam_title}
+• Date & Time: {session_date}
+
+**Violation Details**
+During the exam, a cell phone was detected. The exam was terminated per academic integrity policy, which requires immediate termination for phone violations.
+
+**Session ID:** {session_id}
+(Use this ID to review the session recording and evidence in the Proctoring Reports.)
+
+Please advise on next steps per your academic integrity procedures.
+
+Best regards,
+Proctoring System"""
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = subject
+        msg['From'] = user
+        msg['To'] = to_email
+        msg.attach(MIMEText(body, 'plain'))
+        with smtplib.SMTP(host, port) as s:
+            s.starttls(context=ssl.create_default_context())
+            s.login(user, password)
+            s.sendmail(user, to_email, msg.as_string())
+        return True
+    except Exception as e:
+        print(f"[Program Chair] Email send failed: {e}")
+        return False
+
+
+@app.route('/notify_program_chair', methods=['POST'])
+def notify_program_chair():
+    """
+    Send email to program chair when a session has a phone violation.
+    Expects JSON: session_id, program_chair_email.
+    """
+    try:
+        data = request.get_json() or {}
+        session_id = data.get('session_id') or ''
+        program_chair_email = (data.get('program_chair_email') or '').strip().lower()
+        valid, err = validate_session_id(session_id)
+        if not valid:
+            return jsonify({'error': err}), 400
+        valid, err = validate_email(program_chair_email)
+        if not valid:
+            return jsonify({'error': err or 'Invalid program chair email'}), 400
+
+        db_client = firestore.client()
+        session_ref = db_client.collection('proctoring_sessions').document(session_id)
+        session_doc = session_ref.get()
+        if not session_doc.exists:
+            return jsonify({'error': 'Session not found'}), 404
+        session = session_doc.to_dict()
+        session['id'] = session_doc.id
+        flags = session.get('flags') or {}
+
+        has_phone = any(
+            (flags.get(k) or []) for k in PHONE_VIOLATION_FLAGS
+        )
+        if not has_phone:
+            return jsonify({'error': 'No phone violation found in this session'}), 400
+
+        student_id = session.get('student_id') or session.get('user_id') or ''
+        exam_id = session.get('exam_id') or ''
+        student_name = 'Unknown'
+        student_email = ''
+        exam_title = 'Unknown Exam'
+        if student_id:
+            user_doc = db_client.collection('users').document(student_id).get()
+            if user_doc.exists:
+                u = user_doc.to_dict()
+                student_name = u.get('name') or u.get('email') or student_id
+                student_email = u.get('email') or ''
+        if exam_id:
+            exam_doc = db_client.collection('exams').document(exam_id).get()
+            if exam_doc.exists:
+                exam_title = exam_doc.to_dict().get('title') or exam_title
+
+        raw_start = session.get('start_time')
+        try:
+            if hasattr(raw_start, 'strftime'):
+                session_date = raw_start.strftime('%Y-%m-%d %H:%M') if raw_start else 'N/A'
+            elif raw_start:
+                dt = datetime.fromisoformat(str(raw_start).replace('Z', '+00:00'))
+                session_date = dt.strftime('%Y-%m-%d %H:%M')
+            else:
+                session_date = 'N/A'
+        except Exception:
+            session_date = str(raw_start)[:19] if raw_start else 'N/A'
+
+        if not _send_violation_email_to_program_chair(
+            program_chair_email, student_name, student_email, exam_title, session_date, session_id
+        ):
+            return jsonify({'error': 'Failed to send email. Check SMTP configuration.'}), 500
+
+        return jsonify({'status': 'ok', 'message': 'Email sent to program chair'}), 200
+    except Exception as e:
+        print('Error in /notify_program_chair:', e)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/register')
 def register_page():
     return render_template('register.html')
@@ -760,9 +1074,21 @@ def classes():
     return render_template('classes.html')
 
 
+@app.route('/join/<code>')
+def join_class(code):
+    """Invite link: teacher shares this URL; students click to join the class (like Google Classroom)."""
+    return render_template('join.html')
+
+
 @app.route('/reports')
 def reports():
     return render_template('reports.html')
+
+
+@app.route('/view_recording')
+def view_recording():
+    """Standalone page to view session recording - use Chrome/Edge for best playback."""
+    return render_template('view_recording.html')
 
 
 @app.route('/take_exam/<exam_id>')
@@ -856,10 +1182,11 @@ def delete_old_reports():
                 # Use days (backward compatibility)
                 try:
                     cutoff_days = int(cutoff_days)
-                    if cutoff_days < 1:
-                        return jsonify({'error': 'cutoff_days must be at least 1'}), 400
                 except (ValueError, TypeError):
                     return jsonify({'error': 'cutoff_days must be a valid integer'}), 400
+                valid, err = validate_cutoff_days(cutoff_days)
+                if not valid:
+                    return jsonify({'error': err}), 400
 
                 cutoff_date = datetime.utcnow() - timedelta(days=cutoff_days)
                 cutoff_iso = cutoff_date.isoformat()
@@ -877,14 +1204,20 @@ def delete_old_reports():
         for session_doc in old_sessions:
             session_data = session_doc.to_dict()
 
-            # Delete associated video files
-            for path_key in ['video_path', 'clip_path']:
+            # Delete associated video files (webcam, clips, and screen recordings)
+            for path_key in ['video_path', 'clip_path', 'screen_path']:
                 if session_data.get(path_key):
-                    # Convert web path to file system path
+                    # Convert web path to file system path (support both /recordings/ and legacy /static/recordings/)
                     web_path = session_data[path_key]
-                    if web_path.startswith('/static/recordings/'):
+                    if web_path.startswith(WEB_RECORDINGS_PREFIX):
+                        filename = web_path.replace(WEB_RECORDINGS_PREFIX, '')
+                        file_path = os.path.join(RECORDINGS_DIR, filename)
+                    elif web_path.startswith('/static/recordings/'):
                         filename = web_path.replace('/static/recordings/', '')
                         file_path = os.path.join(os.path.dirname(__file__), 'static', 'recordings', filename)
+                    else:
+                        file_path = None
+                    if file_path:
                         try:
                             if os.path.exists(file_path):
                                 os.remove(file_path)
@@ -928,19 +1261,119 @@ def delete_old_reports():
         return jsonify({'error': str(e)}), 500
 
 
+def _convert_webm_to_mp4(webm_path):
+    """Convert WebM to MP4 using ffmpeg. Returns (mp4_path, None) on success or (None, error_message) on failure."""
+    if not os.path.isfile(webm_path):
+        return None, "File not found"
+    size = os.path.getsize(webm_path)
+    if size == 0:
+        return None, "Recording file is empty (0 bytes)"
+    fd, mp4_path = tempfile.mkstemp(suffix='.mp4')
+    os.close(fd)
+    try:
+        # Lenient flags to salvage browser-recorded WebM (incomplete/corrupted)
+        cmd = [
+            'ffmpeg', '-y',
+            '-fflags', '+genpts+igndts',
+            '-err_detect', 'ignore_err',
+            '-i', webm_path,
+            '-c:v', 'libx264', '-preset', 'fast', '-crf', '23',
+            '-c:a', 'aac', '-b:a', '128k',
+            '-max_muxing_queue_size', '1024',
+            mp4_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, timeout=120, text=True)
+        if result.returncode != 0:
+            err = (result.stderr or result.stdout or "Unknown error")[-500:]
+            print(f"ffmpeg conversion failed: {err}")
+            try:
+                os.unlink(mp4_path)
+            except OSError:
+                pass
+            last_line = err.strip().split('\n')[-1] if err.strip() else "check console"
+            return None, f"ffmpeg failed: {last_line}"
+        if not os.path.isfile(mp4_path) or os.path.getsize(mp4_path) == 0:
+            try:
+                os.unlink(mp4_path)
+            except OSError:
+                pass
+            return None, "Conversion produced empty file"
+        return mp4_path, None
+    except FileNotFoundError:
+        print("ffmpeg not found. Install from https://ffmpeg.org/download.html and add to PATH.")
+        try:
+            os.unlink(mp4_path)
+        except OSError:
+            pass
+        return None, "ffmpeg not found. Install ffmpeg and add its bin folder to PATH."
+    except subprocess.TimeoutExpired:
+        try:
+            os.unlink(mp4_path)
+        except OSError:
+            pass
+        return None, "Conversion timed out"
+    except OSError as e:
+        try:
+            os.unlink(mp4_path)
+        except OSError:
+            pass
+        return None, str(e)
+
+
+@app.route('/recordings/<path:filename>')
+def serve_recording(filename):
+    """Serve recorded video files from the local recordings folder.
+    Add ?download=1 to force download (save to computer) instead of inline playback.
+    Add ?format=mp4 to convert WebM to MP4 before serving (requires ffmpeg)."""
+    webm_path = os.path.join(RECORDINGS_DIR, filename)
+    as_attachment = request.args.get('download') == '1'
+    convert_mp4 = request.args.get('format') == 'mp4'
+
+    if convert_mp4 and filename.lower().endswith('.webm'):
+        mp4_path, err_msg = _convert_webm_to_mp4(webm_path)
+        if mp4_path:
+            try:
+                download_name = os.path.splitext(filename)[0] + '.mp4'
+                return send_from_directory(
+                    os.path.dirname(mp4_path),
+                    os.path.basename(mp4_path),
+                    as_attachment=True,
+                    download_name=download_name
+                )
+            finally:
+                try:
+                    os.unlink(mp4_path)
+                except OSError:
+                    pass
+        # Conversion failed: return error so user sees message instead of wrong file
+        return jsonify({'error': err_msg or 'MP4 conversion failed'}), 503
+
+    file_path = os.path.join(RECORDINGS_DIR, filename)
+    if not os.path.isfile(file_path) or os.path.getsize(file_path) == 0:
+        return jsonify({'error': 'Recording file not found or empty'}), 404
+
+    mimetype = None
+    if filename.lower().endswith('.webm'):
+        mimetype = 'video/webm'
+    elif filename.lower().endswith('.mp4'):
+        mimetype = 'video/mp4'
+    return send_from_directory(RECORDINGS_DIR, filename, as_attachment=as_attachment, mimetype=mimetype)
+
+
 @app.route('/upload_video', methods=['POST'])
 def upload_video():
     """
     Accepts multipart/form-data video upload and attaches it to a proctoring session.
     Query param: session_id (required) or form field session_id
     Query param: type (optional, 'clip' for cheating clips)
-    Saves file under /static/recordings/ and updates proctoring_sessions document with video_path or clip_path.
+    Saves file to local recordings/ folder and updates proctoring_sessions document with video_path or clip_path.
     """
     try:
         session_id = request.args.get('session_id') or request.form.get('session_id')
-        upload_type = request.args.get('type', 'full')  # 'full' or 'clip'
-        if not session_id:
-            return jsonify({'error': 'session_id required'}), 400
+        upload_type = request.args.get('type', 'full')  # 'full', 'clip', or 'screen'
+        valid, err = validate_session_id(session_id or '')
+        if not valid:
+            return jsonify({'error': err}), 400
 
         if 'video' not in request.files:
             return jsonify({'error': 'no video file sent'}), 400
@@ -949,15 +1382,26 @@ def upload_video():
         if f.filename == '':
             return jsonify({'error': 'empty filename'}), 400
 
+        valid, err = validate_video_filename(f.filename)
+        if not valid:
+            return jsonify({'error': err}), 400
+
         safe_name = secure_filename(f.filename)
-        recordings_dir = os.path.join(os.path.dirname(__file__), 'static', 'recordings')
-        os.makedirs(recordings_dir, exist_ok=True)
+        os.makedirs(RECORDINGS_DIR, exist_ok=True)
         timestamp = datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')
         filename = f"session_{session_id}_{timestamp}_{safe_name}"
-        save_path = os.path.join(recordings_dir, filename)
+        save_path = os.path.join(RECORDINGS_DIR, filename)
         f.save(save_path)
 
-        web_path = f"/static/recordings/{filename}"
+        size = os.path.getsize(save_path)
+        if size == 0:
+            try:
+                os.unlink(save_path)
+            except OSError:
+                pass
+            return jsonify({'error': 'Recording is empty (0 bytes). Use Chrome, ensure camera/mic work, and let recording run 10+ seconds before submitting.'}), 400
+
+        web_path = f"{WEB_RECORDINGS_PREFIX}{filename}"
 
         # update proctoring_sessions document
         try:
@@ -965,6 +1409,11 @@ def upload_video():
                 db.collection('proctoring_sessions').document(session_id).update({
                     'clip_path': web_path,
                     'clip_uploaded_at': datetime.utcnow().isoformat()
+                })
+            elif upload_type == 'screen':
+                db.collection('proctoring_sessions').document(session_id).update({
+                    'screen_path': web_path,
+                    'screen_uploaded_at': datetime.utcnow().isoformat()
                 })
             else:
                 db.collection('proctoring_sessions').document(session_id).update({
@@ -993,8 +1442,10 @@ def share_report():
         exam_id = data.get('exam_id')
         session_id = data.get('session_id')
 
-        if not all([student_id, exam_id, session_id]):
-            return jsonify({'error': 'student_id, exam_id, and session_id are required'}), 400
+        for fid, fname in [(student_id, 'student_id'), (exam_id, 'exam_id'), (session_id, 'session_id')]:
+            valid, err = validate_firestore_id(fid or '', fname)
+            if not valid:
+                return jsonify({'error': err}), 400
 
         # Generate unique token
         import secrets
@@ -1093,8 +1544,12 @@ def start_session():
         student_id = data.get('student_id')
         exam_id = data.get('exam_id')
 
-        if not student_id or not exam_id:
-            return jsonify({'error': 'student_id and exam_id are required'}), 400
+        valid, err = validate_firestore_id(student_id or '', 'student_id')
+        if not valid:
+            return jsonify({'error': err}), 400
+        valid, err = validate_firestore_id(exam_id or '', 'exam_id')
+        if not valid:
+            return jsonify({'error': err}), 400
 
         session_data = {
             'student_id': student_id,
@@ -1103,7 +1558,8 @@ def start_session():
             'status': 'active',
             'flags': {},
             'video_path': None,
-            'clip_path': None
+            'clip_path': None,
+            'screen_path': None
         }
 
         doc_ref = db.collection('proctoring_sessions').add(session_data)
@@ -1126,11 +1582,12 @@ def end_session():
     Expects JSON with: session_id
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         session_id = data.get('session_id')
 
-        if not session_id:
-            return jsonify({'error': 'session_id is required'}), 400
+        valid, err = validate_session_id(session_id or '')
+        if not valid:
+            return jsonify({'error': err}), 400
 
         db.collection('proctoring_sessions').document(session_id).update({
             'end_time': datetime.utcnow().isoformat(),
@@ -1154,8 +1611,9 @@ def get_session_status():
     """
     try:
         session_id = request.args.get('session_id')
-        if not session_id:
-            return jsonify({'error': 'session_id is required'}), 400
+        valid, err = validate_session_id(session_id or '')
+        if not valid:
+            return jsonify({'error': err}), 400
 
         doc = db.collection('proctoring_sessions').document(session_id).get()
         if not doc.exists:
@@ -1197,8 +1655,12 @@ def get_or_create_session():
         student_id = data.get('student_id')
         exam_id = data.get('exam_id')
 
-        if not student_id or not exam_id:
-            return jsonify({'error': 'student_id and exam_id are required'}), 400
+        valid, err = validate_firestore_id(student_id or '', 'student_id')
+        if not valid:
+            return jsonify({'error': err}), 400
+        valid, err = validate_firestore_id(exam_id or '', 'exam_id')
+        if not valid:
+            return jsonify({'error': err}), 400
 
         sessions_ref = db.collection('proctoring_sessions')
 
@@ -1230,7 +1692,8 @@ def get_or_create_session():
             # Keep flags empty so we only accumulate violations from this point
             'flags': {},
             'video_path': None,
-            'clip_path': None
+            'clip_path': None,
+            'screen_path': None
         }
 
         doc_ref = sessions_ref.add(session_data)
@@ -1268,14 +1731,20 @@ def cleanup_old_reports():
         for session_doc in old_sessions:
             session_data = session_doc.to_dict()
 
-            # Delete associated video files
-            for path_key in ['video_path', 'clip_path']:
+            # Delete associated video files (webcam, clips, and screen recordings)
+            for path_key in ['video_path', 'clip_path', 'screen_path']:
                 if session_data.get(path_key):
-                    # Convert web path to file system path
+                    # Convert web path to file system path (support both /recordings/ and legacy /static/recordings/)
                     web_path = session_data[path_key]
-                    if web_path.startswith('/static/recordings/'):
+                    if web_path.startswith(WEB_RECORDINGS_PREFIX):
+                        filename = web_path.replace(WEB_RECORDINGS_PREFIX, '')
+                        file_path = os.path.join(RECORDINGS_DIR, filename)
+                    elif web_path.startswith('/static/recordings/'):
                         filename = web_path.replace('/static/recordings/', '')
                         file_path = os.path.join(os.path.dirname(__file__), 'static', 'recordings', filename)
+                    else:
+                        file_path = None
+                    if file_path:
                         try:
                             if os.path.exists(file_path):
                                 os.remove(file_path)

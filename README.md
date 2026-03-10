@@ -12,6 +12,7 @@ if not firebase_admin._apps:
     db = firestore.client()
 
 ## If you want to finally commit and push to git
+# Initialize Firebase
 if not firebase_admin._apps:
     cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
     firebase_admin.initialize_app(cred)
@@ -145,6 +146,13 @@ For camera access in browsers, HTTPS is required. Place SSL certificates as:
 
 The application will automatically use HTTPS if these files are present.
 
+### Install as App (Chrome or Microsoft Edge)
+The app can be installed as a Progressive Web App (PWA) on your computer:
+- **Chrome**: Open the app, click **Install App** in the navbar (or use the ⋮ menu → Install Proctoring System)
+- **Microsoft Edge**: Same as Chrome—click **Install App** in the navbar, or use ⋮ → Apps → Install this site as an app
+
+The app will open in its own window with an app icon. HTTPS is required for the install option to appear.
+
 ## API Endpoints
 
 ### Detection Endpoints
@@ -158,7 +166,7 @@ The application will automatically use HTTPS if these files are present.
 - `GET /get_session_status` - Get session status
 
 ### Video Management
-- `POST /upload_video` - Upload video recording for a session
+- `POST /upload_video` - Upload video recording. Recordings are **WebM** (auto-recorded when student starts exam). **Chrome or Edge** recommended for playback; no ffmpeg required.
 
 ### Data Management
 - `POST /add` - Add document to Firestore collection

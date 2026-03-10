@@ -21,6 +21,7 @@ build/
 dist/
 
 # 🎥 Recordings / large media
+recordings/
 static/recordings/
 *.webm
 
