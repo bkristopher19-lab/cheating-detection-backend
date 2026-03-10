@@ -34,6 +34,7 @@ PASSWORD_MIN_LENGTH = 6
 PASSWORD_MAX_LENGTH = 128
 EMAIL_MAX_LENGTH = 254
 OTP_LENGTH = 6
+ALLOWED_EMAIL_DOMAINS = frozenset({'gmail.com', 'yahoo.com'})
 
 # Simple email regex (covers most valid emails; not RFC 5322 exhaustive)
 EMAIL_PATTERN = re.compile(
@@ -48,7 +49,7 @@ OTP_PATTERN = re.compile(r'^\d{6}$')
 
 
 def validate_email(email: str) -> Tuple[bool, Optional[str]]:
-    """Validate email format. Returns (valid, error_message)."""
+    """Validate email format + allowlisted domains. Returns (valid, error_message)."""
     if not email or not isinstance(email, str):
         return False, 'Email is required'
     email = email.strip().lower()
@@ -56,6 +57,9 @@ def validate_email(email: str) -> Tuple[bool, Optional[str]]:
         return False, 'Email is too long'
     if not EMAIL_PATTERN.match(email):
         return False, 'Invalid email format'
+    domain = email.rsplit('@', 1)[-1]
+    if domain not in ALLOWED_EMAIL_DOMAINS:
+        return False, 'Only Gmail and Yahoo email addresses are allowed'
     return True, None
 
 
