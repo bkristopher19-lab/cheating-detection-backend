@@ -8,6 +8,7 @@ import base64
 import math
 import smtplib
 import ssl
+import requests
 import secrets
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -851,6 +852,51 @@ OTP_EXPIRY_MINUTES = 5
 OTP_LENGTH = 6
 
 
+def _sendgrid_send_email(subject: str, to_email: str, text_body: str) -> bool:
+    """
+    Send a plain-text email via SendGrid Web API.
+
+    Env vars:
+      - SENDGRID_API_KEY (required)
+      - EMAIL_FROM (required)  # must be a verified sender in SendGrid
+      - EMAIL_TIMEOUT (optional, seconds; default 20)
+    """
+    api_key = os.environ.get('SENDGRID_API_KEY')
+    from_email = os.environ.get('EMAIL_FROM')
+    timeout_s = int(os.environ.get('EMAIL_TIMEOUT', '20'))
+    if not api_key:
+        print("[SendGrid] Not configured (missing SENDGRID_API_KEY).")
+        return False
+    if not from_email:
+        print("[SendGrid] Not configured (missing EMAIL_FROM).")
+        return False
+
+    payload = {
+        "personalizations": [{"to": [{"email": to_email}]}],
+        "from": {"email": from_email},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": text_body}],
+    }
+    try:
+        res = requests.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=timeout_s,
+        )
+        if 200 <= res.status_code < 300:
+            return True
+        # SendGrid often includes useful error details in JSON.
+        print(f"[SendGrid] Send failed to {to_email}: HTTP {res.status_code} {res.text}")
+        return False
+    except Exception as e:
+        print(f"[SendGrid] Send failed to {to_email}: {e}")
+        return False
+
+
 def _smtp_send_email(subject: str, to_email: str, text_body: str) -> bool:
     """
     Send a plain-text email via SMTP.
@@ -903,12 +949,33 @@ def _smtp_send_email(subject: str, to_email: str, text_body: str) -> bool:
         return False
 
 
+def _send_email(subject: str, to_email: str, text_body: str) -> bool:
+    """
+    Send an email using the best available provider.
+    Priority:
+      1) SendGrid (if SENDGRID_API_KEY is set)
+      2) SMTP (if SMTP_* is set)
+      3) If neither is configured, log OTP to console and return True (dev mode)
+    """
+    if os.environ.get('SENDGRID_API_KEY'):
+        return _sendgrid_send_email(subject, to_email, text_body)
+
+    host = os.environ.get('SMTP_HOST')
+    user = os.environ.get('SMTP_USER')
+    password = os.environ.get('SMTP_PASS')
+    if host and user and password:
+        return _smtp_send_email(subject, to_email, text_body)
+
+    print(f"[Email] No email provider configured. Would send to {to_email}. Subject: {subject}. Body: {text_body}")
+    return True
+
+
 def _send_otp_email(to_email: str, otp: str) -> bool:
-    """Send OTP via SMTP. Returns True on success."""
+    """Send OTP via configured email provider. Returns True on success."""
     text = f'Your verification code is: {otp}\n\nValid for {OTP_EXPIRY_MINUTES} minutes.'
-    ok = _smtp_send_email('Your verification code', to_email, text)
+    ok = _send_email('Your verification code', to_email, text)
     if not ok:
-        print("[OTP] Email send failed (see [SMTP] log above).")
+        print("[OTP] Email send failed (see provider log above).")
     return ok
 
 
@@ -986,9 +1053,9 @@ Please advise on next steps per your academic integrity procedures.
 
 Best regards,
 Proctoring System"""
-        ok = _smtp_send_email(subject, to_email, body)
+        ok = _send_email(subject, to_email, body)
         if not ok:
-            print(f"[Program Chair] Email send failed for session {session_id} (see [SMTP] log above).")
+            print(f"[Program Chair] Email send failed for session {session_id} (see provider log above).")
         return ok
     except Exception as e:
         print(f"[Program Chair] Email send failed: {e}")
