@@ -6,12 +6,156 @@
     <title>Student Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --accent: #00c853;
+            --accent-dark: #009624;
+            --accent-light: #69f0ae;
+            --bg-page: #f0f7f0;
+            --card-shadow: 0 4px 20px rgba(0, 200, 83, 0.08);
+            --card-shadow-hover: 0 12px 32px rgba(0, 200, 83, 0.15);
+            --text-dark: #1b2e1b;
+            --text-muted: #5a7a5a;
+        }
+        * { font-family: 'DM Sans', system-ui, sans-serif; }
+        body { background: var(--bg-page); }
+
+        /* Navbar */
+        .navbar-student {
+            background: linear-gradient(135deg, #0d1f0d 0%, #1a3d1a 100%) !important;
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+        }
+        .navbar-student .navbar-brand {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            color: white !important;
+        }
+        .navbar-student .navbar-text,
+        .navbar-student .nav-link { color: rgba(255,255,255,0.9) !important; }
+        .navbar-student .navbar-text small { color: rgba(255,255,255,0.75) !important; }
+        .navbar-student .dropdown-menu {
+            border-radius: 12px;
+            border: 1px solid #e0e8e0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        .navbar-student .dropdown-item:hover { background: rgba(0, 200, 83, 0.1); }
+        .navbar-student .dropdown-item i { margin-right: 0.5rem; }
+
+        /* Join section card */
+        .join-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,255,244,0.98) 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 83, 0.2);
+            box-shadow: var(--card-shadow);
+        }
+        .join-card h5 { font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--text-dark); }
+        .join-card .form-control {
+            border-radius: 10px;
+            border: 1.5px solid #e0e8e0;
+        }
+        .join-card .form-control:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.15);
+        }
+        .btn-join-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            color: white !important;
+            font-weight: 600;
+            border-radius: 10px;
+            padding: 0.5rem 1.25rem;
+            box-shadow: 0 4px 12px rgba(0, 200, 83, 0.3);
+        }
+        .btn-join-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 200, 83, 0.35);
+        }
+
+        /* Section headings */
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            color: var(--text-dark);
+            letter-spacing: -0.02em;
+        }
+        .section-badge {
+            background: rgba(0, 200, 83, 0.12);
+            color: var(--accent-dark);
+            padding: 0.35rem 0.85rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Exam cards */
         .exam-card {
-            transition: transform 0.2s;
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 83, 0.15);
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
         }
         .exam-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-4px);
+            box-shadow: var(--card-shadow-hover);
+        }
+        .exam-card .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        .exam-card .card-text { color: var(--text-muted); }
+        .exam-card .btn-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .exam-card .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 200, 83, 0.4);
+        }
+
+        /* Scores section */
+        .scores-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 83, 0.15);
+            box-shadow: var(--card-shadow);
+        }
+        .scores-card .card-body { padding: 1.5rem; }
+        .scores-card .table thead th {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--text-dark);
+            background: rgba(0, 200, 83, 0.06);
+            border-bottom: 2px solid rgba(0, 200, 83, 0.2);
+            padding: 0.85rem 1rem;
+        }
+        .scores-card .table tbody td { padding: 0.85rem 1rem; }
+        .scores-card .table-striped tbody tr:nth-of-type(odd) { background: rgba(0, 200, 83, 0.03); }
+
+        /* Modal */
+        #proctoringModal .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+        }
+        #proctoringModal .modal-header {
+            background: rgba(0, 200, 83, 0.08);
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
+        }
+        #proctoringModal .modal-title { font-family: 'Outfit', sans-serif; font-weight: 600; }
+        #proctoringModal .btn-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
         }
 
         /* Dark mode styles */
@@ -65,10 +209,30 @@
             border-color: rgba(255, 255, 255, 0.2);
             color: #ffffff;
         }
+        body.dark-mode .join-card {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+        body.dark-mode .join-card h5,
+        body.dark-mode .section-title { color: #ffffff !important; }
+        body.dark-mode .section-badge {
+            background: rgba(0, 200, 83, 0.2);
+            color: var(--accent-light);
+        }
+        body.dark-mode .exam-card {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+        body.dark-mode .exam-card .card-title,
+        body.dark-mode .exam-card .card-text { color: #e0e0e0 !important; }
+        body.dark-mode .scores-card {
+            background: #1e1e1e;
+            border-color: #333;
+        }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+    <nav class="navbar navbar-expand-lg navbar-student border-bottom">
         <div class="container">
             <a class="navbar-brand" href="#">Online Proctoring System</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -109,7 +273,7 @@
 
     <div class="container py-4">
         <!-- Join class by code -->
-        <div class="card mb-4">
+        <div class="card join-card mb-4">
             <div class="card-body d-flex flex-column flex-md-row align-items-md-center gap-3">
                 <div>
                     <h5 class="mb-1">Join a Section with Code</h5>
@@ -117,17 +281,15 @@
                 </div>
                 <div class="ms-md-auto d-flex gap-2 w-100 w-md-auto">
                     <input type="text" id="joinCodeInput" class="form-control" placeholder="e.g., ABC123" maxlength="10" style="text-transform: uppercase;">
-                    <button class="btn btn-primary" id="joinCodeBtn">Join</button>
+                    <button class="btn btn-join-primary" id="joinCodeBtn">Join</button>
                 </div>
                 <div id="joinCodeMessage" class="small"></div>
             </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2 class="mb-0">Available Exams</h2>
-            <div class="alert alert-info mb-0" style="padding: 0.5rem 1rem;">
-                <small><i class='bx bx-info-circle'></i> Showing exams for your section only</small>
-            </div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+            <h2 class="section-title mb-0">Available Exams</h2>
+            <span class="section-badge"><i class='bx bx-info-circle'></i> Your section only</span>
         </div>
 
         <div class="row" id="examsList">
@@ -136,8 +298,8 @@
 
         <!-- Student Scores Section -->
         <div class="mt-5">
-            <h2 class="mb-4">My Exam Scores</h2>
-            <div class="card">
+            <h2 class="section-title mb-4">My Exam Scores</h2>
+            <div class="card scores-card">
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-striped">
@@ -166,24 +328,26 @@
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Exam Monitoring Consent</h5>
+                    <h5 class="modal-title">How This Proctored Exam Works</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
                     <div class="alert alert-info">
-                        <h6>Before proceeding with the exam, please note:</h6>
+                        <h6>Before you start, please read these instructions:</h6>
                         <ul>
-                            <li>Your webcam will be used to monitor the exam session</li>
-                            <li>Audio may be recorded during the exam</li>
-                            <li>Screen recording may be enabled</li>
-                            <li>All monitoring data will be automatically deleted after 14 days</li>
-                            <li>The data will only be used for exam integrity verification</li>
+                            <li>You must <strong>allow camera and microphone</strong> access when prompted.</li>
+                            <li>You must <strong>share your entire screen</strong> when the browser asks. Sharing only a window or tab is not allowed and the exam will not start.</li>
+                            <li><strong>Dual monitors:</strong> If you have multiple monitors, choose "Entire Screen" so both displays are shared. Do not use Win+Arrow or similar shortcuts to move the exam window between monitors.</li>
+                            <li>Do <strong>not switch tabs/apps</strong>, resize the exam window, or exit fullscreen while taking the exam.</li>
+                            <li><strong>Copy, paste, and cut</strong> (Ctrl+C, Ctrl+V, Ctrl+X) are disabled during the exam. These shortcuts will be blocked and may be flagged as violations.</li>
+                            <li>Keep your <strong>face clearly visible</strong> to the camera at all times and avoid using your phone or other devices.</li>
+                            <li>Audio and screen activity may be recorded and automatically deleted after 14 days, and will only be used to check exam integrity.</li>
                         </ul>
                     </div>
                     <div class="form-check mb-3">
                         <input class="form-check-input" type="checkbox" id="consentCheck">
                         <label class="form-check-label" for="consentCheck">
-                            I understand and agree to exam monitoring
+                            I have read and understand how this proctored exam works
                         </label>
                     </div>
                 </div>
@@ -705,6 +869,18 @@
             } else {
                 tbody.innerHTML = '<tr><td colspan="7" class="text-center">No exams taken yet</td></tr>';
             }
+        }
+
+        // Show success message if just joined via invite link
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('joined') === '1') {
+            const msgEl = document.getElementById('joinCodeMessage');
+            if (msgEl) {
+                msgEl.textContent = 'You successfully joined the section!';
+                msgEl.className = 'small text-success';
+            }
+            // Remove ?joined=1 from URL without reload
+            window.history.replaceState({}, '', window.location.pathname);
         }
 
         // Load exams when page loads

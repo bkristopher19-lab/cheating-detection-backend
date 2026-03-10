@@ -3,19 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Profile</title>
+    <title>Profile – Proctoring Platform</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #00c853; --accent-dark: #009624; --bg-page: #f0f7f0; --text-dark: #1b2e1b; }
+        * { font-family: 'DM Sans', system-ui, sans-serif; }
+        body { background: var(--bg-page); }
+        .profile-nav {
+            background: linear-gradient(135deg, #0d1f0d 0%, #1a3d1a 100%) !important;
+            border-bottom: 1px solid rgba(0,200,83,0.2);
+        }
+        .profile-nav .btn-outline-secondary { border-radius: 10px; }
+        .profile-nav .btn-outline-danger { border-radius: 10px; }
+        .profile-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(0,200,83,0.15);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
+        }
+        .profile-card .form-control { border-radius: 10px; }
+        .profile-card .form-control:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,200,83,0.15); }
+        .profile-card .btn-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .profile-card h1 { font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--text-dark); }
+    </style>
 </head>
 <body>
     <!-- Minimal Header -->
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <nav class="navbar navbar-expand-lg profile-nav">
         <div class="container-fluid">
-            <button class="btn btn-outline-secondary" onclick="window.history.back()">
-                <i class="bx bx-arrow-back"></i> Back to Dashboard
+            <button class="btn btn-outline-light" onclick="window.history.back()">
+                <i class="bx bx-arrow-back"></i> Back
             </button>
             <div class="ms-auto">
-                <button class="btn btn-outline-danger" onclick="logout()">
+                <button class="btn btn-outline-light border-danger text-danger" onclick="logout()">
                     <i class="bx bx-log-out"></i> Logout
                 </button>
             </div>
@@ -30,7 +57,7 @@
 
             <div class="row">
                 <div class="col-md-12">
-                    <div class="card">
+                    <div class="card profile-card">
                         <div class="card-body">
                             <form id="profileForm">
                                 <div class="mb-3">

@@ -4,12 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Proctoring Dashboard</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
+        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; }
+        .main-content { background: #f0f7f0; }
         .stat-card {
-            border-radius: 15px;
+            border-radius: 16px;
             transition: transform 0.2s;
+            border: 1px solid rgba(0,200,83,0.15);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
         }
         .stat-card:hover {
             transform: translateY(-5px);
@@ -587,18 +594,31 @@
                     fetch('/select?collection=exam_results').then(r => r.json())
                 ]);
 
+                // Determine current user role
+                const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
+                const currentRole = ((currentUser.role || currentUser.type || '') + '').toLowerCase();
+
                 // Check if proctor has classes assigned
-                const proctorClasses = (classes || []).filter(c => String(c.proctor_id) === String(userId));
+                const allClassesArr = classes || [];
+                const proctorClasses = currentRole === 'proctor'
+                    ? allClassesArr.filter(c => String(c.proctor_id) === String(userId))
+                    : allClassesArr;
                 const proctorClassIds = proctorClasses.map(c => String(c.id));
 
-                // If proctor has classes, filter by classes; otherwise show all exams
+                // If proctor has classes, filter by classes; otherwise (admin) show all exams
                 let proctorExams, proctorExamIds;
-                if (proctorClassIds.length > 0) {
-                    // Filter exams to those in proctor's classes
-                    proctorExams = (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)));
-                    proctorExamIds = proctorExams.map(e => e.id);
+                if (currentRole === 'proctor') {
+                    if (proctorClassIds.length > 0) {
+                        // Filter exams to those in proctor's classes
+                        proctorExams = (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)));
+                        proctorExamIds = proctorExams.map(e => e.id);
+                    } else {
+                        // Proctor with no assigned classes sees no exams
+                        proctorExams = [];
+                        proctorExamIds = [];
+                    }
                 } else {
-                    // If no classes assigned, show all exams (admin/proctor can see all)
+                    // Filter exams to those in proctor's classes
                     proctorExams = exams || [];
                     proctorExamIds = proctorExams.map(e => e.id);
                 }
@@ -616,8 +636,8 @@
                 const filteredClasses = proctorClasses;
                 const filteredExamResults = proctorExamResults;
 
-                // Load filters
-                loadFilters(filteredExams, filteredClasses);
+                // Load filters (proctors are locked to their assigned sections)
+                loadFilters(filteredExams, filteredClasses, currentRole === 'proctor');
 
                 // Normalize role/type accessor
                 const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
@@ -638,7 +658,7 @@
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
 
-                // Alerts aggregation - using same types as reports page
+                // Alerts aggregation - using same types as reports page, but only for filtered sessions
                 let totalAlerts = 0;
                 let alertTypes = {
                     twofaces: 0,
@@ -649,7 +669,7 @@
                     right_click: 0,
                     tab_switch: 0
                 };
-                (sessions || []).forEach(session => {
+                (filteredSessions || []).forEach(session => {
                     if (session.flags) {
                         Object.entries(session.flags).forEach(([type, alerts]) => {
                             if (Array.isArray(alerts)) {
@@ -660,14 +680,14 @@
                     }
                 });
 
-                // Total questions (defensive)
-                const totalQuestions = (exams || []).reduce((sum, exam) => {
+                // Total questions (defensive) for exams visible to this user
+                const totalQuestions = (filteredExams || []).reduce((sum, exam) => {
                     const qlen = Array.isArray(exam.questions) ? exam.questions.length : 0;
                     return sum + qlen;
                 }, 0);
 
-                // Avg session duration (defensive)
-                const durations = (sessions || []).map(s => {
+                // Avg session duration (defensive) for visible sessions
+                const durations = (filteredSessions || []).map(s => {
                     const start = new Date(s.start_time);
                     const end = new Date(s.end_time);
                     if (isNaN(start) || isNaN(end)) return 0;
@@ -678,12 +698,12 @@
                 // Update UI
                 document.getElementById('totalStudents').textContent = studentUsers.length;
                 document.getElementById('totalTeachers').textContent = teachersCount;
-                document.getElementById('totalExams').textContent = (exams || []).length;
-                document.getElementById('totalSessions').textContent = (sessions || []).length;
+                document.getElementById('totalExams').textContent = (filteredExams || []).length;
+                document.getElementById('totalSessions').textContent = (filteredSessions || []).length;
                 document.getElementById('totalAlerts').textContent = totalAlerts;
                 document.getElementById('totalQuestions').textContent = totalQuestions;
                 document.getElementById('avgDuration').textContent = `${avgDuration} min`;
-                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (sessions || []).length))} per exam`;
+                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (filteredSessions || []).length))} per exam`;
 
                 // Update alert types distribution
                 const alertTypesHtml = Object.entries(alertTypes)
@@ -701,27 +721,26 @@
 
                 // --- NEW metrics calculations ---
 
-                // Total classes
-                const totalClasses = (classes || []).length;
+                // Total classes (sections) visible to this user
+                const totalClasses = (filteredClasses || []).length;
                 document.getElementById('totalClasses').textContent = totalClasses;
 
-                // Avg exams per class (map by class.course+section or count exams with exam.class_id if present)
-                // fallback: exams / classes
-                const avgExamsPerClass = totalClasses ? ((exams || []).length / totalClasses) : 0;
+                // Avg exams per class (only for classes visible to this user)
+                const avgExamsPerClass = totalClasses ? ((filteredExams || []).length / totalClasses) : 0;
                 document.getElementById('avgExamsPerClass').textContent = avgExamsPerClass.toFixed(2);
 
-                // Completion rate: sessions with status === 'completed'
-                const completed = (sessions || []).filter(s => (s.status || '').toString().toLowerCase() === 'completed').length;
-                const completionRate = (sessions && sessions.length) ? Math.round((completed / sessions.length) * 100) : 0;
+                // Completion rate: sessions with status === 'completed' (visible only)
+                const completed = (filteredSessions || []).filter(s => (s.status || '').toString().toLowerCase() === 'completed').length;
+                const completionRate = (filteredSessions && filteredSessions.length) ? Math.round((completed / filteredSessions.length) * 100) : 0;
                 document.getElementById('completionRate').textContent = `${completionRate}%`;
 
-                // Avg alerts per session
-                const avgAlertsPerSession = sessions && sessions.length ? (totalAlerts / sessions.length).toFixed(2) : 0;
+                // Avg alerts per session (visible only)
+                const avgAlertsPerSession = filteredSessions && filteredSessions.length ? (totalAlerts / filteredSessions.length).toFixed(2) : 0;
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
                 // Top 5 exams by alerts per session
                 const examStats = {};
-                (sessions || []).forEach(s => {
+                (filteredSessions || []).forEach(s => {
                     const eid = s.exam_id;
                     if (!eid) return;
                     const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
@@ -734,13 +753,13 @@
                     .sort((a, b) => b.rate - a.rate)
                     .slice(0, 5)
                     .map(x => {
-                        const ex = exams.find(e => e.id === x.eid) || { title: x.eid };
+                        const ex = filteredExams.find(e => e.id === x.eid) || { title: x.eid };
                         return `<tr><td>${ex.title}</td><td>${x.rate.toFixed(2)}</td></tr>`;
                     }).join('');
                 document.getElementById('topExamsByAlertRate').innerHTML = topExams || '<tr><td colspan="2">No data</td></tr>';
 
-                // (optional) Participation rate: users who appear in exam_results vs known students
-                const resultUserIds = new Set((examResults || []).map(r => r.user_id).filter(Boolean));
+                // (optional) Participation rate: users who appear in exam_results vs known students (visible exams)
+                const resultUserIds = new Set((filteredExamResults || []).map(r => r.user_id).filter(Boolean));
                 const participationRate = studentUsers.length ? Math.round((resultUserIds.size / studentUsers.length) * 100) : 0;
                 // set a tooltip or reuse element (here we set 'totalStudents' title)
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
@@ -751,8 +770,29 @@
                 const classMap = {};
                 allClasses.forEach(cls => classMap[cls.id] = cls);
 
-                // Load student scores with proctoring flags
-                await loadStudentScoresWithFlags(users, exams, sessions, examResults, classMap);
+                // Load student scores with proctoring flags, locked to assigned classes for proctors
+                if (currentRole === 'proctor' && filteredClasses.length === 1) {
+                    const onlyClassId = String(filteredClasses[0].id);
+                    await loadStudentScoresWithFlags(
+                        users,
+                        filteredExams,
+                        filteredSessions,
+                        filteredExamResults,
+                        classMap,
+                        filteredClasses,
+                        null,
+                        onlyClassId
+                    );
+                } else {
+                    await loadStudentScoresWithFlags(
+                        users,
+                        filteredExams,
+                        filteredSessions,
+                        filteredExamResults,
+                        classMap,
+                        filteredClasses
+                    );
+                }
 
                 // done
             } catch (err) {
@@ -810,12 +850,19 @@
                     fetch('/select?collection=exam_results').then(r => r.json())
                 ]);
 
+                // Determine current user role
+                const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
+                const currentRole = ((currentUser.role || currentUser.type || '') + '').toLowerCase();
+
                 // Filter data based on proctor permissions
-                const proctorClasses = (classes || []).filter(c => String(c.proctor_id) === String(userId));
+                const allClassesArr = classes || [];
+                const proctorClasses = currentRole === 'proctor'
+                    ? allClassesArr.filter(c => String(c.proctor_id) === String(userId))
+                    : allClassesArr;
                 const proctorClassIds = proctorClasses.map(c => String(c.id));
-                const proctorExams = proctorClassIds.length > 0
+                const proctorExams = currentRole === 'proctor'
                     ? (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)))
-                    : exams || [];
+                    : (exams || []);
                 const proctorExamIds = proctorExams.map(e => e.id);
                 const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
                 const proctorExamResults = (examResults || []).filter(r => proctorExamIds.includes(r.exam_id));
@@ -832,15 +879,17 @@
         }
 
         // Load filters for exam and section
-        function loadFilters(exams, classes) {
+        // When isProctor is true, we lock the section filter to the proctor's assigned class(es)
+        // and do not expose an "All Sections" option.
+        function loadFilters(exams, classes, isProctor) {
             const examFilter = document.getElementById('examFilter');
             const sectionFilter = document.getElementById('sectionFilter');
 
             // Clear existing options
             examFilter.innerHTML = '<option value="">All Exams</option>';
-            sectionFilter.innerHTML = '<option value="">All Sections</option>';
+            sectionFilter.innerHTML = '';
 
-            // Add exam options
+            // Add exam options (same for admin/proctor; already class-filtered for proctors)
             exams.forEach(exam => {
                 const option = document.createElement('option');
                 option.value = exam.id;
@@ -849,12 +898,35 @@
             });
 
             // Add section options
-            classes.forEach(cls => {
-                const option = document.createElement('option');
-                option.value = cls.id;
-                option.textContent = `${cls.course} - ${cls.section}`;
-                sectionFilter.appendChild(option);
-            });
+            if (isProctor) {
+                // Proctor: only their assigned classes, no "All Sections"
+                classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls.id;
+                    option.textContent = `${cls.course} - ${cls.section}`;
+                    sectionFilter.appendChild(option);
+                });
+
+                // If exactly one class, preselect it and hide the dropdown UI
+                if (classes.length === 1) {
+                    sectionFilter.value = classes[0].id;
+                    const wrapper = sectionFilter.closest('.col-md-4');
+                    if (wrapper) wrapper.style.display = 'none';
+                }
+            } else {
+                // Admin: can see all sections, including "All Sections"
+                const allOpt = document.createElement('option');
+                allOpt.value = '';
+                allOpt.textContent = 'All Sections';
+                sectionFilter.appendChild(allOpt);
+
+                classes.forEach(cls => {
+                    const option = document.createElement('option');
+                    option.value = cls.id;
+                    option.textContent = `${cls.course} - ${cls.section}`;
+                    sectionFilter.appendChild(option);
+                });
+            }
         }
 
         // Load student scores with proctoring flags
@@ -945,16 +1017,20 @@
                 const tbody = document.getElementById('studentScoresTable');
                 tbody.innerHTML = '';
 
-                // Get students in selected class or all students if no class selected
+                // Get students in selected class (year/section) or, if none selected, in any of the visible classes.
+                // Students from other years/sections will not appear.
+                const allStudentUsers = users.filter(u => (u.role === 'student' || u.type === 'student'));
                 let studentsToShow = [];
+
                 if (selectedClassId) {
-                    // Get students enrolled in the selected class
-                    // Assuming there's a way to get enrolled students, for now get all students
-                    // In a real implementation, you'd have an enrollment collection
-                    studentsToShow = users.filter(u => u.role === 'student' || u.type === 'student');
+                    const selectedIdStr = String(selectedClassId);
+                    studentsToShow = allStudentUsers.filter(u => String(u.class_id || '') === selectedIdStr);
+                } else if (allClasses && allClasses.length > 0) {
+                    const visibleClassIds = new Set(allClasses.map(cls => String(cls.id)));
+                    studentsToShow = allStudentUsers.filter(u => u.class_id && visibleClassIds.has(String(u.class_id)));
                 } else {
-                    // Show all students
-                    studentsToShow = users.filter(u => u.role === 'student' || u.type === 'student');
+                    // Fallback: if no classes context is provided, show none to avoid leaking other sections
+                    studentsToShow = [];
                 }
 
                 // If no students, show message

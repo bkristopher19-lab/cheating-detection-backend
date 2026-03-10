@@ -1,16 +1,26 @@
 <style>
-        /* Copy the same sidebar styles from dashboard.html */
         :root {
             --sidebar-width: 250px;
+            --accent: #00c853;
+            --accent-dark: #009624;
         }
         
         .sidebar {
             width: var(--sidebar-width);
             height: 100vh;
             position: fixed;
-            background-color: #2c3e50;
+            background: linear-gradient(180deg, #0d1f0d 0%, #1a3d1a 100%);
+            border-right: 1px solid rgba(0, 200, 83, 0.2);
             transition: all 0.3s;
+            box-shadow: 2px 0 20px rgba(0,0,0,0.1);
         }
+        
+        .sidebar .nav-link {
+            border-radius: 10px;
+            margin: 0.2rem 0.5rem;
+        }
+        .sidebar .nav-link:hover { background: rgba(0, 200, 83, 0.15) !important; }
+        .sidebar .nav-link.active { background: var(--accent) !important; color: #032 !important; }
 
         .sidebar-collapsed {
             margin-left: calc(-1 * var(--sidebar-width));

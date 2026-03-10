@@ -4,12 +4,28 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Proctoring Dashboard</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bs-primary: #00c853;
+            --bs-success: #009624;
+            --bs-info: #00FF7F;
+            --bs-warning: #808000;
+            --bs-danger: #FF0000;
+            --bs-secondary: #6c757d;
+        }
+
+        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; }
+        .main-content { background: #f0f7f0; }
         .stat-card {
-            border-radius: 15px;
+            border-radius: 16px;
             transition: transform 0.2s;
+            border: 1px solid rgba(0,200,83,0.15);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
         }
         .stat-card:hover {
             transform: translateY(-5px);
@@ -208,26 +224,26 @@
             color: #ffffff;
         }
 
-        body.dark-mode .text-primary { color: #4dabf7 !important; }
-        body.dark-mode .text-success { color: #51cf66 !important; }
-        body.dark-mode .text-info { color: #74c0fc !important; }
-        body.dark-mode .text-warning { color: #ffd43b !important; }
-        body.dark-mode .text-danger { color: #ff6b6b !important; }
-        body.dark-mode .text-secondary { color: #868e96 !important; }
+        body.dark-mode .text-primary { color: #00FF00 !important; }
+        body.dark-mode .text-success { color: #008000 !important; }
+        body.dark-mode .text-info { color: #00FF7F !important; }
+        body.dark-mode .text-warning { color: #808000 !important; }
+        body.dark-mode .text-danger { color: #FF0000 !important; }
+        body.dark-mode .text-secondary { color: #6c757d !important; }
 
-        body.dark-mode .bg-primary { background-color: #4dabf7 !important; }
-        body.dark-mode .bg-success { background-color: #51cf66 !important; }
-        body.dark-mode .bg-info { background-color: #74c0fc !important; }
-        body.dark-mode .bg-warning { background-color: #ffd43b !important; }
-        body.dark-mode .bg-danger { background-color: #ff6b6b !important; }
-        body.dark-mode .bg-secondary { background-color: #868e96 !important; }
+        body.dark-mode .bg-primary { background-color: #00FF00 !important; }
+        body.dark-mode .bg-success { background-color: #008000 !important; }
+        body.dark-mode .bg-info { background-color: #00FF7F !important; }
+        body.dark-mode .bg-warning { background-color: #808000 !important; }
+        body.dark-mode .bg-danger { background-color: #FF0000 !important; }
+        body.dark-mode .bg-secondary { background-color: #6c757d !important; }
 
-        body.dark-mode .border-left-primary { border-left-color: #4dabf7 !important; }
-        body.dark-mode .border-left-success { border-left-color: #51cf66 !important; }
-        body.dark-mode .border-left-info { border-left-color: #74c0fc !important; }
-        body.dark-mode .border-left-warning { border-left-color: #ffd43b !important; }
-        body.dark-mode .border-left-danger { border-left-color: #ff6b6b !important; }
-        body.dark-mode .border-left-secondary { border-left-color: #868e96 !important; }
+        body.dark-mode .border-left-primary { border-left-color: #00FF00 !important; }
+        body.dark-mode .border-left-success { border-left-color: #008000 !important; }
+        body.dark-mode .border-left-info { border-left-color: #00FF7F !important; }
+        body.dark-mode .border-left-warning { border-left-color: #808000 !important; }
+        body.dark-mode .border-left-danger { border-left-color: #FF0000 !important; }
+        body.dark-mode .border-left-secondary { border-left-color: #6c757d !important; }
 
         /* Enhanced mobile dark mode */
         @media (max-width: 768px) {
@@ -270,6 +286,16 @@
         <div class="container-fluid p-4">
             <h1 class="h3 mb-4">Analytics Dashboard</h1>
             
+            <!-- Loading overlay -->
+            <div id="dashboardLoading" class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                <p class="mt-2 text-muted">Retrieving dashboard data...</p>
+            </div>
+            <div id="dashboardError" class="alert alert-danger d-none" role="alert">
+                <i class='bx bx-error-circle'></i> <span id="dashboardErrorMsg">Failed to load dashboard data.</span>
+                <button type="button" class="btn btn-sm btn-outline-danger ms-3" onclick="loadDashboardData()">Retry</button>
+            </div>
+            <div id="dashboardContent" class="d-none">
             <!-- Main Stats -->
             <div class="row">
                 <!-- Users Stats -->
@@ -364,8 +390,20 @@
                 <!-- Student Exam Scores & Proctoring Flags -->
                 <div class="col-xl-8 mb-4">
                     <div class="card shadow h-100">
-                        <div class="card-header py-3">
+                        <div class="card-header py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
                             <h6 class="m-0 fw-bold">Student Exam Scores & Proctoring Flags</h6>
+                            <div class="d-flex flex-wrap gap-2" id="scoresFilterArea">
+                                <input type="text" id="searchStudentName" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Search student...">
+                                <input type="text" id="searchExamType" class="form-control form-control-sm" style="max-width: 140px;" placeholder="Search exam...">
+                                <input type="date" id="filterDateFrom" class="form-control form-control-sm" style="max-width: 130px;" title="From date">
+                                <input type="date" id="filterDateTo" class="form-control form-control-sm" style="max-width: 130px;" title="To date">
+                                <button type="button" class="btn btn-sm btn-outline-primary" onclick="applyScoresFilter()">
+                                    <i class='bx bx-search'></i> Filter
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="clearScoresFilter()">
+                                    <i class='bx bx-x'></i> Clear
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -535,39 +573,65 @@
                     </div>
                 </div>
             </div>
+            </div><!-- /#dashboardContent -->
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Cached rows for filtering (admin retrieval)
+        let _cachedScoreRows = [];
+
         // Load dashboard data
         async function loadDashboardData() {
+            const loadingEl = document.getElementById('dashboardLoading');
+            const errorEl = document.getElementById('dashboardError');
+            const contentEl = document.getElementById('dashboardContent');
+
+            loadingEl.classList.remove('d-none');
+            errorEl.classList.add('d-none');
+            contentEl.classList.add('d-none');
+
             try {
-                // Fetch all required data (include classes)
+                const base = '/select?collection=';
+                const resUsers = await fetch(base + 'users');
+                const resExams = await fetch(base + 'exams');
+                const resSessions = await fetch(base + 'proctoring_sessions');
+                const resClasses = await fetch(base + 'classes');
+                const resResults = await fetch(base + 'exam_results');
+
+                if (!resUsers.ok || !resExams.ok || !resSessions.ok || !resClasses.ok || !resResults.ok) {
+                    const failed = [resUsers.ok ? null : 'users', resExams.ok ? null : 'exams', resSessions.ok ? null : 'sessions', resClasses.ok ? null : 'classes', resResults.ok ? null : 'exam_results'].filter(Boolean);
+                    throw new Error('Failed to retrieve: ' + (failed.join(', ') || 'data'));
+                }
+
                 const [users, exams, sessions, classes, examResults] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json())
+                    resUsers.json(), resExams.json(), resSessions.json(), resClasses.json(), resResults.json()
                 ]);
 
+                // Normalize: ensure arrays
+                const safeArr = (v) => Array.isArray(v) ? v : (v && typeof v === 'object' && !Array.isArray(v) ? [v] : []);
+                const u = safeArr(users);
+                const e = safeArr(exams);
+                const s = safeArr(sessions);
+                const c = safeArr(classes);
+                const er = safeArr(examResults);
+
                 // Normalize role/type accessor
-                const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
+                const userRole = usr => ((usr.role || usr.type || '')).toString().toLowerCase();
 
                 // Students: prefer explicit user records, otherwise infer from results/sessions
-                let studentUsers = users.filter(u => userRole(u) === 'student');
+                let studentUsers = u.filter(usr => userRole(usr) === 'student');
                 if (studentUsers.length === 0) {
-                    // fallback: unique user ids from exam_results and sessions
-                    const idsFromResults = (examResults || []).map(r => r.user_id).filter(Boolean);
-                    const idsFromSessions = (sessions || []).map(s => s.user_id).filter(Boolean);
+                    const idsFromResults = er.map(r => r.user_id).filter(Boolean);
+                    const idsFromSessions = s.map(sess => sess.user_id).filter(Boolean);
                     const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions]));
-                    studentUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+                    studentUsers = uniqueIds.map(id => u.find(usr => usr.id === id)).filter(Boolean);
                 }
 
                 // Proctors: combine explicit proctor users and any proctor_id referenced in classes
-                const proctorUsers = users.filter(u => userRole(u) === 'proctor');
-                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id).filter(Boolean)));
+                const proctorUsers = u.filter(usr => userRole(usr) === 'proctor');
+                const proctorIdsFromClasses = Array.from(new Set(c.map(cls => cls.proctor_id).filter(Boolean)));
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
 
@@ -582,7 +646,7 @@
                     right_click: 0,
                     tab_switch: 0
                 };
-                (sessions || []).forEach(session => {
+                s.forEach(session => {
                     if (session.flags) {
                         Object.entries(session.flags).forEach(([type, alerts]) => {
                             if (Array.isArray(alerts)) {
@@ -594,15 +658,15 @@
                 });
 
                 // Total questions (defensive)
-                const totalQuestions = (exams || []).reduce((sum, exam) => {
+                const totalQuestions = e.reduce((sum, exam) => {
                     const qlen = Array.isArray(exam.questions) ? exam.questions.length : 0;
                     return sum + qlen;
                 }, 0);
 
                 // Avg session duration (defensive)
-                const durations = (sessions || []).map(s => {
-                    const start = new Date(s.start_time);
-                    const end = new Date(s.end_time);
+                const durations = s.map(sess => {
+                    const start = new Date(sess.start_time);
+                    const end = new Date(sess.end_time);
                     if (isNaN(start) || isNaN(end)) return 0;
                     return (end - start) / (1000 * 60); // minutes
                 }).filter(d => d > 0);
@@ -611,12 +675,12 @@
                 // Update UI
                 document.getElementById('totalStudents').textContent = studentUsers.length;
                 document.getElementById('totalTeachers').textContent = teachersCount;
-                document.getElementById('totalExams').textContent = (exams || []).length;
-                document.getElementById('totalSessions').textContent = (sessions || []).length;
+                document.getElementById('totalExams').textContent = e.length;
+                document.getElementById('totalSessions').textContent = s.length;
                 document.getElementById('totalAlerts').textContent = totalAlerts;
                 document.getElementById('totalQuestions').textContent = totalQuestions;
                 document.getElementById('avgDuration').textContent = `${avgDuration} min`;
-                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (sessions || []).length))} per exam`;
+                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, s.length))} per exam`;
 
                 // Update alert types distribution
                 const alertTypesHtml = Object.entries(alertTypes)
@@ -635,29 +699,29 @@
                 // --- NEW metrics calculations ---
 
                 // Total classes
-                const totalClasses = (classes || []).length;
+                const totalClasses = c.length;
                 document.getElementById('totalClasses').textContent = totalClasses;
 
                 // Avg exams per class (map by class.course+section or count exams with exam.class_id if present)
                 // fallback: exams / classes
-                const avgExamsPerClass = totalClasses ? ((exams || []).length / totalClasses) : 0;
+                const avgExamsPerClass = totalClasses ? (e.length / totalClasses) : 0;
                 document.getElementById('avgExamsPerClass').textContent = avgExamsPerClass.toFixed(2);
 
                 // Completion rate: sessions with status === 'completed'
-                const completed = (sessions || []).filter(s => (s.status || '').toString().toLowerCase() === 'completed').length;
-                const completionRate = (sessions && sessions.length) ? Math.round((completed / sessions.length) * 100) : 0;
+                const completed = s.filter(sess => (sess.status || '').toString().toLowerCase() === 'completed').length;
+                const completionRate = s.length ? Math.round((completed / s.length) * 100) : 0;
                 document.getElementById('completionRate').textContent = `${completionRate}%`;
 
                 // Avg alerts per session
-                const avgAlertsPerSession = sessions && sessions.length ? (totalAlerts / sessions.length).toFixed(2) : 0;
+                const avgAlertsPerSession = s.length ? (totalAlerts / s.length).toFixed(2) : 0;
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
                 // Top 5 exams by alerts per session
                 const examStats = {};
-                (sessions || []).forEach(s => {
-                    const eid = s.exam_id;
+                s.forEach(sess => {
+                    const eid = sess.exam_id;
                     if (!eid) return;
-                    const count = Object.values(s.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
+                    const count = Object.values(sess.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
                     if (!examStats[eid]) examStats[eid] = { alerts: 0, sessions: 0 };
                     examStats[eid].alerts += count;
                     examStats[eid].sessions += 1;
@@ -667,23 +731,27 @@
                     .sort((a, b) => b.rate - a.rate)
                     .slice(0, 5)
                     .map(x => {
-                        const ex = exams.find(e => e.id === x.eid) || { title: x.eid };
+                        const ex = e.find(exam => exam.id === x.eid) || { title: x.eid };
                         return `<tr><td>${ex.title}</td><td>${x.rate.toFixed(2)}</td></tr>`;
                     }).join('');
                 document.getElementById('topExamsByAlertRate').innerHTML = topExams || '<tr><td colspan="2">No data</td></tr>';
 
                 // (optional) Participation rate: users who appear in exam_results vs known students
-                const resultUserIds = new Set((examResults || []).map(r => r.user_id).filter(Boolean));
+                const resultUserIds = new Set(er.map(r => r.user_id).filter(Boolean));
                 const participationRate = studentUsers.length ? Math.round((resultUserIds.size / studentUsers.length) * 100) : 0;
                 // set a tooltip or reuse element (here we set 'totalStudents' title)
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
 
-                // Load student scores with proctoring flags
-                await loadStudentScoresWithFlags(users, exams, sessions, examResults);
+                // Load student scores with proctoring flags and cache for admin retrieval
+                await loadStudentScoresWithFlags(u, e, s, er);
 
-                // done
+                loadingEl.classList.add('d-none');
+                contentEl.classList.remove('d-none');
             } catch (err) {
                 console.error('Error loading dashboard data:', err);
+                loadingEl.classList.add('d-none');
+                document.getElementById('dashboardErrorMsg').textContent = err.message || 'Failed to load dashboard data.';
+                errorEl.classList.remove('d-none');
             }
         }
 
@@ -778,71 +846,102 @@
         // Load student scores with proctoring flags
         async function loadStudentScoresWithFlags(users, exams, sessions, examResults) {
             try {
-                const tbody = document.getElementById('studentScoresTable');
-                tbody.innerHTML = '';
-
-                // Group results by student
+                const rows = [];
                 const studentResults = {};
-
                 (examResults || []).forEach(result => {
-                    if (!studentResults[result.user_id]) {
-                        studentResults[result.user_id] = [];
-                    }
+                    if (!studentResults[result.user_id]) studentResults[result.user_id] = [];
                     studentResults[result.user_id].push(result);
                 });
 
-                // Display results for each student
                 Object.entries(studentResults).forEach(([userId, results]) => {
                     const student = users.find(u => u.id === userId);
-
                     results.forEach(result => {
-                        const exam = exams.find(e => e.id === result.exam_id);
-
-                        // Calculate score
+                        const exam = exams.find(ex => ex.id === result.exam_id);
                         let scoreDisplay = 'N/A';
                         if (exam && exam.questions && result.answers) {
                             let correctAnswers = 0;
                             exam.questions.forEach((question, index) => {
-                                if (result.answers[index] === question.correctAnswer) {
-                                    correctAnswers++;
-                                }
+                                if (result.answers[index] === question.correctAnswer) correctAnswers++;
                             });
                             scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
                         }
-
-                        // Get proctoring flags for this session - check both student_id and user_id
-                        const session = sessions.find(s => {
-                            const matchesUser = (s.student_id === userId || s.user_id === userId);
-                            return matchesUser && s.exam_id === result.exam_id;
+                        const session = sessions.find(sess => {
+                            const matches = (sess.student_id === userId || sess.user_id === userId);
+                            return matches && sess.exam_id === result.exam_id;
                         });
-                        
-                        // Use unified formatting functions
                         const flagsDisplay = formatProctoringFlags(session ? session.flags : null);
                         const dateTimeTaken = formatDateTime(result.timestamp);
-
-                        const row = `
-                            <tr>
-                                <td>${student?.name || 'Unknown'}</td>
-                                <td>${exam?.title || 'Unknown'} (${exam?.subject || ''})</td>
-                                <td>${scoreDisplay}</td>
-                                <td>${dateTimeTaken}</td>
-                                <td>${flagsDisplay}</td>
-                            </tr>
-                        `;
-                        tbody.innerHTML += row;
+                        const studentName = student?.name || 'Unknown';
+                        const examTitle = exam?.title || 'Unknown';
+                        const writtenType = exam?.exam_type ? ` - ${exam.exam_type}` : '';
+                        const examType = `${examTitle} (${exam?.subject || ''})${writtenType}`;
+                        const ts = result.timestamp ? new Date(result.timestamp) : null;
+                        rows.push({
+                            studentName, examTitle, subject: exam?.subject || '', examType,
+                            scoreDisplay, dateTimeTaken, flagsDisplay, timestamp: ts
+                        });
                     });
                 });
 
-                if (tbody.innerHTML === '') {
-                    tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
-                }
-
+                _cachedScoreRows = rows;
+                renderScoresTable(rows);
             } catch (err) {
                 console.error('Error loading student scores:', err);
                 document.getElementById('studentScoresTable').innerHTML =
                     '<tr><td colspan="5" class="text-center text-danger">Error loading scores</td></tr>';
             }
         }
+
+        function renderScoresTable(rows) {
+            const tbody = document.getElementById('studentScoresTable');
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = rows.map(r => `
+                <tr>
+                    <td>${r.studentName}</td>
+                    <td>${r.examType}</td>
+                    <td>${r.scoreDisplay}</td>
+                    <td>${r.dateTimeTaken}</td>
+                    <td>${r.flagsDisplay}</td>
+                </tr>
+            `).join('');
+        }
+
+        function applyScoresFilter() {
+            const nameQ = (document.getElementById('searchStudentName').value || '').toLowerCase().trim();
+            const examQ = (document.getElementById('searchExamType').value || '').toLowerCase().trim();
+            const fromStr = document.getElementById('filterDateFrom').value;
+            const toStr = document.getElementById('filterDateTo').value;
+            const from = fromStr ? new Date(fromStr + 'T00:00:00') : null;
+            const to = toStr ? new Date(toStr + 'T23:59:59') : null;
+
+            const filtered = _cachedScoreRows.filter(r => {
+                if (nameQ && !r.studentName.toLowerCase().includes(nameQ)) return false;
+                if (examQ && !r.examTitle.toLowerCase().includes(examQ) && !(r.subject || '').toLowerCase().includes(examQ)) return false;
+                if (from && r.timestamp && r.timestamp < from) return false;
+                if (to && r.timestamp && r.timestamp > to) return false;
+                return true;
+            });
+            renderScoresTable(filtered);
+        }
+
+        function clearScoresFilter() {
+            document.getElementById('searchStudentName').value = '';
+            document.getElementById('searchExamType').value = '';
+            document.getElementById('filterDateFrom').value = '';
+            document.getElementById('filterDateTo').value = '';
+            renderScoresTable(_cachedScoreRows);
+        }
+
+        // Allow Enter key to apply filter in search inputs
+        (function initFilterListeners() {
+            ['searchStudentName', 'searchExamType', 'filterDateFrom', 'filterDateTo'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyScoresFilter(); });
+            });
+        })();
 
         // Function to delete old reports (admin only)
         async function deleteOldReports() {
@@ -946,7 +1045,7 @@
                 alert('Failed to delete reports. Please try again.');
             } finally {
                 const btn = document.getElementById('deleteAllBtn');
-                btn.innerHTML = '<i class="bx bx-trash-alt"></i> Delete ALL Reports';
+                btn.innerHTML = '<i class="bx bx-trash"></i> Archive Report';
                 btn.disabled = false;
             }
         }

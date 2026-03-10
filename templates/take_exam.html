@@ -6,18 +6,18 @@
     <title>Take Exam</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root{
             --bg:#0f1724;
             --card: rgba(255,255,255,0.06);
-            --accent: #6ee7b7;
+            --accent: #00c853;
             --muted: #9aa4b2;
             --radius: 14px;
         }
         
-        html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background: linear-gradient(180deg,#071023 0%, #0b2440 100%); color:#e6eef8}
+        html,body{height:100%;margin:0;font-family:'DM Sans',system-ui,sans-serif; background: linear-gradient(180deg,#071023 0%, #0b2440 100%); color:#e6eef8}
         body{background-color:#0b2440}
 
         /* Permission Modal Styles */
@@ -227,6 +227,71 @@
         #fullscreenBtn:hover {
             background: #4dd0e1;
         }
+
+        /* Alerts */
+        #alerts {
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .alert {
+            display: none;
+            padding: 10px 12px;
+            border-radius: 10px;
+            font-weight: 600;
+            align-items: center;
+            gap: 8px;
+        }
+        .alert.show {
+            display: flex;
+        }
+        .alert.danger {
+            background: rgba(255,80,80,0.08);
+            color: #ffb3b3;
+            border: 1px solid rgba(255,80,80,0.12);
+        }
+
+        /* Mic UI */
+        .mic-ui {
+            width: 100%;
+            max-width: 380px;
+            margin-top: 6px;
+            padding: 10px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .mic-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .mic-label {
+            font-weight: 600;
+        }
+        .mic-meter {
+            flex: 1;
+            height: 10px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .mic-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent), #4dd0e1);
+        }
+        .mic-status {
+            font-size: 0.86rem;
+            color: var(--muted);
+            min-width: 120px;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -396,7 +461,19 @@
     <!-- Exam Container -->
     <div id="examContainer" class="exam-container" style="display: none;">
         <div class="detection-area">
-            <!-- Detection area content -->
+            <!-- Audio detection UI -->
+            <div id="alerts" aria-live="polite">
+                <div id="alert-loudsound" class="alert danger">Loud sound detected!</div>
+            </div>
+
+            <!-- Mic UI -->
+            <div class="mic-ui" aria-live="polite">
+                <div class="mic-row">
+                    <div class="mic-label">Microphone</div>
+                    <div class="mic-meter"><div id="micFill" class="mic-fill"></div></div>
+                    <div id="micStatus" class="mic-status">Initializing…</div>
+                </div>
+            </div>
         </div>
         <div class="exam-questions">
             <!-- Exam questions will be loaded here -->
@@ -876,6 +953,197 @@
             e.preventDefault();
             return false;
         }, true);
+
+        // ================= AUDIO DETECTION FOR EXAM =================
+        let audioContext = null;
+        let analyser = null;
+        let microphoneStream = null;
+        let audioDataArray = null;
+        let isAudioInitialized = false;
+
+        // Elements
+        const alertLoudSound = document.getElementById('alert-loudsound');
+        const micFillEl = document.getElementById('micFill');
+        const micStatus = document.getElementById('micStatus');
+
+        // Audio detection variables
+        let lastAudioCheck = 0;
+        const AUDIO_CHECK_INTERVAL = 1000; // Check every 1 second
+
+        // Initialize audio detection
+        async function initAudioDetection() {
+            try {
+                // Request microphone access
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    },
+                    video: false
+                });
+
+                microphoneStream = stream;
+
+                // Create audio context and analyser
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = 0.3;
+                source.connect(analyser);
+
+                const bufferLength = analyser.frequencyBinCount;
+                audioDataArray = new Uint8Array(bufferLength);
+
+                isAudioInitialized = true;
+                if (micStatus) micStatus.innerText = 'Listening';
+
+                console.log('Audio detection initialized for exam');
+                startAudioMonitoring();
+
+            } catch (error) {
+                console.error('Failed to initialize audio detection:', error);
+                if (micStatus) micStatus.innerText = 'Audio unavailable';
+            }
+        }
+
+        // Start monitoring audio levels
+        function startAudioMonitoring() {
+            if (!isAudioInitialized || !analyser) return;
+
+            function monitorAudio() {
+                if (!analyser) return;
+
+                const now = Date.now();
+                if (now - lastAudioCheck >= AUDIO_CHECK_INTERVAL) {
+                    lastAudioCheck = now;
+
+                    analyser.getByteFrequencyData(audioDataArray);
+
+                    // Calculate RMS (Root Mean Square) for loudness
+                    let sum = 0;
+                    for (let i = 0; i < audioDataArray.length; i++) {
+                        const v = audioDataArray[i] / 255;
+                        sum += v * v;
+                    }
+                    const rms = Math.sqrt(sum / audioDataArray.length);
+
+                    // Update microphone meter
+                    const meterPct = Math.min(1, rms * 1.6); // Scale for better visualization
+                    if (micFillEl) {
+                        micFillEl.style.width = `${Math.round(meterPct * 100)}%`;
+                    }
+
+                    // Check for loud sounds and send to backend
+                    checkAudioLevel(rms);
+
+                    // Update status
+                    if (micStatus) {
+                        micStatus.innerText = `${Math.round(meterPct * 100)}%`;
+                    }
+                }
+
+                requestAnimationFrame(monitorAudio);
+            }
+
+            monitorAudio();
+        }
+
+        // Check audio level and send to backend for processing
+        async function checkAudioLevel(rms) {
+            try {
+                // Get exam parameters from URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const userId = urlParams.get('user_id');
+                const examId = window.location.pathname.split('/').pop();
+
+                if (!userId || !examId) return;
+
+                // Send audio data to backend for processing
+                const formData = new FormData();
+                // Create a simple audio blob for analysis
+                const audioBlob = new Blob([new Uint8Array(1024)], { type: 'audio/wav' });
+                formData.append('audio', audioBlob);
+                formData.append('rms_level', rms.toString());
+
+                const response = await fetch(`/detect_audio?session_id=${examId}&user_id=${userId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+
+                    // Show alert if loud sound detected
+                    if (result.loud_sound) {
+                        showLoudSoundAlert();
+                    }
+                }
+
+            } catch (error) {
+                console.error('Audio check failed:', error);
+            }
+        }
+
+        // Show loud sound alert
+        function showLoudSoundAlert() {
+            if (alertLoudSound) {
+                alertLoudSound.classList.add('show');
+
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    if (alertLoudSound) {
+                        alertLoudSound.classList.remove('show');
+                    }
+                }, 3000);
+            }
+
+            // Also show a browser alert for immediate attention
+            showExamAlert('🚨 Loud sound detected! Please ensure a quiet environment.');
+        }
+
+        // Initialize audio detection when exam starts
+        function startExamAudioDetection() {
+            if (!isAudioInitialized) {
+                initAudioDetection();
+            }
+        }
+
+        // Clean up audio resources
+        function cleanupAudioDetection() {
+            try {
+                if (microphoneStream) {
+                    microphoneStream.getTracks().forEach(track => track.stop());
+                }
+                if (audioContext && audioContext.state !== 'closed') {
+                    audioContext.close();
+                }
+                isAudioInitialized = false;
+            } catch (error) {
+                console.error('Audio cleanup error:', error);
+            }
+        }
+
+        // Start audio detection when exam becomes visible
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && !isAudioInitialized) {
+                // Small delay to ensure everything is ready
+                setTimeout(() => {
+                    startExamAudioDetection();
+                }, 1000);
+            }
+        });
+
+        // Initialize audio detection after permissions are granted
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.id === 'grantPermissionsBtn') {
+                // Start audio detection after permissions are granted
+                setTimeout(() => {
+                    startExamAudioDetection();
+                }, 2000);
+            }
+        });
     </script>
 </body>
 </html>

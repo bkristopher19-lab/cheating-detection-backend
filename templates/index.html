@@ -10,9 +10,18 @@
     <title>Online Exam with Proctoring</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+
+        :root {
+            --bs-primary: #00c853;
+            --bs-success: #008000;
+            --bs-info: #00FF7F;
+            --bs-warning: #808000;
+            --bs-danger: #FF0000;
+            --bs-secondary: #6c757d;
+        }
 
         /* ---------- PROCTORING COLLAPSE ---------- */
 .detection-area {
@@ -101,7 +110,7 @@
         :root{
             --bg:#0f1724;
             --card: rgba(255,255,255,0.06);
-            --accent: #6ee7b7;
+            --accent: #00FF7F;
             --muted: #9aa4b2;
             --radius: 14px;
         }
@@ -174,7 +183,7 @@
         }
 
         /* Keep rest of existing styles */
-        html,body{height:100%;margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial; background: linear-gradient(180deg,#071023 0%, #0b2440 100%); color:#e6eef8}
+        html,body{height:100%;margin:0;font-family:'DM Sans',system-ui,sans-serif; background: linear-gradient(180deg,#07100a 0%, #0b4024 100%); color:#e6eef8}
         body{background-color:#0b2440}
         *,*::before,*::after{box-sizing:border-box}
         .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px;
@@ -662,6 +671,9 @@
     <!-- Permission Request Modal -->
     <div id="permissionModal" class="permission-modal">
         <div class="permission-content">
+            <div id="chromeRecommendBanner" class="alert alert-info mb-3" style="display: none;">
+                <strong>For best recording compatibility:</strong> Please use <b>Google Chrome</b> or <b>Microsoft Edge</b> to take this exam. Recordings may not play correctly in other browsers.
+            </div>
             <div class="permission-header">
                 <h3>Camera & Microphone Access Required</h3>
                 <p>To take this exam, we need access to your camera and microphone for proctoring purposes.</p>
@@ -1086,10 +1098,13 @@
             examState.submitted = true;
 
             try {
-                // stop & finalize recording if running (upload handled in onstop)
+                // stop & finalize webcam recording if running (upload handled in onstop)
                 if (window.mediaRecorder && window.mediaRecorder.state !== 'inactive') {
                     try { window.mediaRecorder.stop(); } catch(e) { console.warn('stop mediaRecorder failed', e); }
                 }
+
+                // stop screen recording if active
+                stopScreenRecording();
 
                 // wait for video upload to finish (if any)
                 if (alertsSession.videoUploadPromise) {
@@ -1252,12 +1267,15 @@
         // Function to start recording a 5-second clip when cheating is detected
         async function startCheatingClip() {
             if (alertsSession.clipRecorded || !window.mediaRecorder) return;
+            const stream = window.mediaRecorder.stream;
+            const clipMime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' :
+                            (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm');
 
             try {
                 alertsSession.clipChunks = [];
-                alertsSession.clipRecorder = new MediaRecorder(window.mediaRecorder.stream, {
-                    mimeType: window.mediaRecorder.mimeType,
-                    bitsPerSecond: 2000000
+                alertsSession.clipRecorder = new MediaRecorder(stream, {
+                    mimeType: clipMime,
+                    bitsPerSecond: 1500000
                 });
 
                 alertsSession.clipRecorder.ondataavailable = (ev) => {
@@ -1267,8 +1285,13 @@
                 };
 
                 alertsSession.clipRecorder.onstop = async () => {
-                    const clipBlob = new Blob(alertsSession.clipChunks, { type: alertsSession.clipRecorder.mimeType });
+                    const clipBlob = new Blob(alertsSession.clipChunks, { type: clipMime });
                     alertsSession.clipChunks = [];
+                    if (!alertsSession.sessionId) return;
+                    if (!clipBlob || clipBlob.size === 0) {
+                        console.warn('Cheating clip empty - nothing to upload');
+                        return;
+                    }
 
                     const fd = new FormData();
                     fd.append('video', clipBlob, `cheating_clip_${alertsSession.sessionId}_${Date.now()}.webm`);
@@ -1287,7 +1310,7 @@
                     }
                 };
 
-                alertsSession.clipRecorder.start();
+                alertsSession.clipRecorder.start(1000);
                 setTimeout(() => {
                     if (alertsSession.clipRecorder && alertsSession.clipRecorder.state === 'recording') {
                         alertsSession.clipRecorder.stop();
@@ -1407,7 +1430,7 @@
                 align-items: center;
                 justify-content: center;
                 flex-direction: column;
-                font-family: Inter, sans-serif;
+                font-family: 'DM Sans', sans-serif;
                 color: white;
             `;
 
@@ -1863,6 +1886,12 @@
                     shortcutName = 'Alt+Tab';
                 }
 
+                // Dual monitor shortcuts: Win+Arrow, Win+Shift+Arrow (move window between monitors)
+                else if ((e.metaKey || e.key === 'Meta') && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                    shortcutDetected = true;
+                    shortcutName = e.shiftKey ? 'Win+Shift+Arrow (dual monitor)' : 'Win+Arrow (dual monitor)';
+                }
+
                 // Escape key (prevent closing dialogs or exiting)
                 else if (e.key === 'Escape') {
                     // Allow escape only for closing modals, but log it
@@ -2304,9 +2333,120 @@
             alert('Camera and microphone access are required to take this exam. Please refresh the page and allow access.');
         }
 
+        // Screen recording (getDisplayMedia) for capturing student's entire screen during the exam
+        let screenRecorder = null;
+        let screenChunks = [];
+
+        async function startScreenRecording() {
+            // Require browser support for screen capture
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+                alert('This exam requires sharing your entire screen, but your browser does not support screen sharing.');
+                return false;
+            }
+            try {
+                const screenStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { frameRate: 10 },
+                    audio: false
+                });
+
+                // Enforce ENTIRE SCREEN only (not window/tab) where supported
+                const track = screenStream.getVideoTracks()[0];
+                const settings = track && track.getSettings ? track.getSettings() : {};
+                // Chrome/Edge: displaySurface is usually 'monitor', 'window', 'browser', or 'application'
+                if (settings.displaySurface && settings.displaySurface !== 'monitor') {
+                    screenStream.getTracks().forEach(t => t.stop());
+                    if (typeof showExamAlert === 'function') {
+                        showExamAlert('🚫 You must choose "Entire Screen" to take this exam. Window or tab sharing is not allowed.');
+                    } else {
+                        alert('You must choose "Entire Screen" to take this exam. Window or tab sharing is not allowed.');
+                    }
+                    return false;
+                }
+
+                const mime = (window.MediaRecorder && MediaRecorder.isTypeSupported &&
+                    (MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+                        ? 'video/webm;codecs=vp8'
+                        : (MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                            ? 'video/webm;codecs=vp9'
+                            : 'video/webm'))) || 'video/webm';
+
+                screenChunks = [];
+                screenRecorder = new MediaRecorder(screenStream, { mimeType: mime, bitsPerSecond: 1500000 });
+                screenRecorder.ondataavailable = (ev) => {
+                    if (ev.data && ev.data.size > 0) {
+                        screenChunks.push(ev.data);
+                    }
+                };
+                screenRecorder.onstop = async () => {
+                    if (!alertsSession || !alertsSession.sessionId) return;
+                    const blob = new Blob(screenChunks, { type: mime });
+                    screenChunks = [];
+                    if (!blob || blob.size === 0) {
+                        console.warn('Screen recording empty - nothing to upload');
+                        return;
+                    }
+                    const fd = new FormData();
+                    fd.append('video', blob, `screen_${alertsSession.sessionId}_${Date.now()}.webm`);
+                    try {
+                        await fetch(`/upload_video?session_id=${encodeURIComponent(alertsSession.sessionId)}&type=screen`, {
+                            method: 'POST',
+                            body: fd
+                        });
+                        console.log('Screen recording uploaded successfully');
+                    } catch (e) {
+                        console.error('Failed to upload screen recording:', e);
+                    }
+                    screenStream.getTracks().forEach(t => t.stop());
+                };
+
+                screenRecorder.start(3000); // use timeslices so recording is more robust
+                // If user manually stops screen sharing via browser UI, stop recorder too
+                screenStream.getVideoTracks().forEach(track => {
+                    track.addEventListener('ended', () => {
+                        if (screenRecorder && screenRecorder.state === 'recording') {
+                            screenRecorder.stop();
+                        }
+                    });
+                });
+
+                console.log('Screen recording started');
+                return true;
+            } catch (e) {
+                console.warn('Screen recording permission denied or failed:', e);
+                if (typeof showExamAlert === 'function') {
+                    showExamAlert('🚫 This exam requires sharing your entire screen. Screen sharing was cancelled or blocked.');
+                } else {
+                    alert('This exam requires sharing your entire screen. Screen sharing was cancelled or blocked.');
+                }
+                return false;
+            }
+        }
+
+        function stopScreenRecording() {
+            try {
+                if (screenRecorder && screenRecorder.state === 'recording') {
+                    screenRecorder.stop();
+                }
+            } catch (e) {
+                console.warn('Failed to stop screen recorder:', e);
+            }
+        }
+
         // Start exam after permissions granted
         async function startExam() {
             try {
+                // Require ENTIRE SCREEN sharing before anything else
+                const screenOk = await startScreenRecording();
+                if (!screenOk) {
+                    // Block exam if screen cannot be shared properly
+                    examState.active = false;
+                    examState.submitted = false;
+                    setTimeout(() => {
+                        window.location.href = '/student_dashboard';
+                    }, 500);
+                    return;
+                }
+
                 await initExam();
                 await initAlertsSession();
                 await initModels();
@@ -2350,6 +2490,7 @@
                         }, 3000);
                     }
                 }, 1000); // Increased delay to ensure mic permissions are ready
+
             } catch(err) {
                 labelDiv.innerText = 'Initialization error: '+ (err && err.message ? err.message : String(err));
                 return;
@@ -2360,6 +2501,13 @@
 
         // Start exam when page loads
         window.addEventListener('load', () => {
+            // Show Chrome recommendation if not using Chrome/Edge
+            const ua = navigator.userAgent;
+            const isChromeOrEdge = ua.includes('Edg/') || (ua.includes('Chrome/') && !ua.includes('Edg'));
+            if (!isChromeOrEdge) {
+                const banner = document.getElementById('chromeRecommendBanner');
+                if (banner) banner.style.display = 'block';
+            }
             // Show permission modal first
             document.getElementById('permissionModal').style.display = 'flex';
         });
@@ -2587,7 +2735,7 @@
                 const x = landmarks[1].x * canvas.width;
                 const y = (landmarks[10].y * canvas.height) - 8;
                 ctx.fillStyle = gaze.looking ? 'rgba(0,200,80,0.95)' : 'rgba(255,80,80,0.95)';
-                ctx.font = '16px Inter, sans-serif';
+                ctx.font = '16px "DM Sans", sans-serif';
                 ctx.fillText(`${gaze.looking ? 'LOOKING' : 'NOT'}`, x, y);
             });
 
@@ -2611,7 +2759,7 @@
                         ctx.lineWidth = 3;
                         ctx.strokeRect(rx, ry, rw, rh);
                         ctx.fillStyle = '#ff8c42';
-                        ctx.font = '16px Inter, sans-serif';
+                        ctx.font = '16px "DM Sans", sans-serif';
                         ctx.fillText(`${d.class} ${(d.score*100).toFixed(0)}%`, rx + 6, ry + 18);
                     });
                 }catch(e){
@@ -3234,8 +3382,10 @@
                 // start MediaPipe faceMesh + camera stream (this will drive onFaceResults)
                 await startCameraStream();
 
-                // start recording the full session (use same stream if available)
-                try { startMediaRecorder(stream); } catch(e) { console.warn('startMediaRecorder failed', e); }
+                // start recording the full session using the active camera stream
+                // (startCameraStream replaces video.srcObject; using the old stream can produce empty recordings)
+                const activeStream = video && video.srcObject ? video.srcObject : stream;
+                try { startMediaRecorder(activeStream); } catch(e) { console.warn('startMediaRecorder failed', e); }
 
                 // mic analysis (no sound playback) - always start on all devices
                 // Audio detection is essential for proctoring, so we always enable it
@@ -3266,48 +3416,37 @@
             }
         };
 
-        // ----------------- MediaRecorder: record full session and upload -----------------
+        // ----------------- Auto-recording: WebM (Chrome/Edge recommended for playback) -----------------
         window.mediaRecorder = null;
         window.mediaChunks = [];
-        // alertsSession.videoUploadPromise will be set when upload starts; resolved when server confirms
-        async function startMediaRecorder(stream) {
+        // Use VP8 (broader compatibility) and timeslice for playable output
+        const RECORD_TIMESLICE_MS = 3000;
+        function startMediaRecorder(stream) {
             if (!stream) return;
             try {
-                const mime = (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' :
-                              (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' : 'video/webm'));
+                const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ? 'video/webm;codecs=vp8' :
+                             (MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm');
                 window.mediaChunks = [];
-                window.mediaRecorder = new MediaRecorder(stream, { mimeType: mime, bitsPerSecond: 2000000 });
+                window.mediaRecorder = new MediaRecorder(stream, { mimeType: mime, bitsPerSecond: 1500000 });
                 window.mediaRecorder.ondataavailable = (ev) => {
                     if (ev.data && ev.data.size > 0) window.mediaChunks.push(ev.data);
                 };
                 window.mediaRecorder.onstop = async () => {
-                    // assemble blob and upload to server
                     const blob = new Blob(window.mediaChunks, { type: mime });
                     window.mediaChunks = [];
-                    if (!alertsSession.sessionId) {
-                        console.warn('no session id to attach video to');
-                        return;
-                    }
+                    if (!alertsSession.sessionId) return;
+                    if (blob.size === 0) { console.warn('Recording empty - nothing to upload'); return; }
                     const fd = new FormData();
                     fd.append('video', blob, `session_${alertsSession.sessionId}_${Date.now()}.webm`);
-                    // store promise on alertsSession so submitExam can await
-                    alertsSession.videoUploadPromise = fetch(`/upload_video?session_id=${encodeURIComponent(alertsSession.sessionId)}`, {
-                        method: 'POST',
-                        body: fd
-                    }).then(async (res) => {
-                        if(!res.ok) throw new Error('upload failed');
-                        return res.json();
-                    }).then((j) => {
-                        console.log('video uploaded', j);
-                        return j;
-                    }).catch(e => { console.error('video upload error', e); throw e; }).finally(() => {
-                        // clear reference after finishing
-                        alertsSession.videoUploadPromise = null;
-                    });
+                    alertsSession.videoUploadPromise = fetch(`/upload_video?session_id=${encodeURIComponent(alertsSession.sessionId)}`, { method: 'POST', body: fd })
+                        .then(r => { if (!r.ok) throw new Error('upload failed'); return r.json(); })
+                        .then(j => { console.log('video uploaded', j); return j; })
+                        .catch(e => { console.error('video upload error', e); throw e; })
+                        .finally(() => { alertsSession.videoUploadPromise = null; });
                     return alertsSession.videoUploadPromise;
                 };
-                window.mediaRecorder.start();
-                console.log('MediaRecorder started', mime);
+                window.mediaRecorder.start(RECORD_TIMESLICE_MS);
+                console.log('MediaRecorder started (WebM, timeslice ' + RECORD_TIMESLICE_MS + 'ms)');
             } catch (e) {
                 console.warn('Failed to start MediaRecorder', e);
             }

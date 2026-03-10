@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Recording - Proctoring</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'DM Sans', system-ui, sans-serif; background: #1a1a2e; color: #eee; min-height: 100vh; }
+        .header { background: #16213e; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; }
+        .header h1 { font-family: 'Outfit', sans-serif; font-size: 1.25rem; margin: 0; }
+        .header a { color: #00c853; text-decoration: none; }
+        .header a:hover { text-decoration: underline; }
+        .chrome-banner { background: #0d47a1; color: #fff; padding: 0.75rem 1.5rem; text-align: center; font-size: 0.9rem; }
+        .chrome-banner a { color: #90caf9; }
+        .player-section { padding: 1.5rem; max-width: 900px; margin: 0 auto; }
+        .video-card { background: #16213e; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .video-card h5 { margin-bottom: 1rem; font-size: 1rem; }
+        .video-card video { width: 100%; max-height: 400px; border-radius: 8px; background: #000; }
+        .video-card .download { margin-top: 0.75rem; }
+        .empty-state { text-align: center; padding: 3rem 2rem; color: #888; }
+        .empty-state p { margin-bottom: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Video Recording Player</h1>
+        <a href="/reports" id="backLink">← Back to Reports</a>
+    </div>
+    <div class="chrome-banner">
+        For best playback, open this page in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>. 
+        If video won't play, <a href="https://www.videolan.org/vlc/" target="_blank" rel="noopener">download VLC</a> and open the recording file.
+    </div>
+    <div class="player-section">
+        <div id="loading" class="text-center py-5">Loading recording...</div>
+        <div id="content" style="display: none;">
+            <div id="sessionVideo" class="video-card" style="display: none;">
+                <h5>Session Recording</h5>
+                <video id="sessionVid" controls playsinline preload="auto">
+                    <source id="sessionSource">
+                    Your browser does not support video playback. <a id="sessionDownloadAlt" href="#">Download instead</a>.
+                </video>
+                <p id="sessionError" class="text-warning small mt-1" style="display:none;">Video won't play? <a id="sessionDownloadLink" href="#">Download</a> and open in VLC.</p>
+                <div class="download mt-2">
+                    <a id="sessionDownload" href="#" class="btn btn-sm btn-outline-light" download>Download Recording</a>
+                </div>
+            </div>
+            <div id="clipVideo" class="video-card" style="display: none;">
+                <h5>Violation Clip</h5>
+                <video id="clipVid" controls playsinline preload="auto">
+                    <source id="clipSource">
+                    Your browser does not support video playback. <a id="clipDownloadAlt" href="#">Download instead</a>.
+                </video>
+                <p id="clipError" class="text-warning small mt-1" style="display:none;">Video won't play? <a id="clipDownloadLink" href="#">Download</a> and open in VLC.</p>
+                <div class="download mt-2">
+                    <a id="clipDownload" href="#" class="btn btn-sm btn-outline-light" download>Download Clip</a>
+                </div>
+            </div>
+            <div id="screenVideo" class="video-card" style="display: none;">
+                <h5>Screen Recording</h5>
+                <video id="screenVid" controls playsinline preload="auto">
+                    <source id="screenSource">
+                    Your browser does not support video playback. <a id="screenDownloadAlt" href="#">Download instead</a>.
+                </video>
+                <p id="screenError" class="text-warning small mt-1" style="display:none;">Video won't play? <a id="screenDownloadLink" href="#">Download</a> and open in VLC.</p>
+                <div class="download mt-2">
+                    <a id="screenDownload" href="#" class="btn btn-sm btn-outline-light" download>Download Screen Recording</a>
+                </div>
+            </div>
+            <div id="empty" class="empty-state" style="display: none;">
+                <p>No recording available for this session.</p>
+            </div>
+        </div>
+        <div id="error" class="empty-state" style="display: none;">
+            <p class="text-danger">Failed to load recording. Check the session ID or try again.</p>
+        </div>
+    </div>
+
+    <script>
+        (async function() {
+            const params = new URLSearchParams(window.location.search);
+            const sessionId = params.get('session_id');
+            const baseUrl = window.location.origin;
+
+            if (!sessionId) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = '<p class="text-danger">Missing session_id. Use: /view_recording?session_id=YOUR_SESSION_ID</p>';
+                return;
+            }
+
+            try {
+                const res = await fetch(`/select?collection=proctoring_sessions&id=${encodeURIComponent(sessionId)}`);
+                if (!res.ok) throw new Error('Not found');
+                const session = await res.json();
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+
+                const videoPath = session.video_path;
+                const clipPath = session.clip_path;
+                const screenPath = session.screen_path;
+
+                async function setVideo(card, vidEl, srcEl, src, downloadEl, errorEl, downloadLinkEl, notFoundEl) {
+                    const ext = (src.split('.').pop() || '').split('?')[0].toLowerCase();
+                    const type = ext === 'mp4' ? 'video/mp4' : 'video/webm';
+                    downloadEl.href = src + (src.includes('?') ? '&' : '?') + 'download=1';
+                    downloadEl.download = src.split('/').pop().split('?')[0] || 'recording.webm';
+                    if (downloadLinkEl) downloadLinkEl.href = downloadEl.href;
+                    vidEl.addEventListener('error', () => { if (errorEl) errorEl.style.display = 'block'; });
+                    try {
+                        const r = await fetch(src);
+                        if (!r.ok) throw new Error('not found');
+                        const blob = await r.blob();
+                        if (blob.size === 0) throw new Error('empty');
+                        const blobUrl = URL.createObjectURL(blob);
+                        srcEl.src = blobUrl;
+                        srcEl.type = type;
+                        vidEl.load();
+                        vidEl.addEventListener('loadedmetadata', () => { if (notFoundEl) notFoundEl.style.display = 'none'; });
+                    } catch (e) {
+                        if (notFoundEl) {
+                            notFoundEl.innerHTML = 'Recording file not found or empty. If you downloaded and VLC won\'t open it either, the file is corrupted. <strong>Take a new exam in Chrome</strong>, let it record at least 15 seconds, then submit.';
+                            notFoundEl.style.display = 'block';
+                        }
+                        srcEl.src = src;
+                        srcEl.type = type;
+                        vidEl.load();
+                    }
+                }
+                if (videoPath) {
+                    const sessionVideo = document.getElementById('sessionVideo');
+                    sessionVideo.style.display = 'block';
+                    const sessionNotFound = document.createElement('p');
+                    sessionNotFound.className = 'text-warning small mt-1';
+                    sessionNotFound.style.display = 'none';
+                    sessionVideo.querySelector('.download').before(sessionNotFound);
+                    const src = baseUrl + (videoPath.startsWith('/') ? videoPath : '/' + videoPath);
+                    await setVideo(sessionVideo, document.getElementById('sessionVid'), document.getElementById('sessionSource'),
+                        src, document.getElementById('sessionDownload'), document.getElementById('sessionError'),
+                        document.getElementById('sessionDownloadLink'), sessionNotFound);
+                }
+                if (clipPath) {
+                    const clipVideo = document.getElementById('clipVideo');
+                    clipVideo.style.display = 'block';
+                    const clipNotFound = document.createElement('p');
+                    clipNotFound.className = 'text-warning small mt-1';
+                    clipNotFound.style.display = 'none';
+                    clipVideo.querySelector('.download').before(clipNotFound);
+                    const src = baseUrl + (clipPath.startsWith('/') ? clipPath : '/' + clipPath);
+                    await setVideo(clipVideo, document.getElementById('clipVid'), document.getElementById('clipSource'),
+                        src, document.getElementById('clipDownload'), document.getElementById('clipError'),
+                        document.getElementById('clipDownloadLink'), clipNotFound);
+                }
+                if (screenPath) {
+                    const screenVideo = document.getElementById('screenVideo');
+                    screenVideo.style.display = 'block';
+                    const screenNotFound = document.createElement('p');
+                    screenNotFound.className = 'text-warning small mt-1';
+                    screenNotFound.style.display = 'none';
+                    screenVideo.querySelector('.download').before(screenNotFound);
+                    const src = baseUrl + (screenPath.startsWith('/') ? screenPath : '/' + screenPath);
+                    await setVideo(screenVideo, document.getElementById('screenVid'), document.getElementById('screenSource'),
+                        src, document.getElementById('screenDownload'), document.getElementById('screenError'),
+                        document.getElementById('screenDownloadLink'), screenNotFound);
+                }
+                if (!videoPath && !clipPath && !screenPath) {
+                    document.getElementById('empty').style.display = 'block';
+                }
+            } catch (e) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        })();
+    </script>
+</body>
+</html>

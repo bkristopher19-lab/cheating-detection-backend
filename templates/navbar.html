@@ -1,5 +1,5 @@
 <!-- Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+        <nav class="navbar navbar-expand-lg navbar-proctor border-bottom">
             <div class="container-fluid">
                 <button class="btn btn-link d-lg-none" id="menu-toggle">
                     <i class='bx bx-menu fs-4'></i>
@@ -54,7 +54,7 @@
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item me-2 d-none" id="installNavItem">
-                            <button class="btn btn-outline-primary btn-sm" id="installBtn" type="button">
+                            <button class="btn btn-outline-primary btn-sm" id="installBtn" type="button" title="Install app (Chrome or Microsoft Edge)">
                                 <i class='bx bx-download'></i> Install App
                             </button>
                         </li>
@@ -88,9 +88,22 @@
         </nav>
 
     <style>
-        .navbar-brand {
-            font-weight: 600;
+        .navbar-proctor {
+            background: linear-gradient(135deg, #0d1f0d 0%, #1a3d1a 100%) !important;
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2) !important;
         }
+        .navbar-proctor .navbar-brand {
+            font-weight: 700;
+            color: white !important;
+        }
+        .navbar-proctor .nav-link,
+        .navbar-proctor .btn-link { color: rgba(255,255,255,0.9) !important; }
+        .navbar-proctor .dropdown-menu {
+            border-radius: 12px;
+            border: 1px solid rgba(0,200,83,0.2);
+        }
+        .navbar-proctor .dropdown-item:hover { background: rgba(0, 200, 83, 0.1); }
+        .navbar-brand { font-weight: 600; }
 
         .back-btn-mobile {
             color: #6c757d;
@@ -185,9 +198,10 @@
             color: #9ca3af;
         }
 
-        body.dark-mode .navbar {
-            background-color: #1e1e1e !important;
-            border-bottom: 1px solid #333;
+        body.dark-mode .navbar,
+        body.dark-mode .navbar-proctor {
+            background: #1e1e1e !important;
+            border-bottom: 1px solid #333 !important;
         }
 
         body.dark-mode .navbar-brand {
@@ -476,6 +490,11 @@ document.getElementById('menu-toggle').addEventListener('click', function() {
 });
 
 
+
+// PWA: register service worker for install (Chrome/Edge)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/static/sw.js').catch(function() {});
+}
 
 // PWA install prompt handling (dashboards)
 (function() {

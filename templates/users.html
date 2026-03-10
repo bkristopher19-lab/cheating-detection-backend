@@ -4,10 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Management</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
     <link href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css" rel="stylesheet">
- 
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #00c853; --accent-dark: #009624; --bg-page: #f0f7f0; }
+        body { background: var(--bg-page); font-family: 'DM Sans', system-ui, sans-serif; }
+        .main-content { background: var(--bg-page); }
+        .page-title { font-family: 'Outfit', sans-serif; font-weight: 700; color: #1b2e1b; }
+        .card { border-radius: 16px; border: 1px solid rgba(0,200,83,0.15); box-shadow: 0 4px 20px rgba(0,200,83,0.08); }
+        .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 10px !important; }
+    </style>
 </head>
 <body>
     <!-- Include Sidebar -->
@@ -21,7 +31,7 @@
         <!-- Page Content -->
         <div class="container-fluid p-4">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1 class="h3">User Management</h1>
+                <h1 class="h3 page-title">User Management</h1>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#userModal">
                     <i class='bx bx-plus'></i> Add New User
                 </button>
