@@ -629,8 +629,11 @@
                     studentUsers = uniqueIds.map(id => u.find(usr => usr.id === id)).filter(Boolean);
                 }
 
-                // Proctors: combine explicit proctor users and any proctor_id referenced in classes
-                const proctorUsers = u.filter(usr => userRole(usr) === 'proctor');
+                // Proctors / teachers: combine explicit staff users and any proctor_id referenced in classes
+                const proctorUsers = u.filter(usr => {
+                    const r = userRole(usr);
+                    return r === 'proctor' || r === 'teacher';
+                });
                 const proctorIdsFromClasses = Array.from(new Set(c.map(cls => cls.proctor_id).filter(Boolean)));
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
@@ -755,11 +758,53 @@
             }
         }
 
-        // Load data when page loads
-        loadDashboardData();
+        async function resolveCurrentRole() {
+            const fromSession = (() => {
+                try {
+                    const raw = sessionStorage.getItem('user');
+                    if (!raw) return '';
+                    const parsed = JSON.parse(raw);
+                    return (parsed.role || parsed.type || '').toString().trim().toLowerCase();
+                } catch (_) {
+                    return '';
+                }
+            })();
+            if (fromSession) return fromSession;
 
-        // Real-time data updates every 30 seconds
-        setInterval(loadDashboardData, 30000);
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) return '';
+            try {
+                const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
+                if (!res.ok) return '';
+                const user = await res.json();
+                return (user.role || user.type || '').toString().trim().toLowerCase();
+            } catch (_) {
+                return '';
+            }
+        }
+
+        async function initDashboardPage() {
+            const role = await resolveCurrentRole();
+            if (role === 'student') {
+                window.location.replace('/student_dashboard');
+                return;
+            }
+            if (role === 'proctor' || role === 'teacher') {
+                window.location.replace('/proctor_dashboard');
+                return;
+            }
+            // Only admin can load global analytics dashboard data.
+            if (role && role !== 'admin') {
+                window.location.replace('/');
+                return;
+            }
+
+            loadDashboardData();
+            setInterval(loadDashboardData, 30000);
+        }
+
+        // Load data when page loads (admin only)
+        initDashboardPage();
 
         // Unified utility functions for consistent display across all dashboards
         
@@ -859,9 +904,10 @@
                         const exam = exams.find(ex => ex.id === result.exam_id);
                         let scoreDisplay = 'N/A';
                         if (exam && exam.questions && result.answers) {
+                            const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
                             let correctAnswers = 0;
                             exam.questions.forEach((question, index) => {
-                                if (result.answers[index] === question.correctAnswer) correctAnswers++;
+                                if (normalizeAnswer(result.answers[index]) === normalizeAnswer(question.correctAnswer)) correctAnswers++;
                             });
                             scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
                         }
@@ -1050,30 +1096,10 @@
             }
         }
 
-        (async function redirectUsers() {
-            const userId = sessionStorage.getItem('userId');
-            if (!userId) return; // no client session, do nothing
-
-            try {
-                const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
-                if (!res.ok) return;
-                const user = await res.json();
-                const role = (user.role || user.type || '').toString().toLowerCase();
-
-                // Show admin controls if user is admin
-                if (role === 'admin') {
-                    document.getElementById('adminControls').style.display = 'block';
-                }
-
-                if (role === 'proctor') {
-                    // redirect proctor to the proctor-scoped dashboard
-                    window.location.replace('/proctor_dashboard');
-                } else if (role === 'student') {
-                    // redirect student to student dashboard
-                    window.location.replace('/student_dashboard');
-                }
-            } catch (err) {
-                console.error('User redirect check failed', err);
+        (async function showAdminControlsIfAdmin() {
+            const role = await resolveCurrentRole();
+            if (role === 'admin') {
+                document.getElementById('adminControls').style.display = 'block';
             }
         })();
     </script>

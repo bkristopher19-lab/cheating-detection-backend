@@ -123,7 +123,10 @@
             try {
                 const res = await fetch('/select?collection=users');
                 const users = await res.json();
-                const proctors = users.filter(u => u.role === 'proctor' || u.role === 'admin');
+                const proctors = users.filter(u => {
+                    const r = ((u.role || u.type) + '').toString().toLowerCase().trim();
+                    return r === 'proctor' || r === 'teacher' || r === 'admin';
+                });
                 const $sel = $(selector);
                 $sel.empty();
                 $sel.append('<option value="">-- Select Proctor or Admin --</option>');

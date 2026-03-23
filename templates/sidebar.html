@@ -58,7 +58,7 @@
         {% set role = current_user.role if current_user is defined and current_user.role is defined else (current_user.type if current_user is defined and current_user.type is defined else '') %}
         <ul class="nav nav-pills flex-column mb-auto">
             <li class="nav-item proctor-only">
-                <a href="/dashboard" class="nav-link {{ 'active' if active_page == 'dashboard' else 'text-white' }}">
+                <a href="/proctor_dashboard" id="sidebarDashboardLink" class="nav-link {{ 'active' if active_page == 'dashboard' else 'text-white' }}">
                     <i class='bx bxs-dashboard'></i>
                     Dashboard
                 </a>
@@ -110,7 +110,11 @@
             const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
             if (!res.ok) return;
             const user = await res.json();
-            const role = (user.role || user.type || '').toString().toLowerCase();
+            const role = (user.role || user.type || '').toString().trim().toLowerCase();
+            const dashboardLink = document.getElementById('sidebarDashboardLink');
+            if (dashboardLink) {
+                dashboardLink.setAttribute('href', role === 'admin' ? '/dashboard' : '/proctor_dashboard');
+            }
 
             if (role === 'admin') {
                 document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');

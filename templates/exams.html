@@ -18,6 +18,16 @@
         .card { border-radius: 16px; border: 1px solid rgba(0,200,83,0.15); box-shadow: 0 4px 20px rgba(0,200,83,0.08); }
         .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 10px !important; }
         .list-group-item { border-radius: 8px !important; margin: 0.2rem 0; }
+        /* Exam modal: clean, but with subtle accent */
+        #examModal .modal-content { border-radius: 12px; border: 1px solid rgba(0,200,83,0.22); background: #f8fffb; box-shadow: 0 12px 34px rgba(0,200,83,0.12); }
+        #examModal .modal-header { background: #f8f9fa; border-bottom: 1px solid #e9ecef; }
+        #examModal .modal-title { font-weight: 600; }
+        #examModal .form-control, #examModal .form-select { border-radius: 8px; }
+        /* Question cards: subtle accent */
+        #examModal .question-item { border: 1px solid rgba(0,200,83,0.22) !important; background: rgba(255,255,255,0.96) !important; box-shadow: 0 6px 18px rgba(0,200,83,0.06) !important; border-radius: 10px !important; }
+        #examModal .question-item .card-body { padding: 0.95rem 1rem !important; }
+        #examModal .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,200,83,0.25) !important; }
+        #examModal .btn-outline-primary { border-radius: 8px !important; }
     </style>
 </head>
 <body>
@@ -148,7 +158,8 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Duration (minutes)</label>
-                            <input type="number" class="form-control" id="examDuration" required>
+                            <input type="number" class="form-control" id="examDuration" min="5" max="120" step="1" required>
+                            <div class="form-text">Allowed range: 5 to 120 minutes.</div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Start Date & Time</label>
@@ -204,18 +215,63 @@
         // Initialize DataTable
         let examTable = $('#examsTable').DataTable();
 
-        // Question Template
-        function getQuestionTemplate(index) {
+        // undefined = not loaded yet; null = admin (all exams); array of ids = proctor scope
+        let examScopeForAlerts = undefined;
+
+        // Question Template (changes based on exam type)
+        function getQuestionTemplate(index, examType) {
+            const t = ((examType || '') + '').toString().trim();
+            const questionHeader = `
+                <div class="d-flex justify-content-between mb-2">
+                    <h6>Question ${index + 1}</h6>
+                    <button type="button" class="btn btn-danger btn-sm remove-question">
+                        <i class='bx bx-trash'></i>
+                    </button>
+                </div>
+            `;
+
+            if (t === 'Identification') {
+                return `
+                    <div class="card mb-2 question-item">
+                        <div class="card-body">
+                            ${questionHeader}
+                            <div class="mb-2 mt-2">
+                                <input type="text" class="form-control question-text" placeholder="Enter question" required>
+                            </div>
+                            <div class="mb-2">
+                                <input type="text" class="form-control correct-answer" placeholder="Answer" required>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (t === 'True or False') {
+                return `
+                    <div class="card mb-2 question-item">
+                        <div class="card-body">
+                            ${questionHeader}
+                            <div class="mb-2 mt-2">
+                                <input type="text" class="form-control question-text" placeholder="Enter question" required>
+                            </div>
+                            <div class="mb-2">
+                                <select class="form-select correct-answer" required>
+                                    <option value="" selected disabled>Choose true/false</option>
+                                    <option value="True">True</option>
+                                    <option value="False">False</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Default: Multiple Choices
             return `
                 <div class="card mb-2 question-item">
                     <div class="card-body">
-                        <div class="d-flex justify-content-between mb-2">
-                            <h6>Question ${index + 1}</h6>
-                            <button type="button" class="btn btn-danger btn-sm remove-question">
-                                <i class='bx bx-trash'></i>
-                            </button>
-                        </div>
-                        <div class="mb-2">
+                        ${questionHeader}
+                        <div class="mb-2 mt-2">
                             <input type="text" class="form-control question-text" placeholder="Enter question" required>
                         </div>
                         <div class="mb-2">
@@ -240,7 +296,8 @@
         // Add / remove question handlers
         $('#addQuestion').click(function() {
             const questionCount = $('.question-item').length;
-            $('#questionsContainer').append(getQuestionTemplate(questionCount));
+            const examType = $('#examType').val();
+            $('#questionsContainer').append(getQuestionTemplate(questionCount, examType));
         });
         $(document).on('click', '.remove-question', function() {
             $(this).closest('.question-item').remove();
@@ -256,8 +313,20 @@
             $('#examId').val('');
             $('#examForm')[0].reset();
             $('#questionsContainer').empty();
-            $('#questionsContainer').append(getQuestionTemplate(0));
+            $('#questionsContainer').append(getQuestionTemplate(0, $('#examType').val()));
             await loadClassesIntoSelect();
+        });
+
+        // Update question inputs when exam type changes
+        $('#examType').on('change', function() {
+            const examType = $('#examType').val();
+            const existingCount = $('.question-item').length;
+            const countToBuild = existingCount > 0 ? existingCount : 1;
+
+            $('#questionsContainer').empty();
+            for (let i = 0; i < countToBuild; i++) {
+                $('#questionsContainer').append(getQuestionTemplate(i, examType));
+            }
         });
 
         // Load Classes into Select (filtered for proctor)
@@ -276,9 +345,11 @@
             const response = await fetch('/select?collection=classes');
             let classes = await response.json() || [];
 
-            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
-            if (role === 'proctor') {
-                classes = classes.filter(c => c.proctor_id === userId);
+            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
+            // Registration stores "teacher" for proctoring staff; treat same as "proctor" for data scope
+            const isProctorLike = role === 'proctor' || role === 'teacher';
+            if (isProctorLike) {
+                classes = classes.filter(c => String(c.proctor_id) === String(userId));
             }
 
             const $sel = $('#examClassSelect');
@@ -315,9 +386,24 @@
             const classMap = {};
             classes.forEach(cls => classMap[cls.id] = cls);
 
-            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
-            if (role === 'proctor') {
-                exams = exams.filter(e => (e.proctor_id && e.proctor_id === userId) || (e.created_by && e.created_by === userId));
+            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
+            const isProctorLike = role === 'proctor' || role === 'teacher';
+            if (isProctorLike) {
+                const proctorClassIds = classes
+                    .filter(c => String(c.proctor_id) === String(userId))
+                    .map(c => String(c.id));
+                if (proctorClassIds.length > 0) {
+                    const allowedIds = exams
+                        .filter(e => proctorClassIds.includes(String(e.class_id)))
+                        .map(e => String(e.id));
+                    examScopeForAlerts = allowedIds;
+                    exams = exams.filter(e => allowedIds.includes(String(e.id)));
+                } else {
+                    examScopeForAlerts = [];
+                    exams = [];
+                }
+            } else {
+                examScopeForAlerts = null;
             }
 
             examTable.clear();
@@ -370,11 +456,18 @@
         // Save Exam
         $('#saveExam').click(async function() {
             const userId = sessionStorage.getItem('userId') || null;
+            const examType = $('#examType').val();
+            const durationValue = parseInt($('#examDuration').val(), 10);
+            if (Number.isNaN(durationValue) || durationValue < 5 || durationValue > 120) {
+                alert('Duration must be between 5 and 120 minutes.');
+                $('#examDuration').focus();
+                return;
+            }
             const examData = {
                 title: $('#examTitle').val(),
                 subject: $('#examSubject').val(),
                 exam_type: $('#examType').val(),
-                duration: parseInt($('#examDuration').val()),
+                duration: durationValue,
                 start_date: $('#examStartDate').val(),
                 end_date: $('#examEndDate').val(),
                 class_id: $('#examClassSelect').val(),
@@ -387,11 +480,17 @@
                     correctAnswer: $(this).find('.correct-answer').val(),
                     wrongAnswers: []
                 };
+                // Multiple choices questions provide explicit wrong answers.
                 $(this).find('.wrong-answer').each(function() {
-                    if ($(this).val()) {
-                        question.wrongAnswers.push($(this).val());
-                    }
+                    if ($(this).val()) question.wrongAnswers.push($(this).val());
                 });
+
+                // True/False questions: wrongAnswers are generated from the selected correctAnswer.
+                if (examType === 'True or False') {
+                    const correct = ((question.correctAnswer || '') + '').toString().trim();
+                    if (correct === 'True') question.wrongAnswers = ['False'];
+                    if (correct === 'False') question.wrongAnswers = ['True'];
+                }
                 examData.questions.push(question);
             });
 
@@ -440,14 +539,19 @@
             $('#examClassSelect').val(exam.class_id || '');
 
             $('#questionsContainer').empty();
+            const examType = exam.exam_type || '';
             (exam.questions || []).forEach((question, index) => {
-                $('#questionsContainer').append(getQuestionTemplate(index));
+                $('#questionsContainer').append(getQuestionTemplate(index, examType));
                 const $questionItem = $('.question-item').last();
                 $questionItem.find('.question-text').val(question.text);
                 $questionItem.find('.correct-answer').val(question.correctAnswer);
-                (question.wrongAnswers || []).forEach((answer, i) => {
-                    $questionItem.find('.wrong-answer').eq(i).val(answer);
-                });
+
+                // Only multiple-choice questions have wrong answers
+                if (examType === 'Multiple Choices') {
+                    (question.wrongAnswers || []).forEach((answer, i) => {
+                        $questionItem.find('.wrong-answer').eq(i).val(answer);
+                    });
+                }
             });
 
             $('#examModal').modal('show');
@@ -478,14 +582,19 @@
             $('#examClassSelect').val('');
 
             $('#questionsContainer').empty();
+            const examType = exam.exam_type || '';
             (exam.questions || []).forEach((question, index) => {
-                $('#questionsContainer').append(getQuestionTemplate(index));
+                $('#questionsContainer').append(getQuestionTemplate(index, examType));
                 const $questionItem = $('.question-item').last();
                 $questionItem.find('.question-text').val(question.text);
                 $questionItem.find('.correct-answer').val(question.correctAnswer);
-                (question.wrongAnswers || []).forEach((answer, i) => {
-                    $questionItem.find('.wrong-answer').eq(i).val(answer);
-                });
+
+                // Only multiple-choice questions have wrong answers
+                if (examType === 'Multiple Choices') {
+                    (question.wrongAnswers || []).forEach((answer, i) => {
+                        $questionItem.find('.wrong-answer').eq(i).val(answer);
+                    });
+                }
             });
 
             $('#examModal').modal('show');
@@ -545,7 +654,11 @@
             }
         });
 
-        loadExams();
+        (async function initExamsPage() {
+            await loadExams();
+            refreshAlertDistribution();
+            setInterval(refreshAlertDistribution, 5000);
+        })();
         loadUserName();
 
         // Show modal -> refresh class list
@@ -558,6 +671,30 @@
            ======================= */
 
         let alertsChart = null;
+
+        function resetAlertBadgesToZero() {
+            const counts = {
+                twofaces: 0,
+                loud_sound: 0,
+                phone: 0,
+                fullscreen_exit: 0,
+                keyboard_shortcut: 0,
+                right_click: 0,
+                tab_switch: 0,
+                captions: 0,
+                face_absent: 0
+            };
+            document.getElementById('alert-twofaces').innerText = counts.twofaces;
+            document.getElementById('alert-loud-sound').innerText = counts.loud_sound;
+            document.getElementById('alert-phone').innerText = counts.phone;
+            document.getElementById('alert-fullscreen-exit').innerText = counts.fullscreen_exit;
+            document.getElementById('alert-keyboard-shortcut').innerText = counts.keyboard_shortcut;
+            document.getElementById('alert-right-click').innerText = counts.right_click;
+            document.getElementById('alert-tab-switch').innerText = counts.tab_switch;
+            document.getElementById('alert-captions').innerText = counts.captions;
+            document.getElementById('alert-face-absent').innerText = counts.face_absent;
+            createOrUpdateAlertsChart(counts);
+        }
 
         function createOrUpdateAlertsChart(counts) {
             const ctx = document.getElementById('alertsChart');
@@ -617,17 +754,28 @@
         }
 
         async function refreshAlertDistribution() {
+            if (examScopeForAlerts === undefined) {
+                return;
+            }
             try {
                 const res = await fetch('/select?collection=proctoring_sessions');
                 let sessions = await res.json() || [];
+                if (!Array.isArray(sessions)) {
+                    sessions = [];
+                }
 
-                if (!Array.isArray(sessions) || sessions.length === 0) {
-                    return;
+                if (Array.isArray(examScopeForAlerts)) {
+                    sessions = sessions.filter(s => examScopeForAlerts.includes(String(s.exam_id)));
                 }
 
                 // If a specific exam is selected, filter sessions to that exam
                 if (currentMonitoredExamId) {
-                    sessions = sessions.filter(s => s.exam_id === currentMonitoredExamId);
+                    sessions = sessions.filter(s => String(s.exam_id) === String(currentMonitoredExamId));
+                }
+
+                if (sessions.length === 0) {
+                    resetAlertBadgesToZero();
+                    return;
                 }
 
                 // Prefer active session, else latest by start_time
@@ -676,9 +824,6 @@
             }
         }
 
-        // First load + auto-refresh every 5 seconds
-        refreshAlertDistribution();
-        setInterval(refreshAlertDistribution, 5000);
     </script>
 </body>
 </html>

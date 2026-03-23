@@ -824,9 +824,10 @@
                                 scoreDisplay = '0 (terminated)';
                                 statusBadge = '<span class="badge bg-danger">Terminated</span>';
                             } else if (exam.questions) {
+                                const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
                                 let correctAnswers = 0;
                                 exam.questions.forEach((question, index) => {
-                                    if (userResult.answers && userResult.answers[index] === question.correctAnswer) {
+                                    if (userResult.answers && normalizeAnswer(userResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
                                         correctAnswers++;
                                     }
                                 });

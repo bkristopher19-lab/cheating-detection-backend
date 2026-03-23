@@ -948,32 +948,69 @@
                 document.getElementById('examSubject').textContent = `Subject: ${examData.subject}`;
                 
                 // Store exam questions and answers for speech detection
+                const examType = ((examData.exam_type || 'Multiple Choices') + '').toString().trim();
                 examState.questions = examData.questions.map(q => q.text.toLowerCase());
                 examState.allAnswers = [];
                 examData.questions.forEach(q => {
                     examState.allAnswers.push(q.correctAnswer.toLowerCase());
-                    q.wrongAnswers.forEach(ans => {
-                        examState.allAnswers.push(ans.toLowerCase());
-                    });
+                    const wrongAnswers = Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [];
+                    if (examType === 'True or False') {
+                        const correct = (q.correctAnswer || '').toString().trim().toLowerCase();
+                        if (correct === 'true') examState.allAnswers.push('false');
+                        if (correct === 'false') examState.allAnswers.push('true');
+                    } else {
+                        wrongAnswers.forEach(ans => {
+                            examState.allAnswers.push(String(ans).toLowerCase());
+                        });
+                    }
                 });
                 
                 const container = document.getElementById('questionsContainer');
                 examData.questions.forEach((q, idx) => {
-                    const answers = [q.correctAnswer, ...q.wrongAnswers].sort(() => Math.random() - 0.5);
-                    
-                    const questionHtml = `
-                        <div class="question-card">
-                            <h5>Question ${idx + 1}</h5>
-                            <p>${q.text}</p>
-                            <div class="answers">
-                                ${answers.map((answer, i) => `
-                                    <div class="answer-option" onclick="selectAnswer(${idx}, ${i}, this)">
-                                        ${answer}
-                                    </div>
-                                `).join('')}
+                    const wrongAnswers = Array.isArray(q.wrongAnswers) ? q.wrongAnswers : [];
+                    let questionHtml = '';
+
+                    if (examType === 'Identification') {
+                        questionHtml = `
+                            <div class="question-card" data-question-type="identification">
+                                <h5>Question ${idx + 1}</h5>
+                                <p>${q.text}</p>
+                                <div class="answers">
+                                    <input type="text" class="form-control identification-answer" placeholder="Type your answer here">
+                                </div>
                             </div>
-                        </div>
-                    `;
+                        `;
+                    } else if (examType === 'True or False') {
+                        const answers = ['True', 'False'].sort(() => Math.random() - 0.5);
+                        questionHtml = `
+                            <div class="question-card" data-question-type="true_false">
+                                <h5>Question ${idx + 1}</h5>
+                                <p>${q.text}</p>
+                                <div class="answers">
+                                    ${answers.map((answer, i) => `
+                                        <div class="answer-option" onclick="selectAnswer(${idx}, ${i}, this)">
+                                            ${answer}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        const answers = [q.correctAnswer, ...wrongAnswers].sort(() => Math.random() - 0.5);
+                        questionHtml = `
+                            <div class="question-card" data-question-type="multiple_choices">
+                                <h5>Question ${idx + 1}</h5>
+                                <p>${q.text}</p>
+                                <div class="answers">
+                                    ${answers.map((answer, i) => `
+                                        <div class="answer-option" onclick="selectAnswer(${idx}, ${i}, this)">
+                                            ${answer}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
                     container.innerHTML += questionHtml;
                 });
 
@@ -1090,6 +1127,12 @@
 
             const answers = [];
             document.querySelectorAll('.question-card').forEach(card => {
+                const textInput = card.querySelector('.identification-answer');
+                if (textInput) {
+                    const typed = (textInput.value || '').trim();
+                    answers.push(typed || null);
+                    return;
+                }
                 const selected = card.querySelector('.answer-option.selected');
                 answers.push(selected ? selected.textContent.trim() : null);
             });

@@ -594,20 +594,24 @@
                     fetch('/select?collection=exam_results').then(r => r.json())
                 ]);
 
-                // Determine current user role
+                // Determine current user role (normalized) and scope.
+                // Safety-first: only admin sees global data on this page.
+                const normalizeRole = (usr) => ((usr?.role || usr?.type || '') + '').trim().toLowerCase();
                 const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
-                const currentRole = ((currentUser.role || currentUser.type || '') + '').toLowerCase();
+                const currentRole = normalizeRole(currentUser);
+                const isAdmin = currentRole === 'admin';
+                const isProctorScopedView = !isAdmin;
 
                 // Check if proctor has classes assigned
                 const allClassesArr = classes || [];
-                const proctorClasses = currentRole === 'proctor'
+                const proctorClasses = isProctorScopedView
                     ? allClassesArr.filter(c => String(c.proctor_id) === String(userId))
                     : allClassesArr;
                 const proctorClassIds = proctorClasses.map(c => String(c.id));
 
                 // If proctor has classes, filter by classes; otherwise (admin) show all exams
                 let proctorExams, proctorExamIds;
-                if (currentRole === 'proctor') {
+                if (isProctorScopedView) {
                     if (proctorClassIds.length > 0) {
                         // Filter exams to those in proctor's classes
                         proctorExams = (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)));
@@ -637,23 +641,37 @@
                 const filteredExamResults = proctorExamResults;
 
                 // Load filters (proctors are locked to their assigned sections)
-                loadFilters(filteredExams, filteredClasses, currentRole === 'proctor');
+                loadFilters(filteredExams, filteredClasses, isProctorScopedView);
 
                 // Normalize role/type accessor
                 const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
 
                 // Students: prefer explicit user records, otherwise infer from results/sessions
                 let studentUsers = users.filter(u => userRole(u) === 'student');
+                if (isProctorScopedView) {
+                    const visibleClassIds = new Set((filteredClasses || []).map(cls => String(cls.id)));
+                    studentUsers = studentUsers.filter(u => u.class_id && visibleClassIds.has(String(u.class_id)));
+                }
                 if (studentUsers.length === 0) {
-                    // fallback: unique user ids from exam_results and sessions
-                    const idsFromResults = (examResults || []).map(r => r.user_id).filter(Boolean);
-                    const idsFromSessions = (sessions || []).map(s => s.user_id).filter(Boolean);
-                    const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions]));
-                    studentUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+                    // Admin: infer students from all activity. Proctor/teacher: only from scoped exams/sessions.
+                    if (isProctorScopedView) {
+                        const idsFromResults = (proctorExamResults || []).flatMap(r => [r.user_id, r.student_id]).filter(Boolean);
+                        const idsFromSessions = (proctorSessions || []).flatMap(s => [s.user_id, s.student_id]).filter(Boolean);
+                        const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions].map(String)));
+                        studentUsers = uniqueIds.map(id => users.find(u => String(u.id) === id)).filter(Boolean);
+                    } else {
+                        const idsFromResults = (examResults || []).map(r => r.user_id).filter(Boolean);
+                        const idsFromSessions = (sessions || []).map(s => s.user_id).filter(Boolean);
+                        const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions]));
+                        studentUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
+                    }
                 }
 
-                // Proctors: combine explicit proctor users and any proctor_id referenced in classes
-                const proctorUsers = users.filter(u => userRole(u) === 'proctor');
+                // Proctors / teachers: combine explicit staff users and any proctor_id referenced in classes
+                const proctorUsers = users.filter(u => {
+                    const r = userRole(u);
+                    return r === 'proctor' || r === 'teacher';
+                });
                 const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id ? String(c.proctor_id) : null).filter(Boolean)));
                 const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
                 const teachersCount = combinedProctorIds.size;
@@ -771,7 +789,7 @@
                 allClasses.forEach(cls => classMap[cls.id] = cls);
 
                 // Load student scores with proctoring flags, locked to assigned classes for proctors
-                if (currentRole === 'proctor' && filteredClasses.length === 1) {
+                if (isProctorScopedView && filteredClasses.length === 1) {
                     const onlyClassId = String(filteredClasses[0].id);
                     await loadStudentScoresWithFlags(
                         users,
@@ -850,17 +868,21 @@
                     fetch('/select?collection=exam_results').then(r => r.json())
                 ]);
 
-                // Determine current user role
+                // Determine current user role (normalized) and scope.
+                // Safety-first: only admin sees global data on this page.
+                const normalizeRole = (usr) => ((usr?.role || usr?.type || '') + '').trim().toLowerCase();
                 const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
-                const currentRole = ((currentUser.role || currentUser.type || '') + '').toLowerCase();
+                const currentRole = normalizeRole(currentUser);
+                const isAdmin = currentRole === 'admin';
+                const isProctorScopedView = !isAdmin;
 
                 // Filter data based on proctor permissions
                 const allClassesArr = classes || [];
-                const proctorClasses = currentRole === 'proctor'
+                const proctorClasses = isProctorScopedView
                     ? allClassesArr.filter(c => String(c.proctor_id) === String(userId))
                     : allClassesArr;
                 const proctorClassIds = proctorClasses.map(c => String(c.id));
-                const proctorExams = currentRole === 'proctor'
+                const proctorExams = isProctorScopedView
                     ? (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)))
                     : (exams || []);
                 const proctorExamIds = proctorExams.map(e => e.id);
@@ -1095,9 +1117,10 @@
                     // Calculate score
                     let scoreDisplay = 'N/A';
                     if (examResult && exam && exam.questions && examResult.answers) {
+                        const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
                         let correctAnswers = 0;
                         exam.questions.forEach((question, index) => {
-                            if (examResult.answers && examResult.answers[index] === question.correctAnswer) {
+                            if (examResult.answers && normalizeAnswer(examResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
                                 correctAnswers++;
                             }
                         });

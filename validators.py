@@ -34,6 +34,8 @@ PASSWORD_MIN_LENGTH = 6
 PASSWORD_MAX_LENGTH = 128
 EMAIL_MAX_LENGTH = 254
 OTP_LENGTH = 6
+EXAM_DURATION_MIN = 5
+EXAM_DURATION_MAX = 120
 ALLOWED_EMAIL_DOMAINS = frozenset({'gmail.com', 'yahoo.com'})
 
 # Simple email regex (covers most valid emails; not RFC 5322 exhaustive)
@@ -169,6 +171,41 @@ def validate_user_data(data: dict) -> Tuple[bool, Optional[str]]:
             return False, err
     # Sanitize: don't allow arbitrary keys that could override system fields
     # (optional: whitelist keys; for now we allow common user fields)
+    return True, None
+
+
+def validate_exam_data(data: dict, require_all_fields: bool = True) -> Tuple[bool, Optional[str]]:
+    """Validate exam document data. Enforces duration range of 5-120 minutes."""
+    if not data or not isinstance(data, dict):
+        return False, 'Invalid data: must be a JSON object'
+
+    if require_all_fields:
+        for field in ('title', 'subject', 'exam_type', 'class_id', 'questions', 'duration'):
+            if field not in data:
+                return False, f'Exam data must include {field}'
+
+    if 'duration' in data:
+        raw_duration = data.get('duration')
+        try:
+            duration = int(raw_duration)
+        except (TypeError, ValueError):
+            return False, 'Duration must be a whole number of minutes'
+        if duration < EXAM_DURATION_MIN or duration > EXAM_DURATION_MAX:
+            return False, f'Duration must be between {EXAM_DURATION_MIN} and {EXAM_DURATION_MAX} minutes'
+
+    if 'questions' in data and data.get('questions') is not None and not isinstance(data.get('questions'), list):
+        return False, 'questions must be an array'
+
+    if 'title' in data:
+        title = str(data.get('title', '')).strip()
+        if not title:
+            return False, 'Exam title is required'
+
+    if 'subject' in data:
+        subject = str(data.get('subject', '')).strip()
+        if not subject:
+            return False, 'Exam subject is required'
+
     return True, None
 
 

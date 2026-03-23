@@ -337,9 +337,10 @@
                         let scoreDisplay = 'N/A';
                         let status = 'Incomplete';
                         if (exam.questions && result.answers) {
+                            const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
                             let correctAnswers = 0;
                             exam.questions.forEach((question, index) => {
-                                if (result.answers[index] === question.correctAnswer) {
+                                if (normalizeAnswer(result.answers[index]) === normalizeAnswer(question.correctAnswer)) {
                                     correctAnswers++;
                                 }
                             });

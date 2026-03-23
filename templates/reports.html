@@ -228,19 +228,20 @@
                 const classesData = await cr.json();
                 exams = Array.isArray(examsData) ? examsData : [];
                 const classes = Array.isArray(classesData) ? classesData : [];
-                const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
+                const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
+                const isProctorLike = role === 'proctor' || role === 'teacher';
 
-                if (role === 'proctor') {
+                if (isProctorLike) {
                     // Proctor: lock to exams that belong to the classes assigned to this proctor
                     const proctorClassIds = classes
                         .filter(c => String(c.proctor_id) === String(userId))
                         .map(c => String(c.id));
                     allowedExamIds = proctorClassIds.length > 0
-                        ? exams.filter(e => proctorClassIds.includes(String(e.class_id))).map(e => e.id)
+                        ? exams.filter(e => proctorClassIds.includes(String(e.class_id))).map(e => String(e.id))
                         : [];
                 } else {
                     // Admin (or other roles): can see all exams
-                    allowedExamIds = exams.map(e => e.id);
+                    allowedExamIds = exams.map(e => String(e.id));
                 }
             } catch (err) {
                 console.error('Failed to load exams', err);
@@ -263,27 +264,29 @@
             const safeResults = Array.isArray(results) ? results : [];
             const safeSessions = Array.isArray(allSessions) ? allSessions : [];
             const safeUsers = Array.isArray(allUsers) ? allUsers : [];
-            const filteredResults = safeResults.filter(r => allowedExamIds.includes(r.exam_id));
-            const filteredSessions = safeSessions.filter(s => allowedExamIds.includes(s.exam_id) && s.start_time);
+            const filteredResults = safeResults.filter(r => allowedExamIds.includes(String(r.exam_id)));
+            const filteredSessions = safeSessions.filter(s => allowedExamIds.includes(String(s.exam_id)) && s.start_time);
 
             const studentIds = new Set();
             filteredResults.forEach(r => { if (r.user_id) studentIds.add(String(r.user_id)); if (r.student_id) studentIds.add(String(r.student_id)); });
             filteredSessions.forEach(s => { if (s.user_id) studentIds.add(String(s.user_id)); if (s.student_id) studentIds.add(String(s.student_id)); });
 
-            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase();
+            const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
+            const isProctorLike = role === 'proctor' || role === 'teacher';
 
             // Base candidate set: only students who have results/sessions for the allowed exams
             let candidateStudents = safeUsers.filter(u => studentIds.has(String(u.id)));
 
-            // If current user is a proctor, further restrict to students whose class_id matches one of the proctor's classes
-            if (role === 'proctor') {
+            // Proctoring staff: further restrict to students whose class_id matches an assigned class
+            if (isProctorLike) {
+                const sessionUserId = sessionStorage.getItem('userId');
                 const proctorClassIds = await (async () => {
                     try {
                         const cr = await fetch('/select?collection=classes');
                         const classesData = await cr.json();
                         const classes = Array.isArray(classesData) ? classesData : [];
                         return classes
-                            .filter(c => String(c.proctor_id) === String(currentUser.id))
+                            .filter(c => String(c.proctor_id) === String(sessionUserId))
                             .map(c => String(c.id));
                     } catch (e) {
                         console.error('Failed to load classes for proctor filter', e);
@@ -319,11 +322,11 @@
 
             const studentResults = (results || []).filter(r =>
                 (String(r.user_id) === String(studentId) || String(r.student_id) === String(studentId)) &&
-                allowedExamIds.includes(r.exam_id)
+                allowedExamIds.includes(String(r.exam_id))
             );
             const studentSessions = (allSessions || []).filter(s =>
                 (s.student_id === studentId || s.user_id === studentId || String(s.student_id) === String(studentId) || String(s.user_id) === String(studentId)) &&
-                allowedExamIds.includes(s.exam_id) && s.start_time
+                allowedExamIds.includes(String(s.exam_id)) && s.start_time
             );
 
             const examIds = [...new Set([
@@ -354,7 +357,7 @@
             sessions = (allSessions || []).filter(s => {
                 const matchesStudent = (String(s.student_id) === String(studentId) || String(s.user_id) === String(studentId));
                 const matchesExam = String(s.exam_id) === String(examId);
-                const isAllowed = allowedExamIds.includes(s.exam_id);
+                const isAllowed = allowedExamIds.includes(String(s.exam_id));
                 const hasStartTime = s.start_time; // Ensure session has start_time
                 return matchesStudent && matchesExam && isAllowed && hasStartTime;
             });

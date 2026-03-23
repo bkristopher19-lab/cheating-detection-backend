@@ -36,7 +36,7 @@ from apscheduler.triggers.cron import CronTrigger
 from validators import (
     validate_email, validate_otp, validate_name, validate_password, validate_collection,
     validate_firestore_id, validate_alert_type, validate_video_filename, validate_user_data,
-    validate_session_id, validate_cutoff_days, validate_manual_violation_type
+    validate_session_id, validate_cutoff_days, validate_manual_violation_type, validate_exam_data
 )
 
 # Mediapipe setup
@@ -227,6 +227,7 @@ def add_manual_violation():
         return jsonify({'error': str(e)}), 500
 
 
+## If you want to finally commit and push to git
 # Initialize Firebase
 if not firebase_admin._apps:
     cred = credentials.Certificate("/etc/secrets/firebase_admin_key.json")
@@ -742,6 +743,10 @@ def add():
             valid, err = validate_user_data(data)
             if not valid:
                 return jsonify({'error': err}), 400
+        elif collection == 'exams':
+            valid, err = validate_exam_data(data, require_all_fields=True)
+            if not valid:
+                return jsonify({'error': err}), 400
         doc_ref = db.collection(collection).add(data)
         return jsonify({'id': doc_ref[1].id}), 200
     except Exception as e:
@@ -790,6 +795,10 @@ def edit(id):
         data = request.json
         if not data or not isinstance(data, dict):
             return jsonify({'error': 'Request body must be a JSON object'}), 400
+        if collection == 'exams':
+            valid, err = validate_exam_data(data, require_all_fields=False)
+            if not valid:
+                return jsonify({'error': err}), 400
         db.collection(collection).document(id).update(data)
         return jsonify({'message': 'Updated'}), 200
     except Exception as e:

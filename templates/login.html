@@ -310,12 +310,13 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
             window.location.href = redirectUrl;
             return;
         }
-        if (role === 'student') {
+        const normalizedRole = (role || '').toString().trim().toLowerCase();
+        if (normalizedRole === 'student') {
             window.location.href = '/student_dashboard';
-        } else if (role === 'proctor') {
+        } else if (normalizedRole === 'proctor' || normalizedRole === 'teacher') {
             window.location.href = '/proctor_dashboard';
         } else {
-            // admin or anything else
+            // admin fallback
             window.location.href = '/dashboard';
         }
 
