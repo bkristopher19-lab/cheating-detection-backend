@@ -10,6 +10,7 @@ import smtplib
 import ssl
 import requests
 import secrets
+import re
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from werkzeug.utils import secure_filename
@@ -988,6 +989,40 @@ def _send_otp_email(to_email: str, otp: str) -> bool:
     return ok
 
 
+def _is_valid_recipient_email(email: str) -> bool:
+    """Permissive email validator for report recipients (allows institutional domains)."""
+    if not email or not isinstance(email, str):
+        return False
+    normalized = email.strip().lower()
+    if len(normalized) > 254:
+        return False
+    pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    return bool(pattern.match(normalized))
+
+
+def _send_report_email(to_email: str, student_name: str, exam_title: str, share_url: str, session_id: str) -> bool:
+    """Send shared report link to dean or any designated recipient."""
+    try:
+        subject = 'Proctoring Report Shared for Review'
+        body = f"""Dear Dean,
+
+A proctoring report has been shared for your review.
+
+Student: {student_name}
+Exam: {exam_title}
+Session ID: {session_id}
+
+Open report:
+{share_url}
+
+Regards,
+Proctoring System"""
+        return _send_email(subject, to_email, body)
+    except Exception as e:
+        print(f"[Share Report] Failed to send report email: {e}")
+        return False
+
+
 @app.route('/send_otp', methods=['POST'])
 def send_otp():
     """Generate OTP, store it, and send via email. Expects JSON: {email: str}."""
@@ -1531,14 +1566,15 @@ def upload_video():
 def share_report():
     """
     Creates a shareable link for a specific report.
-    Expects JSON with: student_id, exam_id, session_id
+    Expects JSON with: student_id, exam_id, session_id, optional recipient_email
     Returns a unique token that can be used to access the report.
     """
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
         student_id = data.get('student_id')
         exam_id = data.get('exam_id')
         session_id = data.get('session_id')
+        recipient_email = (data.get('recipient_email') or '').strip().lower()
 
         for fid, fname in [(student_id, 'student_id'), (exam_id, 'exam_id'), (session_id, 'session_id')]:
             valid, err = validate_firestore_id(fid or '', fname)
@@ -1564,10 +1600,40 @@ def share_report():
         # Generate shareable URL
         share_url = f"{request.host_url}shared_report/{token}"
 
+        email_sent = False
+        if recipient_email:
+            if not _is_valid_recipient_email(recipient_email):
+                return jsonify({'error': 'Invalid recipient email format'}), 400
+
+            student_name = 'Unknown Student'
+            exam_title = 'Unknown Exam'
+            try:
+                student_doc = db.collection('users').document(student_id).get()
+                if student_doc.exists:
+                    student_data = student_doc.to_dict() or {}
+                    student_name = student_data.get('name') or student_data.get('email') or student_name
+            except Exception:
+                pass
+            try:
+                exam_doc = db.collection('exams').document(exam_id).get()
+                if exam_doc.exists:
+                    exam_data = exam_doc.to_dict() or {}
+                    exam_title = exam_data.get('title') or exam_title
+            except Exception:
+                pass
+
+            email_sent = _send_report_email(
+                recipient_email, student_name, exam_title, share_url, session_id
+            )
+            if not email_sent:
+                return jsonify({'error': 'Failed to send email. Check SMTP configuration.'}), 500
+
         return jsonify({
             'success': True,
             'share_url': share_url,
-            'token': token
+            'token': token,
+            'email_sent': email_sent,
+            'recipient_email': recipient_email if email_sent else None
         }), 200
 
     except Exception as e:
