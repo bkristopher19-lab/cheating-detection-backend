@@ -137,12 +137,16 @@
 
                         <div id="videoSection" class="mt-4"></div>
 
-                        <div class="mt-3 d-flex gap-2 flex-wrap">
+                        <div class="mt-3 d-flex gap-2 flex-wrap align-items-end">
                             <a href="#" id="openVideoPlayerLink" target="_blank" rel="noopener" class="btn btn-success btn-sm" style="display:none;">
                                 <i class='bx bx-play-circle me-1'></i>Open in Video Player
                             </a>
+                            <div>
+                                <label for="deanEmailInput" class="form-label small mb-1">Send to dean email (optional)</label>
+                                <input type="email" class="form-control form-control-sm" id="deanEmailInput" placeholder="dean@university.edu">
+                            </div>
                             <button type="button" class="btn btn-outline-primary btn-sm" onclick="shareReport()">
-                                <i class='bx bx-share-alt me-1'></i>Share Report
+                                <i class='bx bx-share-alt me-1'></i>Share / Send
                             </button>
                             <button type="button" class="btn btn-outline-danger btn-sm" id="notifyProgramChairBtn" style="display:none;" onclick="openNotifyProgramChairModal()">
                                 <i class='bx bx-envelope me-1'></i>Notify Program Chair
@@ -702,6 +706,7 @@
             const studentId = document.getElementById('studentSelect').value;
             const examId = document.getElementById('examSelect').value;
             const sessionId = document.getElementById('sessionSelect').value;
+            const deanEmail = (document.getElementById('deanEmailInput')?.value || '').trim();
 
             if (!studentId || !examId || !sessionId) {
                 alert('Please select a student, exam, and session first.');
@@ -717,7 +722,8 @@
                     body: JSON.stringify({
                         student_id: studentId,
                         exam_id: examId,
-                        session_id: sessionId
+                        session_id: sessionId,
+                        recipient_email: deanEmail || undefined
                     })
                 });
 
@@ -726,9 +732,11 @@
                 if (result.success) {
                     // Copy to clipboard
                     navigator.clipboard.writeText(result.share_url).then(() => {
-                        alert(`Share link copied to clipboard!\n\n${result.share_url}`);
+                        const sentMsg = result.email_sent ? `\n\nEmail sent to: ${result.recipient_email}` : '';
+                        alert(`Share link copied to clipboard!\n\n${result.share_url}${sentMsg}`);
                     }).catch(() => {
-                        alert(`Share link generated!\n\n${result.share_url}`);
+                        const sentMsg = result.email_sent ? `\n\nEmail sent to: ${result.recipient_email}` : '';
+                        alert(`Share link generated!\n\n${result.share_url}${sentMsg}`);
                     });
                 } else {
                     alert('Failed to generate share link: ' + result.error);
