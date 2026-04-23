@@ -422,7 +422,7 @@
                 tab_switch: 0
             };
 
-            // Use session.flags if available, otherwise fallback to session.alerts
+            // Use session.flags if available, otherwise fallback to session.alerts and good!
             const alertData = session.flags || session.alerts || {};
             Object.keys(alertData).forEach(type => {
                 if (Array.isArray(alertData[type])) {

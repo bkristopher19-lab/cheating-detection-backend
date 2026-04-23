@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 # Web server
 from flask import Flask, render_template, Response, request, jsonify, redirect, url_for, flash, send_from_directory
 
-# Firebase
+# Firebase with Data!
 from firebase_admin import credentials, firestore
 import firebase_admin
 
