@@ -137,16 +137,12 @@
 
                         <div id="videoSection" class="mt-4"></div>
 
-                        <div class="mt-3 d-flex gap-2 flex-wrap align-items-end">
+                        <div class="mt-3 d-flex gap-2 flex-wrap">
                             <a href="#" id="openVideoPlayerLink" target="_blank" rel="noopener" class="btn btn-success btn-sm" style="display:none;">
                                 <i class='bx bx-play-circle me-1'></i>Open in Video Player
                             </a>
-                            <div>
-                                <label for="deanEmailInput" class="form-label small mb-1">Send to dean email (optional)</label>
-                                <input type="email" class="form-control form-control-sm" id="deanEmailInput" placeholder="dean@university.edu">
-                            </div>
                             <button type="button" class="btn btn-outline-primary btn-sm" onclick="shareReport()">
-                                <i class='bx bx-share-alt me-1'></i>Share / Send
+                                <i class='bx bx-share-alt me-1'></i>Share Report
                             </button>
                             <button type="button" class="btn btn-outline-danger btn-sm" id="notifyProgramChairBtn" style="display:none;" onclick="openNotifyProgramChairModal()">
                                 <i class='bx bx-envelope me-1'></i>Notify Program Chair
@@ -422,7 +418,7 @@
                 tab_switch: 0
             };
 
-            // Use session.flags if available, otherwise fallback to session.alerts and good!
+            // Use session.flags if available, otherwise fallback to session.alerts
             const alertData = session.flags || session.alerts || {};
             Object.keys(alertData).forEach(type => {
                 if (Array.isArray(alertData[type])) {
@@ -706,7 +702,6 @@
             const studentId = document.getElementById('studentSelect').value;
             const examId = document.getElementById('examSelect').value;
             const sessionId = document.getElementById('sessionSelect').value;
-            const deanEmail = (document.getElementById('deanEmailInput')?.value || '').trim();
 
             if (!studentId || !examId || !sessionId) {
                 alert('Please select a student, exam, and session first.');
@@ -722,8 +717,7 @@
                     body: JSON.stringify({
                         student_id: studentId,
                         exam_id: examId,
-                        session_id: sessionId,
-                        recipient_email: deanEmail || undefined
+                        session_id: sessionId
                     })
                 });
 
@@ -732,11 +726,9 @@
                 if (result.success) {
                     // Copy to clipboard
                     navigator.clipboard.writeText(result.share_url).then(() => {
-                        const sentMsg = result.email_sent ? `\n\nEmail sent to: ${result.recipient_email}` : '';
-                        alert(`Share link copied to clipboard!\n\n${result.share_url}${sentMsg}`);
+                        alert(`Share link copied to clipboard!\n\n${result.share_url}`);
                     }).catch(() => {
-                        const sentMsg = result.email_sent ? `\n\nEmail sent to: ${result.recipient_email}` : '';
-                        alert(`Share link generated!\n\n${result.share_url}${sentMsg}`);
+                        alert(`Share link generated!\n\n${result.share_url}`);
                     });
                 } else {
                     alert('Failed to generate share link: ' + result.error);
