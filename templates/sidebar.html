@@ -79,6 +79,16 @@
                 </a>
             </li>
 
+            {# Section invite links — proctors only; omitted on proctor dashboard (hide_section_invites_sidebar) #}
+            {% if not hide_section_invites_sidebar %}
+            <li class="nav-item proctor-only">
+                <a href="/proctor_invites" class="nav-link {{ 'active' if active_page is defined and active_page == 'proctor_invites' else 'text-white' }}">
+                    <i class='bx bxs-share-alt'></i>
+                    Section invites
+                </a>
+            </li>
+            {% endif %}
+
             {# Classes link — admin only (hidden by default for client-side control) #}
             <li class="admin-only" style="display: {% if role == 'admin' %}block{% else %}none{% endif %};">
                 <a href="/classes" class="nav-link {{ 'active' if active_page == 'classes' else 'text-white' }}">
