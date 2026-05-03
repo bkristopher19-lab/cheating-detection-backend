@@ -7,7 +7,8 @@ from typing import Optional, Tuple
 
 # Allowed Firestore collection names (whitelist to prevent arbitrary collection access)
 ALLOWED_COLLECTIONS = frozenset({
-    'users', 'exams', 'classes', 'proctoring_sessions', 'shared_reports', 'exam_results'
+    'users', 'exams', 'classes', 'proctoring_sessions', 'shared_reports', 'exam_results',
+    'system_logs',
 })
 
 # Allowed frontend alert types
