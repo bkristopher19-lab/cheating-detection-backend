@@ -1190,7 +1190,7 @@ def user_guide():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html')
+    return render_template('dashboard.html', show_admin_dashboard_user_guide=True)
 
 
 @app.route('/student_dashboard')
