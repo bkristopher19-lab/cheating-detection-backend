@@ -235,6 +235,26 @@ if not firebase_admin._apps:
     db = firestore.client()
 
 
+def append_system_log(message, event_type='info', user_id=None, meta=None):
+    """Append one row to system_logs for dashboard display (server-side only)."""
+    try:
+        msg = '' if message is None else str(message).strip()
+        msg = msg[:4000]
+        et = '' if event_type is None else str(event_type).strip().lower()
+        et = et[:96] if et else 'info'
+        row = {
+            'message': msg or '(no message)',
+            'event_type': et,
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'user_id': user_id,
+        }
+        if meta and isinstance(meta, dict):
+            row['meta'] = meta
+        db.collection('system_logs').add(row)
+    except Exception as e:
+        print('append_system_log failed:', e)
+
+
 def count_faces_bounding_boxes(image, min_confidence=0.4):
     """Return number of faces detected and list of bounding boxes (x,y,w,h) in pixel coords."""
     # Use global face_detection_model (loaded once, not per request)
@@ -736,6 +756,8 @@ def add():
         valid, err = validate_collection(collection)
         if not valid:
             return jsonify({'error': err}), 400
+        if collection == 'system_logs':
+            return jsonify({'error': 'System logs cannot be added via this endpoint'}), 403
         data = request.json
         if not data or not isinstance(data, dict):
             return jsonify({'error': 'Request body must be a JSON object'}), 400
@@ -789,6 +811,8 @@ def edit(id):
         valid, err = validate_collection(collection)
         if not valid:
             return jsonify({'error': err}), 400
+        if collection == 'system_logs':
+            return jsonify({'error': 'System logs cannot be modified'}), 403
         valid, err = validate_firestore_id(id, 'id')
         if not valid:
             return jsonify({'error': err}), 400
@@ -812,6 +836,8 @@ def delete(id):
         valid, err = validate_collection(collection)
         if not valid:
             return jsonify({'error': err}), 400
+        if collection == 'system_logs':
+            return jsonify({'error': 'System logs cannot be deleted via this endpoint'}), 403
         valid, err = validate_firestore_id(id, 'id')
         if not valid:
             return jsonify({'error': err}), 400
@@ -834,6 +860,15 @@ def login():
     if user:
         user_data = user.to_dict()
         user_data['id'] = user.id  # Add document ID to user data
+        utype = (
+            ((user_data.get('role') or user_data.get('type')) or '')
+        ).strip().lower() or 'user'
+        append_system_log(
+            f'{utype.capitalize()} signed in successfully',
+            event_type='auth.login',
+            user_id=user.id,
+            meta={'role': utype},
+        )
         return jsonify({
             'success': True,
             'user': user_data
@@ -1675,6 +1710,13 @@ def start_session():
         doc_ref = db.collection('proctoring_sessions').add(session_data)
         session_id = doc_ref[1].id
 
+        append_system_log(
+            'Proctoring session started',
+            event_type='session.start',
+            user_id=student_id,
+            meta={'exam_id': exam_id, 'session_id': session_id},
+        )
+
         return jsonify({
             'success': True,
             'session_id': session_id,
@@ -1699,10 +1741,22 @@ def end_session():
         if not valid:
             return jsonify({'error': err}), 400
 
+        snap = db.collection('proctoring_sessions').document(session_id).get()
+        prev = snap.to_dict() if snap.exists else {}
+        uid = prev.get('student_id')
+        exid = prev.get('exam_id')
+
         db.collection('proctoring_sessions').document(session_id).update({
             'end_time': datetime.utcnow().isoformat(),
             'status': 'completed'
         })
+
+        append_system_log(
+            'Proctoring session completed',
+            event_type='session.end',
+            user_id=uid,
+            meta={'exam_id': exid, 'session_id': session_id},
+        )
 
         return jsonify({
             'success': True,
@@ -1810,6 +1864,13 @@ def get_or_create_session():
         session_id = doc_ref[1].id
 
         session_data['id'] = session_id
+
+        append_system_log(
+            'Proctoring session started',
+            event_type='session.start',
+            user_id=student_id,
+            meta={'exam_id': exam_id, 'session_id': session_id},
+        )
 
         return jsonify({
             'created': True,
