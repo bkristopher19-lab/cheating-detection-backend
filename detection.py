@@ -16,7 +16,18 @@ from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 
 # Web server
-from flask import Flask, render_template, Response, request, jsonify, redirect, url_for, flash, send_from_directory
+from flask import (
+    Flask,
+    render_template,
+    Response,
+    request,
+    jsonify,
+    redirect,
+    url_for,
+    flash,
+    send_from_directory,
+    make_response,
+)
 
 # Firebase
 from firebase_admin import credentials, firestore
@@ -882,10 +893,18 @@ def select():
                 return jsonify(data), 200
             return jsonify({'error': 'Document not found'}), 404
 
-        # Get all documents
+        # Get all documents (hide soft-archived sessions/results unless requested)
+        include_archived = str(request.args.get('include_archived', '')).lower() in (
+            '1',
+            'true',
+            'yes',
+        )
         docs = []
         for doc in db.collection(collection).stream():
             data = doc.to_dict()
+            if collection in ('proctoring_sessions', 'exam_results') and not include_archived:
+                if data.get('archived'):
+                    continue
             data['id'] = doc.id
             docs.append(data)
         return jsonify(docs), 200
@@ -1477,34 +1496,98 @@ def logout():
     return jsonify({'message': 'Logged out successfully'}), 200
 
 
+def _pdf_cell_text(s, max_len=90):
+    if s is None:
+        return ''
+    t = ' '.join(str(s).split())
+    if len(t) > max_len:
+        t = t[: max_len - 1] + '…'
+    return t.encode('latin-1', 'replace').decode('latin-1')
+
+
+def _build_archive_sessions_pdf_bytes(summaries, heading_line, detail_line):
+    """Build a letter-sized PDF; returns bytes or None if fpdf2 is missing."""
+    try:
+        from fpdf import FPDF
+    except ImportError:
+        return None
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=14)
+    pdf.add_page()
+    pdf.set_font('Helvetica', 'B', 13)
+    pdf.cell(0, 8, text='Archived proctoring reports - summary', ln=1)
+    pdf.set_font('Helvetica', '', 9)
+    pdf.cell(0, 5, text=_pdf_cell_text(heading_line, 130), ln=1)
+    pdf.cell(0, 5, text=_pdf_cell_text(detail_line, 130), ln=1)
+    pdf.ln(2)
+    pdf.set_font('Helvetica', 'B', 7)
+    col_w = [46, 42, 48, 34, 26]
+    hdrs = ['Session ID', 'Student', 'Exam', 'Start (UTC)', 'Violations']
+    for i, h in enumerate(hdrs):
+        pdf.cell(col_w[i], 6, text=_pdf_cell_text(h, 42), border=1)
+    pdf.ln()
+    pdf.set_font('Helvetica', '', 7)
+    for row in summaries:
+        sid, stud, exam, st, viol = row
+        if pdf.get_y() > 280:
+            pdf.add_page()
+        pdf.cell(col_w[0], 5, text=_pdf_cell_text(sid, 30), border=1)
+        pdf.cell(col_w[1], 5, text=_pdf_cell_text(stud, 28), border=1)
+        pdf.cell(col_w[2], 5, text=_pdf_cell_text(exam, 32), border=1)
+        pdf.cell(col_w[3], 5, text=_pdf_cell_text(st, 24), border=1)
+        pdf.cell(col_w[4], 5, text=_pdf_cell_text(viol, 16), border=1, ln=1)
+    out = pdf.output(dest='S')
+    if isinstance(out, str):
+        return out.encode('latin-1')
+    return bytes(out)
+
+
+def _commit_updates_in_batches(db_client, ref_patch_pairs):
+    batch = db_client.batch()
+    n = 0
+    for ref, patch in ref_patch_pairs:
+        batch.update(ref, patch)
+        n += 1
+        if n >= 400:
+            batch.commit()
+            batch = db_client.batch()
+            n = 0
+    if n:
+        batch.commit()
+
+
+@app.route('/archive_reports', methods=['POST'])
 @app.route('/delete_old_reports', methods=['POST'])
-def delete_old_reports():
+def archive_reports():
     """
-    Manually delete old proctoring reports older than specified date.
-    Expects JSON with 'cutoff_date' (ISO format) or 'cutoff_days' (default: 14)
-    Requires admin authentication.
+    Soft-archive proctoring sessions (hide from default /select). Recording files are not removed.
+    When archive_all/delete_all is true, also soft-archives all exam_results.
+    Returns application/pdf when anything was archived; otherwise JSON (including zero matches).
+    Body: cutoff_date | cutoff_days, delete_all | archive_all, user_id (for audit log).
     """
     try:
-        data = request.get_json() or {}
-        delete_all = data.get('delete_all', False)
+        try:
+            from fpdf import FPDF  # noqa: F401
+        except ImportError:
+            return jsonify({'error': 'PDF export requires fpdf2. Run: pip install fpdf2'}), 501
 
-        if delete_all:
-            print("Starting manual cleanup of ALL reports...")
-            cutoff_iso = None  # Delete all, no cutoff
+        data = request.get_json() or {}
+        archive_all = bool(data.get('delete_all') or data.get('archive_all'))
+
+        if archive_all:
+            print('Starting manual archive of ALL proctoring sessions...')
+            cutoff_iso = None
         else:
             cutoff_date_str = data.get('cutoff_date')
             cutoff_days = data.get('cutoff_days', 14)
-
             if cutoff_date_str:
-                # Parse specific date
                 try:
                     cutoff_date = datetime.fromisoformat(cutoff_date_str.replace('Z', '+00:00'))
                     cutoff_iso = cutoff_date.isoformat()
-                    print(f"Starting manual cleanup of reports older than {cutoff_date_str}...")
+                    print(f"Starting manual archive of reports older than {cutoff_date_str}...")
                 except (ValueError, TypeError):
                     return jsonify({'error': 'cutoff_date must be a valid ISO format date'}), 400
             else:
-                # Use days (backward compatibility)
                 try:
                     cutoff_days = int(cutoff_days)
                 except (ValueError, TypeError):
@@ -1512,98 +1595,143 @@ def delete_old_reports():
                 valid, err = validate_cutoff_days(cutoff_days)
                 if not valid:
                     return jsonify({'error': err}), 400
-
                 cutoff_date = datetime.utcnow() - timedelta(days=cutoff_days)
                 cutoff_iso = cutoff_date.isoformat()
-                print(f"Starting manual cleanup of reports older than {cutoff_days} days...")
+                print(f"Starting manual archive of reports older than {cutoff_days} days...")
 
-        # Delete old proctoring sessions
         sessions_ref = db.collection('proctoring_sessions')
         if cutoff_iso is None:
-            # Delete ALL sessions
-            old_sessions = sessions_ref.stream()
+            session_stream = sessions_ref.stream()
         else:
-            old_sessions = sessions_ref.where('start_time', '<', cutoff_iso).stream()
+            session_stream = sessions_ref.where('start_time', '<', cutoff_iso).stream()
 
-        deleted_count = 0
-        for session_doc in old_sessions:
-            session_data = session_doc.to_dict()
+        to_process = []
+        for session_doc in session_stream:
+            session_data = session_doc.to_dict() or {}
+            if session_data.get('archived'):
+                continue
+            to_process.append((session_doc.reference, dict(session_data), session_doc.id))
 
-            # Delete associated video files (webcam, clips, and screen recordings)
-            for path_key in ['video_path', 'clip_path', 'screen_path']:
-                if session_data.get(path_key):
-                    # Convert web path to file system path (support both /recordings/ and legacy /static/recordings/)
-                    web_path = session_data[path_key]
-                    if web_path.startswith(WEB_RECORDINGS_PREFIX):
-                        filename = web_path.replace(WEB_RECORDINGS_PREFIX, '')
-                        file_path = os.path.join(RECORDINGS_DIR, filename)
-                    elif web_path.startswith('/static/recordings/'):
-                        filename = web_path.replace('/static/recordings/', '')
-                        file_path = os.path.join(os.path.dirname(__file__), 'static', 'recordings', filename)
-                    else:
-                        file_path = None
-                    if file_path:
-                        try:
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
-                                print(f"Deleted file: {file_path}")
-                        except Exception as e:
-                            print(f"Error deleting file {file_path}: {e}")
+        admin_uid = (data.get('user_id') or '').strip()
+        ok_ad, _ = validate_firestore_id(admin_uid, 'user_id') if admin_uid else (False, None)
+        actor = ''
+        if ok_ad and db.collection('users').document(admin_uid).get().exists:
+            actor = admin_uid
 
-            # Delete the session document
-            session_doc.reference.delete()
-            deleted_count += 1
+        now_iso = datetime.utcnow().isoformat()
+        patch_base = {'archived': True, 'archived_at': now_iso}
+        session_updates = []
+        summaries = []
+        for ref, session_data, sid in to_process:
+            student_id = session_data.get('student_id') or session_data.get('user_id') or ''
+            exam_id = session_data.get('exam_id') or ''
+            stud = _resolve_user_display_name(student_id) or (student_id[:16] if student_id else '—')
+            exam = _resolve_exam_title(exam_id)
+            st_raw = session_data.get('start_time') or ''
+            st = str(st_raw) if st_raw else '—'
+            if len(st) > 24:
+                st = st[:23] + '…'
+            tot, _, _ = _session_flag_totals(session_data.get('flags'))
+            viol = f'{tot} evt' if tot else '—'
+            summaries.append((sid, stud, exam, st, viol))
+            p = dict(patch_base)
+            if actor:
+                p['archived_by'] = actor
+            session_updates.append((ref, p))
 
-        print(f"Manually deleted {deleted_count} old proctoring sessions")
+        result_updates = []
+        if cutoff_iso is None and archive_all:
+            for result_doc in db.collection('exam_results').stream():
+                rd = result_doc.to_dict() or {}
+                if rd.get('archived'):
+                    continue
+                p = dict(patch_base)
+                if actor:
+                    p['archived_by'] = actor
+                result_updates.append((result_doc.reference, p))
 
-        # If deleting all, also delete exam_results to clear the student scores table
-        if cutoff_iso is None:
-            results_ref = db.collection('exam_results')
-            deleted_results = 0
-            for result_doc in results_ref.stream():
-                result_doc.reference.delete()
-                deleted_results += 1
-            print(f"Deleted {deleted_results} exam results")
+        archived_sessions = len(session_updates)
+        archived_results = len(result_updates)
 
-        # Clean up expired shared reports (if any have expiration set)
         shared_ref = db.collection('shared_reports')
         expired_shares = shared_ref.where('expires_at', '<', datetime.utcnow().isoformat()).stream()
-
         expired_count = 0
         for share_doc in expired_shares:
             share_doc.reference.delete()
             expired_count += 1
+        print(f'Removed {expired_count} expired shared reports (housekeeping)')
 
-        print(f"Deleted {expired_count} expired shared reports")
+        if not session_updates and not result_updates:
+            if actor:
+                nm = _resolve_user_display_name(actor) or actor[:16]
+                append_system_log(
+                    f'{nm} ran report archive but no matching sessions or results were found.',
+                    event_type='admin.reports.archive',
+                    user_id=actor,
+                    meta={'archived_sessions': 0, 'archived_results': 0, 'archive_all': archive_all},
+                )
+            return jsonify({
+                'success': True,
+                'archived_sessions': 0,
+                'archived_results': 0,
+                'message': (
+                    'No reports matched the archive criteria (everything may already be archived). '
+                    f'Expired share links removed: {expired_count}.'
+                ),
+            }), 200
 
-        admin_uid = (data.get('user_id') or '').strip()
-        ok_ad, _ = validate_firestore_id(admin_uid, 'user_id') if admin_uid else (False, None)
-        if ok_ad and db.collection('users').document(admin_uid).get().exists:
-            nm = _resolve_user_display_name(admin_uid) or admin_uid[:16]
-            if cutoff_iso is None and delete_all:
+        heading = (
+            f'Archive all reports: {archived_sessions} session(s)'
+            if archive_all
+            else f'Sessions before cutoff: {archived_sessions} session(s)'
+        )
+        detail = (
+            f'Exam result rows archived: {archived_results}. '
+            f'Generated {now_iso} UTC. Expired shares removed: {expired_count}.'
+        )
+        pdf_bytes = _build_archive_sessions_pdf_bytes(summaries, heading, detail)
+        if not pdf_bytes:
+            return jsonify({'error': 'Failed to generate PDF'}), 500
+
+        _commit_updates_in_batches(db, session_updates + result_updates)
+        print(
+            f'Archived {archived_sessions} session(s) and {archived_results} exam result(s) '
+            f'(soft archive; files retained)'
+        )
+
+        if actor:
+            nm = _resolve_user_display_name(actor) or actor[:16]
+            if archive_all and cutoff_iso is None:
                 admin_msg = (
-                    f'{nm} deleted all archived report sessions ({deleted_count} sessions)'
-                    f' and cleared related exam results from the dashboard.'
+                    f'{nm} archived all proctoring sessions ({archived_sessions}) and '
+                    f'{archived_results} exam result row(s). A summary PDF was downloaded.'
                 )
             else:
                 admin_msg = (
-                    f'{nm} ran automated report cleanup from the dashboard ({deleted_count}'
-                    f' sessions archived/deleted older than cutoff).'
+                    f'{nm} archived {archived_sessions} session(s) before the cutoff. '
+                    f'A summary PDF was downloaded.'
                 )
             append_system_log(
                 admin_msg,
-                event_type='admin.reports.cleanup',
-                user_id=admin_uid,
-                meta={'deleted_sessions': deleted_count, 'delete_all': bool(delete_all)},
+                event_type='admin.reports.archive',
+                user_id=actor,
+                meta={
+                    'archived_sessions': archived_sessions,
+                    'archived_results': archived_results,
+                    'archive_all': bool(archive_all),
+                },
             )
 
-        return jsonify({
-            'success': True,
-            'message': f'Successfully deleted {deleted_count} old reports and {expired_count} expired shares'
-        }), 200
+        fname = f'proctoring_archive_{datetime.utcnow().strftime("%Y%m%d_%H%M%S")}.pdf'
+        resp = make_response(pdf_bytes)
+        resp.headers['Content-Type'] = 'application/pdf'
+        resp.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+        resp.headers['X-Archived-Sessions'] = str(archived_sessions)
+        resp.headers['X-Archived-Results'] = str(archived_results)
+        return resp
 
     except Exception as e:
-        print(f"Error during manual cleanup: {e}")
+        print(f'Error during archive_reports: {e}')
         return jsonify({'error': str(e)}), 500
 
 
@@ -2091,52 +2219,31 @@ def get_or_create_session():
 
 def cleanup_old_reports():
     """
-    Scheduled task to delete proctoring sessions and associated files older than 14 days.
-    Also cleans up expired shared reports.
+    Scheduled task: soft-archive proctoring sessions older than 14 days (same as manual cutoff).
+    Does not remove Firestore rows or recording files. Removes expired shared report links.
     """
     try:
-        print("Starting scheduled cleanup of old reports...")
+        print('Starting scheduled soft-archive of old reports...')
 
-        # Calculate cutoff date (14 days ago)
         cutoff_date = datetime.utcnow() - timedelta(days=14)
         cutoff_iso = cutoff_date.isoformat()
+        now_iso = datetime.utcnow().isoformat()
+        patch = {'archived': True, 'archived_at': now_iso, 'archived_by': 'scheduler'}
 
-        # Delete old proctoring sessions
         sessions_ref = db.collection('proctoring_sessions')
         old_sessions = sessions_ref.where('start_time', '<', cutoff_iso).stream()
 
-        deleted_count = 0
+        updates = []
         for session_doc in old_sessions:
-            session_data = session_doc.to_dict()
+            session_data = session_doc.to_dict() or {}
+            if session_data.get('archived'):
+                continue
+            updates.append((session_doc.reference, dict(patch)))
 
-            # Delete associated video files (webcam, clips, and screen recordings)
-            for path_key in ['video_path', 'clip_path', 'screen_path']:
-                if session_data.get(path_key):
-                    # Convert web path to file system path (support both /recordings/ and legacy /static/recordings/)
-                    web_path = session_data[path_key]
-                    if web_path.startswith(WEB_RECORDINGS_PREFIX):
-                        filename = web_path.replace(WEB_RECORDINGS_PREFIX, '')
-                        file_path = os.path.join(RECORDINGS_DIR, filename)
-                    elif web_path.startswith('/static/recordings/'):
-                        filename = web_path.replace('/static/recordings/', '')
-                        file_path = os.path.join(os.path.dirname(__file__), 'static', 'recordings', filename)
-                    else:
-                        file_path = None
-                    if file_path:
-                        try:
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
-                                print(f"Deleted file: {file_path}")
-                        except Exception as e:
-                            print(f"Error deleting file {file_path}: {e}")
+        if updates:
+            _commit_updates_in_batches(db, updates)
+        print(f'Soft-archived {len(updates)} proctoring session(s) (scheduled, older than 14 days)')
 
-            # Delete the session document
-            session_doc.reference.delete()
-            deleted_count += 1
-
-        print(f"Deleted {deleted_count} old proctoring sessions")
-
-        # Clean up expired shared reports (if any have expiration set)
         shared_ref = db.collection('shared_reports')
         expired_shares = shared_ref.where('expires_at', '<', datetime.utcnow().isoformat()).stream()
 
@@ -2145,10 +2252,10 @@ def cleanup_old_reports():
             share_doc.reference.delete()
             expired_count += 1
 
-        print(f"Deleted {expired_count} expired shared reports")
+        print(f'Deleted {expired_count} expired shared reports')
 
     except Exception as e:
-        print(f"Error during cleanup: {e}")
+        print(f'Error during cleanup: {e}')
 
 
 # Initialize scheduler
