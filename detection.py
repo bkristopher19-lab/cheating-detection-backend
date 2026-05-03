@@ -1178,6 +1178,12 @@ def classes():
     return render_template('classes.html')
 
 
+@app.route('/proctor_invites')
+def proctor_invites():
+    """Proctor-only UI: copy invite links for sections where this user is assigned (classes.proctor_id)."""
+    return render_template('proctor_invites.html', active_page='proctor_invites')
+
+
 @app.route('/join/<code>')
 def join_class(code):
     """Invite link: teacher shares this URL; students click to join the class (like Google Classroom)."""
