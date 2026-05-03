@@ -75,8 +75,12 @@
                 <!-- ALERT DISTRIBUTION PANEL -->
                 <div class="col-lg-4">
                     <div class="card mb-3">
-                        <div class="card-header fw-bold">
-                            Alert Distribution
+                        <div class="card-header fw-bold d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <span>Alert Distribution</span>
+                            <span class="text-end">
+                                <button type="button" id="clearExamChartFocusBtn" class="btn btn-link btn-sm p-0 fw-normal d-none text-decoration-none">← All exams</button>
+                                <small class="text-muted fw-normal d-block" id="chartContextHint"></small>
+                            </span>
                         </div>
                         <div class="list-group list-group-flush" id="alert-distribution">
                             <div class="list-group-item d-flex justify-content-between align-items-center">
@@ -117,6 +121,7 @@
                             </div>
                         </div>
 
+                        <div id="examAvgScoreSummary" class="px-3 pt-2 small text-muted d-none"></div>
                         <!-- Chart under the badges -->
                         <div class="p-3">
                             <canvas id="alertsChart" height="220"></canvas>
@@ -217,6 +222,9 @@
 
         // undefined = not loaded yet; null = admin (all exams); array of ids = proctor scope
         let examScopeForAlerts = undefined;
+        // Same rows as Exams table — used with exam_results for per-exam average scores on the chart
+        let cachedExamsList = [];
+        let cachedExamResultsList = [];
 
         // Question Template (changes based on exam type)
         function getQuestionTemplate(index, examType) {
@@ -406,6 +414,9 @@
                 examScopeForAlerts = null;
             }
 
+            cachedExamsList = Array.isArray(exams) ? exams.slice() : [];
+            cachedExamResultsList = Array.isArray(examResults) ? examResults.slice() : [];
+
             examTable.clear();
             exams.forEach(exam => {
                 // Get section
@@ -445,10 +456,22 @@
         // Which exam we're monitoring alerts for
         let currentMonitoredExamId = null;
 
+        function setExamChartFocusButtonVisible(show) {
+            const btn = document.getElementById('clearExamChartFocusBtn');
+            if (btn) btn.classList.toggle('d-none', !show);
+        }
+
+        document.getElementById('clearExamChartFocusBtn')?.addEventListener('click', () => {
+            currentMonitoredExamId = null;
+            setExamChartFocusButtonVisible(false);
+            refreshAlertDistribution();
+        });
+
         // Click on title to focus alert distribution on that exam
         $('#examsTable tbody').on('click', 'span.exam-title-link', function () {
             const examId = $(this).data('exam-id');
             currentMonitoredExamId = examId;
+            setExamChartFocusButtonVisible(true);
             console.log('Monitoring alerts for exam:', examId);
             refreshAlertDistribution(); // refresh immediately
         });
@@ -670,10 +693,34 @@
            REAL-TIME ALERT DISTRIBUTION + CHART
            ======================= */
 
+        const ALERT_FLAG_KEYS = [
+            'twofaces',
+            'loud_sound',
+            'phone',
+            'fullscreen_exit',
+            'keyboard_shortcut',
+            'right_click',
+            'tab_switch',
+            'captions',
+            'face_absent'
+        ];
+
+        const ALERT_CATEGORY_LABELS = [
+            'Twofaces',
+            'Loud Sound',
+            'Phone',
+            'Fullscreen Exit',
+            'Keyboard Shortcut',
+            'Right Click',
+            'Tab Switch',
+            'Captions',
+            'Face Absent'
+        ];
+
         let alertsChart = null;
 
-        function resetAlertBadgesToZero() {
-            const counts = {
+        function emptyFlagCounts() {
+            return {
                 twofaces: 0,
                 loud_sound: 0,
                 phone: 0,
@@ -684,6 +731,67 @@
                 captions: 0,
                 face_absent: 0
             };
+        }
+
+        function countFlagEvents(flagsObj, flagName) {
+            const flags = flagsObj || {};
+            return Array.isArray(flags[flagName]) ? flags[flagName].length : 0;
+        }
+
+        function sumAlertsInSession(session) {
+            const f = session && session.flags;
+            let t = 0;
+            ALERT_FLAG_KEYS.forEach((k) => { t += countFlagEvents(f, k); });
+            return t;
+        }
+
+        /** Sum alert counts across all matching sessions */
+        function aggregateFlagCountsFromSessions(sessions) {
+            const totals = emptyFlagCounts();
+            if (!Array.isArray(sessions)) return totals;
+            sessions.forEach((session) => {
+                const flags = session.flags || {};
+                ALERT_FLAG_KEYS.forEach((key) => {
+                    totals[key] += countFlagEvents(flags, key);
+                });
+            });
+            return totals;
+        }
+
+        function normalizeAnswer(value) {
+            return String(value ?? '').trim().toLowerCase();
+        }
+
+        /** Average percentage score (0–100) across exam_results rows for one exam */
+        function computeAvgTestScorePercent(exam, allResults) {
+            if (!exam || !exam.questions || exam.questions.length === 0) return null;
+            const nQs = exam.questions.length;
+            const rows = (allResults || []).filter((r) => String(r.exam_id) === String(exam.id));
+            if (rows.length === 0) return null;
+            let sumPct = 0;
+            rows.forEach((userResult) => {
+                if (userResult.forced_score === 0 || userResult.terminated) {
+                    sumPct += 0;
+                    return;
+                }
+                let correct = 0;
+                exam.questions.forEach((question, index) => {
+                    const ans = userResult.answers && userResult.answers[index];
+                    if (normalizeAnswer(ans) === normalizeAnswer(question.correctAnswer)) correct++;
+                });
+                sumPct += (correct / nQs) * 100;
+            });
+            return sumPct / rows.length;
+        }
+
+        function destroyAlertsChartIfExists() {
+            if (alertsChart) {
+                alertsChart.destroy();
+                alertsChart = null;
+            }
+        }
+
+        function applyCountsToBadges(counts) {
             document.getElementById('alert-twofaces').innerText = counts.twofaces;
             document.getElementById('alert-loud-sound').innerText = counts.loud_sound;
             document.getElementById('alert-phone').innerText = counts.phone;
@@ -693,64 +801,189 @@
             document.getElementById('alert-tab-switch').innerText = counts.tab_switch;
             document.getElementById('alert-captions').innerText = counts.captions;
             document.getElementById('alert-face-absent').innerText = counts.face_absent;
-            createOrUpdateAlertsChart(counts);
         }
 
-        function createOrUpdateAlertsChart(counts) {
-            const ctx = document.getElementById('alertsChart');
-            if (!ctx) return;
-
-            const labels = [
-                'Twofaces',
-                'Loud Sound',
-                'Phone',
-                'Fullscreen Exit',
-                'Keyboard Shortcut',
-                'Right Click',
-                'Tab Switch',
-                'Captions',
-                'Face Absent'
-            ];
-
-            const dataArray = [
-                counts.twofaces,
-                counts.loud_sound,
-                counts.phone,
-                counts.fullscreen_exit,
-                counts.keyboard_shortcut,
-                counts.right_click,
-                counts.tab_switch,
-                counts.captions,
-                counts.face_absent
-            ];
-
-            if (!alertsChart) {
-                alertsChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Alert Count',
-                            data: dataArray
-                        }]
+        function chartOptionsDualAxis() {
+            return {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: { boxWidth: 12 }
                     },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: { display: false }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                ticks: { precision: 0 }
+                    tooltip: {
+                        callbacks: {
+                            label(ctx) {
+                                const v = ctx.raw;
+                                if (ctx.datasetIndex === 1 && (v === null || v === undefined)) {
+                                    return 'Avg test score: no results yet';
+                                }
+                                if (ctx.datasetIndex === 1) return `Avg test score: ${Number(v).toFixed(1)}%`;
+                                return `Total alerts: ${v}`;
                             }
                         }
                     }
-                });
-            } else {
-                alertsChart.data.datasets[0].data = dataArray;
-                alertsChart.update();
+                },
+                scales: {
+                    y: {
+                        position: 'left',
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                        title: { display: true, text: 'Alerts' }
+                    },
+                    y1: {
+                        position: 'right',
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Score %' },
+                        ticks: {
+                            callback: (val) => (val !== null ? `${val}%` : '')
+                        }
+                    }
+                }
+            };
+        }
+
+        function renderAlertsChartByType(counts, avgScorePct, examTitle) {
+            destroyAlertsChartIfExists();
+
+            const ctx = document.getElementById('alertsChart');
+            if (!ctx) return;
+
+            const dataArray = ALERT_FLAG_KEYS.map((k) => counts[k]);
+
+            alertsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ALERT_CATEGORY_LABELS.slice(),
+                    datasets: [
+                        { label: 'Alert count', data: dataArray, yAxisID: 'y' },
+                        {
+                            label: 'Exam avg score (%)',
+                            data: dataArray.map(() => (avgScorePct !== null ? avgScorePct : null)),
+                            yAxisID: 'y1',
+                            backgroundColor: 'rgba(0, 200, 83, 0.4)'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: true, position: 'bottom', labels: { boxWidth: 12 } },
+                        tooltip: {
+                            callbacks: {
+                                label(ctx) {
+                                    const v = ctx.raw;
+                                    if (ctx.datasetIndex === 1) {
+                                        if (v === null || v === undefined) return 'Exam avg score: no results yet';
+                                        return `Exam avg score: ${Number(v).toFixed(1)}%`;
+                                    }
+                                    return `Alerts: ${v}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            position: 'left',
+                            beginAtZero: true,
+                            ticks: { precision: 0 },
+                            title: { display: true, text: 'Alert events' }
+                        },
+                        y1: {
+                            position: 'right',
+                            beginAtZero: true,
+                            max: 100,
+                            grid: { drawOnChartArea: false },
+                            title: { display: true, text: 'Score %' }
+                        }
+                    }
+                }
+            });
+
+            const hintEl = document.getElementById('chartContextHint');
+            if (hintEl) hintEl.textContent = examTitle ? `Exam: ${examTitle}` : '';
+
+            const sumEl = document.getElementById('examAvgScoreSummary');
+            if (sumEl) {
+                sumEl.classList.remove('d-none');
+                sumEl.innerHTML =
+                    avgScorePct === null || avgScorePct === undefined
+                        ? '<strong>Average test score (this exam)</strong>: no submissions yet.'
+                        : `<strong>Average test score (this exam)</strong>: ${avgScorePct.toFixed(1)}% <span class="text-secondary">(${examTitle ? examTitle.trim() : 'selected exam'})</span>`;
             }
+        }
+
+        function renderAlertsChartOverview(exams, sessions, examResults) {
+            destroyAlertsChartIfExists();
+
+            const ctx = document.getElementById('alertsChart');
+            if (!ctx) return;
+
+            const avgEl = document.getElementById('examAvgScoreSummary');
+            if (avgEl) avgEl.classList.add('d-none');
+
+            const hintEl = document.getElementById('chartContextHint');
+            if (hintEl) hintEl.textContent = exams.length <= 1 ? '' : `${exams.length} exams`;
+
+            const labels = exams.map((e) => {
+                const t = ((e.title || '') + '').trim();
+                return t.length > 24 ? t.slice(0, 21) + '…' : t || 'Exam';
+            });
+
+            const totalsPerExam = exams.map((exam) => {
+                const forExam = (sessions || []).filter((s) => String(s.exam_id) === String(exam.id));
+                let sum = 0;
+                forExam.forEach((s) => {
+                    sum += sumAlertsInSession(s);
+                });
+                return sum;
+            });
+
+            const avgPctPerExam = exams.map((ex) => computeAvgTestScorePercent(ex, examResults));
+
+            if (exams.length === 0) {
+                alertsChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['—'],
+                        datasets: [
+                            { label: 'Total alerts (sessions)', data: [0], yAxisID: 'y' },
+                            {
+                                label: 'Avg test score (%)',
+                                data: [null],
+                                yAxisID: 'y1',
+                                backgroundColor: 'rgba(0, 200, 83, 0.45)'
+                            }
+                        ]
+                    },
+                    options: chartOptionsDualAxis()
+                });
+                return;
+            }
+
+            alertsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Total alerts (sessions)',
+                            data: totalsPerExam,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Avg test score (%)',
+                            data: avgPctPerExam.map((x) => (x === null ? null : x)),
+                            yAxisID: 'y1',
+                            backgroundColor: 'rgba(0, 200, 83, 0.45)'
+                        }
+                    ]
+                },
+                options: chartOptionsDualAxis()
+            });
         }
 
         async function refreshAlertDistribution() {
@@ -758,6 +991,11 @@
                 return;
             }
             try {
+                const resultsRes = await fetch('/select?collection=exam_results');
+                let latestResults = await resultsRes.json() || [];
+                if (!Array.isArray(latestResults)) latestResults = [];
+                cachedExamResultsList = latestResults.slice();
+
                 const res = await fetch('/select?collection=proctoring_sessions');
                 let sessions = await res.json() || [];
                 if (!Array.isArray(sessions)) {
@@ -768,56 +1006,24 @@
                     sessions = sessions.filter(s => examScopeForAlerts.includes(String(s.exam_id)));
                 }
 
-                // If a specific exam is selected, filter sessions to that exam
                 if (currentMonitoredExamId) {
                     sessions = sessions.filter(s => String(s.exam_id) === String(currentMonitoredExamId));
                 }
 
-                if (sessions.length === 0) {
-                    resetAlertBadgesToZero();
+                const counts = aggregateFlagCountsFromSessions(sessions);
+                applyCountsToBadges(counts);
+
+                const examsSlice = cachedExamsList.slice();
+
+                if (currentMonitoredExamId) {
+                    const ex = examsSlice.find(e => String(e.id) === String(currentMonitoredExamId));
+                    const title = ex ? ((ex.title || '') + '').trim() : '';
+                    const avg = ex ? computeAvgTestScorePercent(ex, cachedExamResultsList) : null;
+                    renderAlertsChartByType(counts, avg, title);
                     return;
                 }
 
-                // Prefer active session, else latest by start_time
-                let session = null;
-                const active = sessions.filter(s => s.status === 'active');
-                if (active.length > 0) {
-                    active.sort((a, b) => new Date(b.start_time || 0) - new Date(a.start_time || 0));
-                    session = active[0];
-                } else {
-                    sessions.sort((a, b) => new Date(b.start_time || 0) - new Date(a.start_time || 0));
-                    session = sessions[0];
-                }
-                if (!session) return;
-
-                const flags = session.flags || {};
-                const count = (name) => Array.isArray(flags[name]) ? flags[name].length : 0;
-
-                const counts = {
-                    twofaces: count('twofaces'),
-                    loud_sound: count('loud_sound'),
-                    phone: count('phone'),
-                    fullscreen_exit: count('fullscreen_exit'),
-                    keyboard_shortcut: count('keyboard_shortcut'),
-                    right_click: count('right_click'),
-                    tab_switch: count('tab_switch'),
-                    captions: count('captions'),
-                    face_absent: count('face_absent')
-                };
-
-                // Update badges
-                document.getElementById('alert-twofaces').innerText          = counts.twofaces;
-                document.getElementById('alert-loud-sound').innerText        = counts.loud_sound;
-                document.getElementById('alert-phone').innerText             = counts.phone;
-                document.getElementById('alert-fullscreen-exit').innerText   = counts.fullscreen_exit;
-                document.getElementById('alert-keyboard-shortcut').innerText = counts.keyboard_shortcut;
-                document.getElementById('alert-right-click').innerText       = counts.right_click;
-                document.getElementById('alert-tab-switch').innerText        = counts.tab_switch;
-                document.getElementById('alert-captions').innerText          = counts.captions;
-                document.getElementById('alert-face-absent').innerText       = counts.face_absent;
-
-                // Update chart
-                createOrUpdateAlertsChart(counts);
+                renderAlertsChartOverview(examsSlice, sessions, cachedExamResultsList);
 
             } catch (err) {
                 console.error('Failed to refresh alert distribution:', err);
