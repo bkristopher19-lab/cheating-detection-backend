@@ -466,6 +466,7 @@
                                             <th>Score</th>
                                             <th>Date Taken</th>
                                             <th>Proctoring Flags</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="studentScoresTable">
@@ -613,7 +614,7 @@
                         <div class="card-header py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
                             <div>
                                 <h6 class="m-0 fw-bold">System logs</h6>
-                                <div class="text-muted small mt-1">Recent sign-ins and proctoring session events.</div>
+                                <div class="text-muted small mt-1">Who did what across the platform, with browser date/time (exam sessions, escalations, and dashboard visits).</div>
                             </div>
                         </div>
                         <div class="card-body">
@@ -621,10 +622,10 @@
                                 <table class="table table-sm table-striped align-middle mb-0">
                                     <thead>
                                         <tr>
+                                            <th>User</th>
                                             <th>Date</th>
                                             <th>Time</th>
-                                            <th>Event</th>
-                                            <th>Details</th>
+                                            <th>What happened</th>
                                         </tr>
                                     </thead>
                                     <tbody id="systemLogsTableBody"></tbody>
@@ -707,6 +708,28 @@
     </div>
     {% endif %}
 
+    <!-- Notify program chair (any session with ≥1 proctoring event) -->
+    <div class="modal fade" id="scoresNotifyChairModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Notify program chair</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Email summarizes all recorded violations for this session (including a single incident such as a tab switch or face absent).</p>
+                    <label class="form-label">Program chair email</label>
+                    <input type="email" class="form-control" id="scoresNotifyChairEmail" placeholder="chair@institution.edu" autocomplete="email">
+                    <div id="scoresNotifyChairError" class="text-danger small mt-2" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="scoresNotifyChairSubmit" onclick="submitScoresNotifyChair()"><i class='bx bx-send me-1'></i>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Cached rows for filtering (admin retrieval)
@@ -725,17 +748,56 @@
             ];
         }
 
-        function renderSystemLogsTableBody(tbodyEl, logs) {
+        function resolveLogWho(r, usersById) {
+            let n = r.actor_name != null ? String(r.actor_name).trim() : '';
+            const uid = r.user_id != null ? String(r.user_id) : '';
+            if (!n && uid && usersById && usersById[uid])
+                n = (usersById[uid].name || usersById[uid].email || '').trim();
+            if (!n && uid)
+                return _escapeHtml('User (' + uid.slice(0, 10) + '…)');
+            return n ? _escapeHtml(n) : '—';
+        }
+
+        let __dashUiLogTimers = {};
+
+        async function logDashboardStaffAction(action, detail) {
+            const uid = sessionStorage.getItem('userId');
+            if (!uid) return;
+            if (action === 'admin_dashboard_open') {
+                if (sessionStorage.getItem('logged_admin_dash_open_v1')) return;
+                sessionStorage.setItem('logged_admin_dash_open_v1', '1');
+            }
+            if (action === 'admin_scores_filter') {
+                const t = Date.now();
+                if (__dashUiLogTimers[action] && t - __dashUiLogTimers[action] < 120000) return;
+                __dashUiLogTimers[action] = t;
+            }
+            try {
+                await fetch('/log_dashboard_activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: uid,
+                        action,
+                        detail: (detail || '').slice(0, 280)
+                    })
+                });
+            } catch (_) { /* offline */ }
+        }
+
+        function renderSystemLogsTableBody(tbodyEl, logs, usersById) {
             if (!tbodyEl) return;
+            usersById = usersById || {};
             if (!logs || !logs.length) {
                 tbodyEl.innerHTML = '<tr><td colspan="4" class="text-muted">No log entries yet.</td></tr>';
                 return;
             }
             tbodyEl.innerHTML = logs.map((r) => {
                 const [dateStr, timeStr] = _formatSystemLogDateTime(r.timestamp);
-                const ev = _escapeHtml(((r.event_type || 'info') + '').trim());
-                const detail = _escapeHtml((r.message || '').trim()) || '—';
-                return `<tr><td>${_escapeHtml(dateStr)}</td><td>${_escapeHtml(timeStr)}</td><td><code class="small">${ev}</code></td><td>${detail}</td></tr>`;
+                const who = resolveLogWho(r, usersById);
+                const act = _escapeHtml((r.message || '').trim()) ||
+                    `<code class="small">${_escapeHtml((r.event_type || 'activity') + '')}</code>`;
+                return `<tr><td>${who}</td><td>${_escapeHtml(dateStr)}</td><td>${_escapeHtml(timeStr)}</td><td>${act}</td></tr>`;
             }).join('');
         }
 
@@ -888,7 +950,11 @@
                 }
                 const logsSorted = logsRaw.slice().sort((a, b) =>
                     new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
-                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsSorted);
+                const usersById = {};
+                u.forEach(usr => { if (usr && usr.id) usersById[usr.id] = usr; });
+                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsSorted, usersById);
+
+                logDashboardStaffAction('admin_dashboard_open');
 
                 // (optional) Participation rate: users who appear in exam_results vs known students
                 const resultUserIds = new Set(er.map(r => r.user_id).filter(Boolean));
@@ -1039,6 +1105,67 @@
             return 'N/A';
         }
 
+        function countViolationEvents(flags) {
+            if (!flags || typeof flags !== 'object') return 0;
+            return Object.values(flags).reduce((s, arr) => s + (Array.isArray(arr) ? arr.length : 0), 0);
+        }
+
+        let dashboardNotifyChairSessionId = '';
+
+        function openScoresNotifyChairModal(sessionId) {
+            dashboardNotifyChairSessionId = (sessionId || '').trim();
+            const em = document.getElementById('scoresNotifyChairEmail');
+            const err = document.getElementById('scoresNotifyChairError');
+            if (em) em.value = '';
+            if (err) { err.style.display = 'none'; err.textContent = ''; }
+            const el = document.getElementById('scoresNotifyChairModal');
+            if (el) bootstrap.Modal.getOrCreateInstance(el).show();
+        }
+
+        async function submitScoresNotifyChair() {
+            const emailInput = document.getElementById('scoresNotifyChairEmail');
+            const errorEl = document.getElementById('scoresNotifyChairError');
+            const submitBtn = document.getElementById('scoresNotifyChairSubmit');
+            const email = (emailInput?.value || '').trim();
+            if (!dashboardNotifyChairSessionId) {
+                errorEl.textContent = 'Missing session.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            if (!email) {
+                errorEl.textContent = 'Enter the program chair email address.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            errorEl.style.display = 'none';
+            if (submitBtn) submitBtn.disabled = true;
+            try {
+                const res = await fetch('/notify_program_chair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: dashboardNotifyChairSessionId,
+                        program_chair_email: email,
+                        acting_user_id: sessionStorage.getItem('userId') || ''
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.status === 'ok') {
+                    const inst = bootstrap.Modal.getInstance(document.getElementById('scoresNotifyChairModal'));
+                    if (inst) inst.hide();
+                    alert('Email sent to the program chair.');
+                } else {
+                    errorEl.textContent = data.error || 'Failed to send email.';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Network error. Try again.';
+                errorEl.style.display = 'block';
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
         // Load student scores with proctoring flags
         async function loadStudentScoresWithFlags(users, exams, sessions, examResults) {
             try {
@@ -1067,6 +1194,8 @@
                             return matches && sess.exam_id === result.exam_id;
                         });
                         const flagsDisplay = formatProctoringFlags(session ? session.flags : null);
+                        const violationCount = countViolationEvents(session ? session.flags : null);
+                        const sessionIdEsc = session && session.id ? String(session.id) : '';
                         const dateTimeTaken = formatDateTime(result.timestamp);
                         const studentName = student?.name || 'Unknown';
                         const examTitle = exam?.title || 'Unknown';
@@ -1075,7 +1204,8 @@
                         const ts = result.timestamp ? new Date(result.timestamp) : null;
                         rows.push({
                             studentName, examTitle, subject: exam?.subject || '', examType,
-                            scoreDisplay, dateTimeTaken, flagsDisplay, timestamp: ts
+                            scoreDisplay, dateTimeTaken, flagsDisplay, timestamp: ts,
+                            violationCount, sessionId: sessionIdEsc
                         });
                     });
                 });
@@ -1085,26 +1215,42 @@
             } catch (err) {
                 console.error('Error loading student scores:', err);
                 document.getElementById('studentScoresTable').innerHTML =
-                    '<tr><td colspan="5" class="text-center text-danger">Error loading scores</td></tr>';
+                    '<tr><td colspan="6" class="text-center text-danger">Error loading scores</td></tr>';
             }
         }
 
         function renderScoresTable(rows) {
             const tbody = document.getElementById('studentScoresTable');
             if (!rows.length) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center">No exam results found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center">No exam results found</td></tr>';
                 return;
             }
-            tbody.innerHTML = rows.map(r => `
+            tbody.innerHTML = rows.map(r => {
+                const actionCell = r.violationCount > 0 && r.sessionId
+                    ? `<button type="button" class="btn btn-sm btn-outline-danger btn-chair-notify-dash" title="Notify program chair" data-chair-sid="${_escapeHtml(r.sessionId)}"><i class='bx bx-envelope'></i></button>`
+                    : '<span class="text-muted small">—</span>';
+                return `
                 <tr>
                     <td>${r.studentName}</td>
                     <td>${r.examType}</td>
                     <td>${r.scoreDisplay}</td>
                     <td>${r.dateTimeTaken}</td>
                     <td>${r.flagsDisplay}</td>
-                </tr>
-            `).join('');
+                    <td>${actionCell}</td>
+                </tr>`;
+            }).join('');
         }
+
+        (function initChairNotifyDelegation() {
+            const tb = document.getElementById('studentScoresTable');
+            if (!tb || tb._chairNotifyBound) return;
+            tb._chairNotifyBound = true;
+            tb.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-chair-notify-dash');
+                if (!btn || !btn.dataset.chairSid) return;
+                openScoresNotifyChairModal(btn.dataset.chairSid);
+            });
+        })();
 
         function applyScoresFilter() {
             const nameQ = (document.getElementById('searchStudentName').value || '').toLowerCase().trim();
@@ -1122,6 +1268,10 @@
                 return true;
             });
             renderScoresTable(filtered);
+            const detailBits = [`student:"${nameQ || '—'}"`, `exam:"${examQ || '—'}"`];
+            if (fromStr) detailBits.push('from:' + fromStr);
+            if (toStr) detailBits.push('to:' + toStr);
+            logDashboardStaffAction('admin_scores_filter', detailBits.join(', '));
         }
 
         function clearScoresFilter() {
@@ -1163,7 +1313,7 @@
                 btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Archiving...';
                 btn.disabled = true;
 
-                const requestBody = {};
+                const requestBody = { user_id: sessionStorage.getItem('userId') || '' };
                 if (cutoffDate) {
                     requestBody.cutoff_date = cutoffDate + 'T00:00:00Z';
                 } else {
@@ -1225,7 +1375,10 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ delete_all: true })
+                    body: JSON.stringify({
+                        delete_all: true,
+                        user_id: sessionStorage.getItem('userId') || ''
+                    })
                 });
 
                 const result = await response.json();
@@ -1233,6 +1386,7 @@
                 if (result.success) {
                     alert(result.message);
                     // Reload dashboard data
+                    sessionStorage.removeItem('logged_admin_dash_open_v1');
                     loadDashboardData();
                 } else {
                     alert('Error: ' + (result.error || 'Unknown error'));
