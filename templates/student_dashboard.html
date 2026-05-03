@@ -158,6 +158,49 @@
             font-weight: 600;
         }
 
+        /* User Guide modal */
+        #studentUserGuideModal .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+        }
+        #studentUserGuideModal .modal-header {
+            background: rgba(0, 200, 83, 0.08);
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
+        }
+        #studentUserGuideModal .modal-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+        }
+        #studentUserGuideModal .ug-step-num {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 10px;
+            background: rgba(0, 200, 83, 0.12);
+            color: var(--accent-dark);
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-right: 0.75rem;
+        }
+        #studentUserGuideModal .ug-step-key {
+            border-left: 4px solid var(--accent);
+            background: linear-gradient(90deg, rgba(0, 200, 83, 0.08), transparent);
+        }
+        #studentUserGuideModal .ug-badge-key {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--accent-dark);
+            background: rgba(0, 200, 83, 0.18);
+            padding: 0.15rem 0.45rem;
+            border-radius: 6px;
+        }
+
         /* Dark mode styles */
         body.dark-mode {
             background-color: #121212;
@@ -229,6 +272,15 @@
             background: #1e1e1e;
             border-color: #333;
         }
+
+        body.dark-mode #studentUserGuideModal .list-group-item {
+            background-color: #1e1e1e;
+            color: #fff;
+            border-color: #333;
+        }
+        body.dark-mode #studentUserGuideModal .text-muted {
+            color: #aaa !important;
+        }
     </style>
 </head>
 <body>
@@ -240,6 +292,11 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item me-2 d-none d-sm-flex align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal" title="Open user guide">
+                            <i class='bx bx-book-open'></i> User Guide
+                        </button>
+                    </li>
                     <li class="nav-item me-3">
                         <span class="navbar-text" id="userInfo">
                             <strong id="userName"></strong><br>
@@ -254,6 +311,10 @@
                             <i class='bx bx-menu'></i>
                         </a>
                         <ul class="dropdown-menu">
+                            <li class="d-sm-none"><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal">
+                                <i class='bx bx-book-open'></i> User Guide
+                            </button></li>
+                            <li class="d-sm-none"><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item" href="#" id="profileBtn">
                                 <i class='bx bx-user'></i> Profile
                             </a></li>
@@ -318,6 +379,67 @@
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Guide (student) -->
+    <div class="modal fade" id="studentUserGuideModal" tabindex="-1" aria-labelledby="studentUserGuideTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex align-items-center gap-2" id="studentUserGuideTitle">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-3 px-2 py-1 bg-success bg-opacity-10 text-success"><i class='bx bxs-graduation fs-5'></i></span>
+                        Student Dashboard Guide
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">AI-based proctoring with camera monitoring — follow these steps to complete your workflow.</p>
+                    <ul class="list-group list-group-flush border rounded overflow-hidden">
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">1</span>
+                            <div><strong class="d-block mb-1">Login to the system</strong><span class="text-muted small">Sign in with your institutional email and password on the login screen.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">2</span>
+                            <div><strong class="d-block mb-1">Access the student dashboard</strong><span class="text-muted small">After authentication, land on your dashboard listing sections and exams for your cohort.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">3</span>
+                            <div><strong class="d-block mb-1">Start exam session</strong><span class="text-muted small">Open an available assessment and launch it inside the permitted time window.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3 ug-step-key">
+                            <span class="ug-step-num">4</span>
+                            <div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Enable camera</strong><span class="ug-badge-key">Important</span></div>
+                                <span class="text-muted small">When the browser prompts you, allow camera access so monitoring can stay active for the sitting.</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">5</span>
+                            <div><strong class="d-block mb-1">Follow exam rules while being monitored</strong><span class="text-muted small">Stay framed in view, avoid unapproved aids, and keep one focused window unless your instructor permits otherwise.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3 ug-step-key">
+                            <span class="ug-step-num">6</span>
+                            <div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Receive alerts if suspicious behavior is detected</strong><span class="ug-badge-key">Alerts</span></div>
+                                <span class="text-muted small">Read any on-screen notices and adjust your posture or environment promptly to reduce escalation.</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">7</span>
+                            <div><strong class="d-block mb-1">Submit exam</strong><span class="text-muted small">Finish all items, verify your answers if allowed, and submit before the timer ends.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">8</span>
+                            <div><strong class="d-block mb-1">Logout</strong><span class="text-muted small">Use logout from the menu when finished, especially when using a lab or shared computer.</span></div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
