@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Section invite links</title>
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/images/192.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --accent: #00c853; --accent-dark: #009624; --bg-page: #f0f7f0; }
+        body { background: var(--bg-page); font-family: 'DM Sans', system-ui, sans-serif; }
+        .main-content { background: var(--bg-page); }
+        .page-title { font-family: 'Outfit', sans-serif; font-weight: 700; color: #1b2e1b; }
+        .card { border-radius: 16px; border: 1px solid rgba(0,200,83,0.15); box-shadow: 0 4px 20px rgba(0,200,83,0.08); }
+        .invite-url-input { font-size: 0.85rem; }
+        body.dark-mode { background: #121212; color: #fff; }
+        body.dark-mode .card { background: #1e1e1e; border-color: #333; color: #fff; }
+        body.dark-mode .page-title { color: #fff; }
+        body.dark-mode .text-muted { color: #aaa !important; }
+        body.dark-mode .table { color: #fff; }
+        body.dark-mode .table thead th { border-color: #444; }
+        body.dark-mode .table td { border-color: #333; }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+
+    <div class="main-content" id="main-content">
+        {% include 'navbar.html' %}
+
+        <div class="container-fluid p-4">
+            <h1 class="h3 page-title mb-2">Section invite links</h1>
+            <p class="text-muted mb-4">
+                Share each link with students assigned to your section. When they open it while logged in as a student,
+                they join that course section automatically (same as entering the join code on the student dashboard).
+            </p>
+
+            <div id="accessDenied" class="alert alert-warning d-none" role="alert"></div>
+
+            <div id="mainCard" class="card d-none">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped align-middle mb-0" id="invitesTable">
+                            <thead>
+                                <tr>
+                                    <th>Course</th>
+                                    <th>Section</th>
+                                    <th>Join code</th>
+                                    <th>Invite link</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="invitesBody"></tbody>
+                        </table>
+                    </div>
+                    <p id="emptyState" class="text-muted mb-0 py-4 text-center d-none">
+                        No sections are assigned to you yet. Ask an administrator to assign you as the proctor for a class in
+                        <strong>Classes</strong> management, then your invite links will appear here.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function fullInviteUrl(code) {
+            const c = (code || '').trim();
+            if (!c) return '';
+            return window.location.origin + '/join/' + encodeURIComponent(c);
+        }
+
+        function copyText(text, okMsg) {
+            if (!text) return;
+            navigator.clipboard.writeText(text).then(() => {
+                alert(okMsg || 'Copied to clipboard.');
+            }).catch(() => {
+                prompt('Copy this link:', text);
+            });
+        }
+
+        (async function init() {
+            const userId = sessionStorage.getItem('userId');
+            const userStr = sessionStorage.getItem('user');
+            let role = '';
+            try {
+                const u = userStr ? JSON.parse(userStr) : {};
+                role = ((u.role || u.type || '') + '').toLowerCase().trim();
+            } catch (e) {}
+
+            const denied = document.getElementById('accessDenied');
+            const mainCard = document.getElementById('mainCard');
+
+            if (!userId) {
+                denied.textContent = 'Please log in to view invite links.';
+                denied.classList.remove('d-none');
+                setTimeout(() => { window.location.href = '/'; }, 1500);
+                return;
+            }
+
+            if (role === 'student') {
+                denied.textContent = 'This page is for instructors and proctors.';
+                denied.classList.remove('d-none');
+                setTimeout(() => { window.location.href = '/student_dashboard'; }, 1500);
+                return;
+            }
+
+            try {
+                const res = await fetch('/select?collection=classes');
+                if (!res.ok) throw new Error('Could not load classes.');
+                const allClasses = await res.json();
+                const mine = (allClasses || []).filter(function (cls) {
+                    return String(cls.proctor_id || '') === String(userId);
+                });
+
+                mainCard.classList.remove('d-none');
+                const tbody = document.getElementById('invitesBody');
+                const empty = document.getElementById('emptyState');
+                tbody.innerHTML = '';
+
+                if (mine.length === 0) {
+                    empty.classList.remove('d-none');
+                    document.querySelector('#invitesTable').classList.add('d-none');
+                    return;
+                }
+
+                empty.classList.add('d-none');
+                document.querySelector('#invitesTable').classList.remove('d-none');
+
+                mine.forEach(function (cls) {
+                    const code = (cls.join_code || '').trim();
+                    const url = fullInviteUrl(code);
+                    const tr = document.createElement('tr');
+                    tr.innerHTML =
+                        '<td>' + escapeHtml(cls.course || '') + '</td>' +
+                        '<td>' + escapeHtml(cls.section || '') + '</td>' +
+                        '<td><code>' + escapeHtml(code || '—') + '</code></td>' +
+                        '<td><input type="text" class="form-control form-control-sm invite-url-input" readonly value="' +
+                            escapeAttr(url) + '"></td>' +
+                        '<td class="text-nowrap">' +
+                            '<button type="button" class="btn btn-sm btn-primary btn-copy-link" data-url="' +
+                            escapeAttr(url) + '"><i class="bx bx-link"></i> Copy link</button>' +
+                        '</td>';
+                    tbody.appendChild(tr);
+                });
+
+                tbody.querySelectorAll('.btn-copy-link').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        copyText(btn.getAttribute('data-url'), 'Invite link copied. Send it to your students.');
+                    });
+                });
+            } catch (err) {
+                denied.textContent = err.message || 'Failed to load sections.';
+                denied.classList.remove('d-none');
+            }
+        })();
+
+        function escapeHtml(s) {
+            const d = document.createElement('div');
+            d.textContent = s;
+            return d.innerHTML;
+        }
+        function escapeAttr(s) {
+            return escapeHtml(s).replace(/"/g, '&quot;');
+        }
+    </script>
+</body>
+</html>
