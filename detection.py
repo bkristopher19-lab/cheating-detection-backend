@@ -1147,6 +1147,12 @@ def register_page():
     return render_template('register.html')
 
 
+@app.route('/user_guide')
+def user_guide():
+    """Public user guide with Student and Proctor dashboard instructions."""
+    return render_template('user_guide.html')
+
+
 @app.route('/dashboard')
 def dashboard():
     return render_template('dashboard.html')
