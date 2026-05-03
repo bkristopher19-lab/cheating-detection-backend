@@ -1478,11 +1478,7 @@ def profile():
 
 @app.route('/proctor_dashboard')
 def proctor_dashboard():
-    return render_template(
-        'proctor_dashboard.html',
-        show_dashboard_user_guide=True,
-        hide_section_invites_sidebar=True,
-    )
+    return render_template('proctor_dashboard.html', show_dashboard_user_guide=True)
 
 
 @app.route('/logout', methods=['POST'])
