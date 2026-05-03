@@ -555,18 +555,28 @@
                 </div>
             </div>
 
-            <!-- Top Lists -->
+            <!-- System logs -->
             <div class="row">
                 <div class="col-lg-12 mb-4">
                     <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Top 5 Exams by Alert Rate</h6>
+                        <div class="card-header py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <h6 class="m-0 fw-bold">System logs</h6>
+                                <div class="text-muted small mt-1">Recent sign-ins and proctoring session events.</div>
+                            </div>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
-                                <table class="table table-sm">
-                                    <thead><tr><th>Exam</th><th>Alerts / Session</th></tr></thead>
-                                    <tbody id="topExamsByAlertRate"></tbody>
+                                <table class="table table-sm table-striped align-middle mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Time</th>
+                                            <th>Event</th>
+                                            <th>Details</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="systemLogsTableBody"></tbody>
                                 </table>
                             </div>
                         </div>
@@ -581,6 +591,33 @@
     <script>
         // Cached rows for filtering (admin retrieval)
         let _cachedScoreRows = [];
+
+        function _escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+
+        function _formatSystemLogDateTime(ts) {
+            const d = new Date(ts || 0);
+            if (Number.isNaN(d.getTime())) return ['—', '—'];
+            return [
+                d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
+                d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            ];
+        }
+
+        function renderSystemLogsTableBody(tbodyEl, logs) {
+            if (!tbodyEl) return;
+            if (!logs || !logs.length) {
+                tbodyEl.innerHTML = '<tr><td colspan="4" class="text-muted">No log entries yet.</td></tr>';
+                return;
+            }
+            tbodyEl.innerHTML = logs.map((r) => {
+                const [dateStr, timeStr] = _formatSystemLogDateTime(r.timestamp);
+                const ev = _escapeHtml(((r.event_type || 'info') + '').trim());
+                const detail = _escapeHtml((r.message || '').trim()) || '—';
+                return `<tr><td>${_escapeHtml(dateStr)}</td><td>${_escapeHtml(timeStr)}</td><td><code class="small">${ev}</code></td><td>${detail}</td></tr>`;
+            }).join('');
+        }
 
         // Load dashboard data
         async function loadDashboardData() {
@@ -599,6 +636,7 @@
                 const resSessions = await fetch(base + 'proctoring_sessions');
                 const resClasses = await fetch(base + 'classes');
                 const resResults = await fetch(base + 'exam_results');
+                const resLogs = await fetch(base + 'system_logs');
 
                 if (!resUsers.ok || !resExams.ok || !resSessions.ok || !resClasses.ok || !resResults.ok) {
                     const failed = [resUsers.ok ? null : 'users', resExams.ok ? null : 'exams', resSessions.ok ? null : 'sessions', resClasses.ok ? null : 'classes', resResults.ok ? null : 'exam_results'].filter(Boolean);
@@ -719,25 +757,18 @@
                 const avgAlertsPerSession = s.length ? (totalAlerts / s.length).toFixed(2) : 0;
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
-                // Top 5 exams by alerts per session
-                const examStats = {};
-                s.forEach(sess => {
-                    const eid = sess.exam_id;
-                    if (!eid) return;
-                    const count = Object.values(sess.flags || {}).reduce((sum, arr) => sum + ((Array.isArray(arr) ? arr.length : 0)), 0);
-                    if (!examStats[eid]) examStats[eid] = { alerts: 0, sessions: 0 };
-                    examStats[eid].alerts += count;
-                    examStats[eid].sessions += 1;
-                });
-                const topExams = Object.entries(examStats)
-                    .map(([eid, st]) => ({ eid, rate: st.alerts / Math.max(1, st.sessions) }))
-                    .sort((a, b) => b.rate - a.rate)
-                    .slice(0, 5)
-                    .map(x => {
-                        const ex = e.find(exam => exam.id === x.eid) || { title: x.eid };
-                        return `<tr><td>${ex.title}</td><td>${x.rate.toFixed(2)}</td></tr>`;
-                    }).join('');
-                document.getElementById('topExamsByAlertRate').innerHTML = topExams || '<tr><td colspan="2">No data</td></tr>';
+                // System logs (admin: all entries from Firestore)
+                let logsRaw = [];
+                if (resLogs.ok) {
+                    try {
+                        logsRaw = safeArr(await resLogs.json());
+                    } catch (_) {
+                        logsRaw = [];
+                    }
+                }
+                const logsSorted = logsRaw.slice().sort((a, b) =>
+                    new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
+                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsSorted);
 
                 // (optional) Participation rate: users who appear in exam_results vs known students
                 const resultUserIds = new Set(er.map(r => r.user_id).filter(Boolean));
