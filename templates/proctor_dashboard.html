@@ -495,14 +495,15 @@
                     </div>
                 </div>
 
-                <!-- Delete Reports Button (Admin Only) -->
+                <!-- Archive all reports (admin only on this page) -->
                 <div class="col-xl-6 col-lg-12 col-md-12 mb-4" id="adminControls" style="display: none;">
                     <div class="stat-card card border-left-danger shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
+                            <p class="small text-muted mb-2">Marks every session and score row as archived (hidden from main views). Recordings stay on the server. Your browser will download a PDF summary.</p>
                             <div class="mt-2">
-                                <button class="btn btn-danger btn-sm me-2" id="deleteAllBtn" onclick="deleteAllReports()">
-                                    <i class='bx bx-trash-alt'></i> Delete ALL Reports
+                                <button type="button" class="btn btn-danger btn-sm me-2" id="deleteAllBtn" onclick="deleteAllReports()">
+                                    <i class="bx bx-archive"></i> Archive reports
                                 </button>
                             </div>
                         </div>
@@ -833,6 +834,8 @@
                 const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
                 const currentRole = normalizeRole(currentUser);
                 const isAdmin = currentRole === 'admin';
+                const adminCard = document.getElementById('adminControls');
+                if (adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
                 const isProctorScopedView = !isAdmin;
 
                 // Check if proctor has classes assigned
@@ -1101,6 +1104,8 @@
                 const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
                 const currentRole = normalizeRole(currentUser);
                 const isAdmin = currentRole === 'admin';
+                const adminCard = document.getElementById('adminControls');
+                if (adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
                 const isProctorScopedView = !isAdmin;
 
                 // Filter data based on proctor permissions
@@ -1487,68 +1492,81 @@
             }
         }
 
-        // Function to delete old reports (admin only)
-        async function deleteOldReports() {
-            const cutoffDays = document.getElementById('cutoffDays').value;
-            const cutoffDate = document.getElementById('cutoffDate').value;
-
-            let confirmMessage = 'Are you sure you want to delete all reports ';
-            if (cutoffDate) {
-                confirmMessage += `older than ${cutoffDate}?`;
-            } else {
-                confirmMessage += `older than ${cutoffDays} days?`;
+        async function downloadArchivePdfResponse(response) {
+            const ct = (response.headers.get('content-type') || '').toLowerCase();
+            if (response.ok && ct.includes('application/pdf')) {
+                const blob = await response.blob();
+                const dispo = response.headers.get('Content-Disposition') || '';
+                let fname = 'proctoring_archive.pdf';
+                const m = /filename="([^"]+)"/i.exec(dispo);
+                if (m) fname = m[1];
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fname;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                return { ok: true, pdf: true };
             }
-            confirmMessage += ' This action cannot be undone.';
+            let data;
+            try {
+                data = await response.json();
+            } catch (e) {
+                data = { error: 'Invalid response' };
+            }
+            return { ok: response.ok, data };
+        }
 
-            if (!confirm(confirmMessage)) {
+        async function deleteAllReports() {
+            const confirmationText = prompt('Type ARCHIVE ALL to archive every session and all exam results (data kept; hidden from dashboards):');
+            if (confirmationText !== 'ARCHIVE ALL') {
+                alert('Cancelled. Type ARCHIVE ALL exactly to confirm.');
+                return;
+            }
+
+            if (!confirm('This will mark all reports as archived, hide them from the main views, and download a PDF summary. Recordings are not deleted from the server. Continue?')) {
                 return;
             }
 
             try {
-                const btn = document.getElementById('deleteReportsBtn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                const btn = document.getElementById('deleteAllBtn');
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Archiving...';
                 btn.disabled = true;
 
-                const requestBody = {};
-                if (cutoffDate) {
-                    requestBody.cutoff_date = cutoffDate + 'T00:00:00Z';
-                } else {
-                    requestBody.cutoff_days = parseInt(cutoffDays);
-                }
-
-                const response = await fetch('/delete_old_reports', {
+                const response = await fetch('/archive_reports', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        delete_all: true,
+                        user_id: sessionStorage.getItem('userId') || ''
+                    })
                 });
 
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(result.message);
-                    // Reload dashboard data
+                const handled = await downloadArchivePdfResponse(response);
+                if (handled.pdf && handled.ok) {
+                    const ns = response.headers.get('X-Archived-Sessions');
+                    const nr = response.headers.get('X-Archived-Results');
+                    alert(`Archive complete. Sessions archived: ${ns || '—'}, exam results archived: ${nr || '—'}. If no PDF appeared, check your Downloads folder or browser settings.`);
+                    sessionStorage.removeItem('logged_proctor_dash_open_v1');
+                    loadDashboardData();
+                } else if (handled.data && handled.data.success) {
+                    alert(handled.data.message || 'Done.');
                     loadDashboardData();
                 } else {
-                    alert('Error: ' + (result.error || 'Unknown error'));
+                    const err = (handled.data && (handled.data.error || handled.data.message)) || 'Unknown error';
+                    alert('Error: ' + err);
                 }
             } catch (error) {
-                console.error('Delete reports error:', error);
-                alert('Failed to delete reports. Please try again.');
+                console.error('Archive all reports error:', error);
+                alert('Failed to archive reports. Please try again.');
             } finally {
-                const btn = document.getElementById('deleteReportsBtn');
-                btn.innerHTML = '<i class="bx bx-trash"></i> Delete Old Reports';
+                const btn = document.getElementById('deleteAllBtn');
+                btn.innerHTML = '<i class="bx bx-archive"></i> Archive reports';
                 btn.disabled = false;
             }
         }
-
-        // Function to clear date selection
-        function clearDateSelection() {
-            document.getElementById('cutoffDate').value = '';
-        }
-
 
     </script>
 
