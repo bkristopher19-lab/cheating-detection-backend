@@ -2380,8 +2380,26 @@
         let screenRecorder = null;
         let screenChunks = [];
 
+        /** Phones/tablets where full-desktop screen capture is not required (camera/mic/other rules still apply). */
+        function isMobileExamPlatform() {
+            const ua = navigator.userAgent || '';
+            if (/Android/i.test(ua)) return true;
+            if (/webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua)) return true;
+            if (/iPad/i.test(ua)) return true;
+            // iPadOS 13+ "Request Desktop Website": often reports as Mac with touch points
+            if (typeof navigator.platform === 'string' && navigator.platform === 'MacIntel'
+                && typeof navigator.maxTouchPoints === 'number' && navigator.maxTouchPoints > 1) {
+                return true;
+            }
+            return false;
+        }
+
         async function startScreenRecording() {
-            // Require browser support for screen capture
+            if (isMobileExamPlatform()) {
+                console.info('Skipping full-screen capture on mobile/tablet platform; proceeding with camera/microphone monitoring only.');
+                return true;
+            }
+            // Require browser support for screen capture on desktop-class devices
             if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
                 alert('This exam requires sharing your entire screen, but your browser does not support screen sharing.');
                 return false;
