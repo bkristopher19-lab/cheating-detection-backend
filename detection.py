@@ -235,6 +235,91 @@ if not firebase_admin._apps:
     db = firestore.client()
 
 
+def _resolve_user_display_name(user_id):
+    """Return a short label for dashboards (name, email, or trimmed id)."""
+    if not user_id:
+        return ''
+    uid = str(user_id).strip()
+    if not uid:
+        return ''
+    try:
+        ok, err = validate_firestore_id(uid, 'user_id')
+        if not ok:
+            return ''
+        doc = db.collection('users').document(uid).get()
+        if not doc.exists:
+            return uid[:36]
+        u = doc.to_dict() or {}
+        return (
+            str(u.get('name') or u.get('email') or uid).strip()[:120]
+        )
+    except Exception:
+        return uid[:36]
+
+
+def _resolve_exam_title(exam_id):
+    if not exam_id:
+        return 'Exam'
+    eid = str(exam_id).strip()
+    try:
+        ok, err = validate_firestore_id(eid, 'exam_id')
+        if not ok:
+            return 'Exam'
+        doc = db.collection('exams').document(eid).get()
+        if doc.exists:
+            return str((doc.to_dict() or {}).get('title') or 'Exam').strip()[:140]
+    except Exception:
+        pass
+    return 'Exam'
+
+
+UI_DASHBOARD_ACTION_MESSAGES = {
+    'admin_dashboard_open': 'Opened the admin dashboard',
+    'proctor_dashboard_open': 'Opened the proctor dashboard',
+    'admin_scores_filter': 'Ran a filter search on Student Exam Scores',
+    'proctor_dashboard_filter': 'Changed exam or section filters',
+}
+
+
+@app.route('/log_dashboard_activity', methods=['POST'])
+def log_dashboard_activity():
+    """
+    Record a staff dashboard action into system_logs.
+    Expects JSON: user_id (required), action (allowlisted), optional detail (short).
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = (data.get('user_id') or '').strip()
+        action = (data.get('action') or '').strip().lower()
+        detail = '' if data.get('detail') is None else str(data.get('detail')).strip()[:280]
+        detail = ''.join(ch for ch in detail if ch not in '<>{}')[:280]
+
+        valid, err = validate_firestore_id(uid or '', 'user_id')
+        if not valid:
+            return jsonify({'error': err}), 400
+        if action not in UI_DASHBOARD_ACTION_MESSAGES:
+            return jsonify({'error': 'Unknown dashboard action'}), 400
+
+        udoc = db.collection('users').document(uid).get()
+        if not udoc.exists:
+            return jsonify({'error': 'User not found'}), 404
+
+        base_msg = UI_DASHBOARD_ACTION_MESSAGES[action]
+        if detail:
+            base_msg += f'. {detail}'
+
+        append_system_log(
+            base_msg,
+            event_type=f'ui.dashboard.{action}',
+            user_id=uid,
+            meta={'action': action},
+        )
+        return jsonify({'status': 'ok'}), 200
+    except Exception as e:
+        print('Error in /log_dashboard_activity:', e)
+        return jsonify({'error': str(e)}), 500
+
+
 def append_system_log(message, event_type='info', user_id=None, meta=None):
     """Append one row to system_logs for dashboard display (server-side only)."""
     try:
@@ -248,6 +333,10 @@ def append_system_log(message, event_type='info', user_id=None, meta=None):
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'user_id': user_id,
         }
+        if user_id:
+            who = _resolve_user_display_name(user_id)
+            if who:
+                row['actor_name'] = who[:120]
         if meta and isinstance(meta, dict):
             row['meta'] = meta
         db.collection('system_logs').add(row)
@@ -863,8 +952,11 @@ def login():
         utype = (
             ((user_data.get('role') or user_data.get('type')) or '')
         ).strip().lower() or 'user'
+        who = (
+            str(user_data.get('name') or user_data.get('email') or 'User').strip()
+        )
         append_system_log(
-            f'{utype.capitalize()} signed in successfully',
+            f'{who} logged in ({utype}).',
             event_type='auth.login',
             user_id=user.id,
             meta={'role': utype},
@@ -1072,14 +1164,62 @@ def verify_otp():
 PHONE_VIOLATION_FLAGS = {'phone', 'object_detected_cell_phone'}
 
 
-def _send_violation_email_to_program_chair(to_email: str, student_name: str, student_email: str,
-                                           exam_title: str, session_date: str, session_id: str) -> bool:
+def _readable_flag_type(key):
+    """Short label for a flags.* key."""
+    return str(key or '').replace('_', ' ').strip().title() or 'Event'
+
+
+def _session_flag_totals(flags):
+    """
+    Return (total_event_count, has_phone_violation, summary_lines_for_email_body).
+    Counts entries in arrays under session.flags only.
+    """
+    if not isinstance(flags, dict):
+        return 0, False, []
+    total = 0
+    has_phone = False
+    lines = []
+    for key, vals in sorted(flags.items()):
+        if not isinstance(vals, list) or len(vals) == 0:
+            continue
+        n = len(vals)
+        total += n
+        if key in PHONE_VIOLATION_FLAGS:
+            has_phone = True
+        lines.append(f'• {_readable_flag_type(key)}: {n} recorded event(s)')
+    return total, has_phone, lines
+
+
+def _send_violation_email_to_program_chair(
+    to_email: str,
+    student_name: str,
+    student_email: str,
+    exam_title: str,
+    session_date: str,
+    session_id: str,
+    total_events: int,
+    has_phone: bool,
+    summary_lines: list,
+) -> bool:
     """Send academic integrity incident email to program chair. Returns True on success."""
     try:
-        subject = 'Academic Integrity Incident – Phone Violation During Proctored Exam'
+        if has_phone:
+            subject = 'Academic Integrity Incident – Proctored Exam (includes phone-related flag)'
+        else:
+            subject = 'Academic Integrity Incident – Proctoring Violation During Exam'
+
+        detail_block = '\n'.join(summary_lines) if summary_lines else f'• Recorded violations: {total_events}'
+
+        phone_note = ''
+        if has_phone:
+            phone_note = (
+                '\n\n**Device policy note**\n'
+                'A phone-related violation was flagged in this session; follow institutional policy on devices and escalation.\n'
+            )
+
         body = f"""Dear Program Chair,
 
-This email reports an academic integrity incident that occurred during a proctored exam.
+This email reports an academic integrity concern from a proctored exam session.
 
 **Student Information**
 • Name: {student_name}
@@ -1087,11 +1227,11 @@ This email reports an academic integrity incident that occurred during a proctor
 • Course/Exam: {exam_title}
 • Date & Time: {session_date}
 
-**Violation Details**
-During the exam, a cell phone was detected. The exam was terminated per academic integrity policy, which requires immediate termination for phone violations.
-
+**Recorded proctoring events ({total_events} total)**
+{detail_block}
+{phone_note}
 **Session ID:** {session_id}
-(Use this ID to review the session recording and evidence in the Proctoring Reports.)
+(Use this ID to review the session recording and evidence in Proctoring Reports.)
 
 Please advise on next steps per your academic integrity procedures.
 
@@ -1109,7 +1249,7 @@ Proctoring System"""
 @app.route('/notify_program_chair', methods=['POST'])
 def notify_program_chair():
     """
-    Send email to program chair when a session has a phone violation.
+    Send email to program chair when a session has one or more proctoring violations.
     Expects JSON: session_id, program_chair_email.
     """
     try:
@@ -1132,11 +1272,9 @@ def notify_program_chair():
         session['id'] = session_doc.id
         flags = session.get('flags') or {}
 
-        has_phone = any(
-            (flags.get(k) or []) for k in PHONE_VIOLATION_FLAGS
-        )
-        if not has_phone:
-            return jsonify({'error': 'No phone violation found in this session'}), 400
+        total_events, has_phone, summary_lines = _session_flag_totals(flags)
+        if total_events < 1:
+            return jsonify({'error': 'No proctoring violations recorded for this session yet'}), 400
 
         student_id = session.get('student_id') or session.get('user_id') or ''
         exam_id = session.get('exam_id') or ''
@@ -1167,9 +1305,41 @@ def notify_program_chair():
             session_date = str(raw_start)[:19] if raw_start else 'N/A'
 
         if not _send_violation_email_to_program_chair(
-            program_chair_email, student_name, student_email, exam_title, session_date, session_id
+            program_chair_email,
+            student_name,
+            student_email,
+            exam_title,
+            session_date,
+            session_id,
+            total_events,
+            has_phone,
+            summary_lines,
         ):
             return jsonify({'error': 'Failed to send email. Check SMTP configuration.'}), 500
+
+        acting_uid = (data.get('acting_user_id') or '').strip()
+        ok_act, _ = validate_firestore_id(acting_uid, 'user_id') if acting_uid else (False, None)
+        acting_valid = ok_act and bool(
+            acting_uid and db_client.collection('users').document(acting_uid).get().exists
+        )
+        who_sent = (
+            _resolve_user_display_name(acting_uid)
+            if acting_valid else ''
+        )
+        esc_msg = (
+            f'{who_sent or "Staff member"} emailed the program chair about exam "{exam_title}" '
+            f'(student {student_name}; {total_events} violation event(s); session logged).'
+        )
+        append_system_log(
+            esc_msg,
+            event_type='escalation.notify_program_chair',
+            user_id=acting_uid if acting_valid else None,
+            meta={
+                'session_id': session_id,
+                'exam_id': exam_id,
+                'student_id': student_id,
+            },
+        )
 
         return jsonify({'status': 'ok', 'message': 'Email sent to program chair'}), 200
     except Exception as e:
@@ -1294,6 +1464,16 @@ def proctor_dashboard():
 
 @app.route('/logout', methods=['POST'])
 def logout():
+    try:
+        data = request.get_json(silent=True) or {}
+        uid = (data.get('user_id') or '').strip()
+        valid, err = validate_firestore_id(uid, 'user_id') if uid else (False, None)
+        if uid and valid:
+            who = _resolve_user_display_name(uid)
+            nm = who or uid[:24]
+            append_system_log(f'{nm} logged out.', event_type='auth.logout', user_id=uid)
+    except Exception as e:
+        print('Logout log warning:', e)
     return jsonify({'message': 'Logged out successfully'}), 200
 
 
@@ -1395,6 +1575,27 @@ def delete_old_reports():
             expired_count += 1
 
         print(f"Deleted {expired_count} expired shared reports")
+
+        admin_uid = (data.get('user_id') or '').strip()
+        ok_ad, _ = validate_firestore_id(admin_uid, 'user_id') if admin_uid else (False, None)
+        if ok_ad and db.collection('users').document(admin_uid).get().exists:
+            nm = _resolve_user_display_name(admin_uid) or admin_uid[:16]
+            if cutoff_iso is None and delete_all:
+                admin_msg = (
+                    f'{nm} deleted all archived report sessions ({deleted_count} sessions)'
+                    f' and cleared related exam results from the dashboard.'
+                )
+            else:
+                admin_msg = (
+                    f'{nm} ran automated report cleanup from the dashboard ({deleted_count}'
+                    f' sessions archived/deleted older than cutoff).'
+                )
+            append_system_log(
+                admin_msg,
+                event_type='admin.reports.cleanup',
+                user_id=admin_uid,
+                meta={'deleted_sessions': deleted_count, 'delete_all': bool(delete_all)},
+            )
 
         return jsonify({
             'success': True,
@@ -1710,8 +1911,10 @@ def start_session():
         doc_ref = db.collection('proctoring_sessions').add(session_data)
         session_id = doc_ref[1].id
 
+        student_label = _resolve_user_display_name(student_id)
+        exam_label = _resolve_exam_title(exam_id)
         append_system_log(
-            'Proctoring session started',
+            f'{student_label} started monitored exam "{exam_label}".',
             event_type='session.start',
             user_id=student_id,
             meta={'exam_id': exam_id, 'session_id': session_id},
@@ -1751,8 +1954,10 @@ def end_session():
             'status': 'completed'
         })
 
+        student_label = _resolve_user_display_name(uid) if uid else 'Student'
+        exam_label = _resolve_exam_title(exid)
         append_system_log(
-            'Proctoring session completed',
+            f'{student_label} ended the monitored exam session for "{exam_label}".',
             event_type='session.end',
             user_id=uid,
             meta={'exam_id': exid, 'session_id': session_id},
@@ -1865,8 +2070,10 @@ def get_or_create_session():
 
         session_data['id'] = session_id
 
+        student_label = _resolve_user_display_name(student_id)
+        exam_label = _resolve_exam_title(exam_id)
         append_system_log(
-            'Proctoring session started',
+            f'{student_label} started monitored exam "{exam_label}".',
             event_type='session.start',
             user_id=student_id,
             meta={'exam_id': exam_id, 'session_id': session_id},
