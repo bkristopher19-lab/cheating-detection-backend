@@ -159,7 +159,7 @@
                                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                                 </div>
                                 <div class="modal-body">
-                                    <p class="text-muted small">An email will be sent to the program chair reporting the phone violation for this session.</p>
+                                    <p class="text-muted small">An email will be sent summarizing recorded proctoring violations for this session (including single events such as tab switch or absence of face).</p>
                                     <label class="form-label">Program chair email</label>
                                     <input type="email" class="form-control" id="programChairEmail" placeholder="chair@university.edu">
                                     <div id="notifyError" class="text-danger small mt-2" style="display:none;"></div>
@@ -465,11 +465,10 @@
                 timeline.appendChild(item);
             });
 
-            // Show/hide Notify Program Chair button when session has phone violation
+            // Show Notify Program Chair when session has any recorded violation(s)
             const notifyBtn = document.getElementById('notifyProgramChairBtn');
             if (notifyBtn) {
-                const hasPhone = hasPhoneViolation(session);
-                notifyBtn.style.display = hasPhone ? 'inline-block' : 'none';
+                notifyBtn.style.display = countSessionViolations(session) > 0 ? 'inline-block' : 'none';
             }
 
             // Video section: always show; video player and downloads when recording exists
@@ -554,11 +553,13 @@
             return div.innerHTML;
         }
 
-        function hasPhoneViolation(session) {
-            if (!session || !session.flags) return false;
-            const flags = session.flags;
-            const phoneTypes = ['phone', 'object_detected_cell_phone'];
-            return phoneTypes.some(t => Array.isArray(flags[t]) && flags[t].length > 0);
+        function countSessionViolations(session) {
+            if (!session || !session.flags) return 0;
+            let n = 0;
+            Object.values(session.flags).forEach((arr) => {
+                if (Array.isArray(arr)) n += arr.length;
+            });
+            return n;
         }
 
         function openNotifyProgramChairModal() {
@@ -586,7 +587,11 @@
                 const res = await fetch('/notify_program_chair', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: currentSession.id, program_chair_email: email })
+                    body: JSON.stringify({
+                        session_id: currentSession.id,
+                        program_chair_email: email,
+                        acting_user_id: sessionStorage.getItem('userId') || ''
+                    })
                 });
                 const data = await res.json();
                 if (res.ok && data.status === 'ok') {
