@@ -181,12 +181,78 @@ The app will open in its own window with an app icon. HTTPS is required for the 
 - `GET /proctor_dashboard` - Proctor dashboard
 - `GET /dashboard` - Admin dashboard
 
+## Dataset (cheating vs. not-cheating images)
+
+This folder layout supports **training or fine-tuning** a separate image classifier (outside the live Flask proctoring pipeline). You capture labeled face/frames from a webcam and store them under `dataset/`.
+
+### Purpose
+
+- **`dataset/cheating/`** — frames you label as suspicious or “cheating” examples.
+- **`dataset/not_cheating/`** — frames you label as normal behavior.
+
+The live app still uses the existing detection stack (`detection.py`, MediaPipe, etc.). This dataset is for **offline ML experiments** (e.g. PyTorch/TensorFlow) if you want a custom binary classifier.
+
+### Folder layout
+
+```
+dataset/
+├── cheating/          # positive class (suspicious behavior samples)
+│   ├── sample1.jpg    # tiny placeholders (committed)
+│   └── sample2.jpg
+└── not_cheating/      # negative class (normal behavior samples)
+    ├── sample1.jpg
+    └── sample2.jpg
+
+scripts/
+├── collect_dataset.py           # Webcam capture (c / n / q keys)
+├── write_placeholder_jpegs.py   # Regenerate tiny JPEG placeholders (no OpenCV GUI)
+├── bootstrap_dataset_samples.py # 224×224 color tiles if OpenCV+NumPy available
+├── dataset_utils.py             # Shared minimal-JPEG bytes
+└── init_dataset.ps1             # Windows: run placeholder writer via Python
+```
+
+### What is included in git?
+
+Only **small placeholder** `sample1.jpg` / `sample2.jpg` files are meant to be tracked so the directory layout is clear. **All other images** under `dataset/cheating/` and `dataset/not_cheating/` are ignored by `.gitignore` so you do not commit a large corpus by accident.
+
+**Full datasets** (thousands of images) should live **outside the repo** — e.g. cloud storage, an external drive, or a private dataset registry — and you document that path in your own training notebooks or config.
+
+### Quick start
+
+1. **Regenerate placeholders** (from repo root; use your venv Python if needed):
+
+   ```bash
+   python scripts/write_placeholder_jpegs.py
+   ```
+
+   On Windows you can also run `powershell -ExecutionPolicy Bypass -File scripts/init_dataset.ps1` (uses `venv\Scripts\python.exe` when present).
+
+2. **Optional: nicer 224×224 sample tiles** (requires dependencies from `requirements.txt`):
+
+   ```bash
+   python scripts/bootstrap_dataset_samples.py
+   ```
+
+3. **Capture from a webcam** (needs a GUI OpenCV build — if `cv2.imshow` fails with headless OpenCV, install `opencv-python` in a local venv):
+
+   ```bash
+   python scripts/collect_dataset.py
+   ```
+
+   - **`c`** — save resized (224×224) frame to `dataset/cheating/`
+   - **`n`** — save to `dataset/not_cheating/`
+   - **`q`** — quit
+
 ## Project Structure
 
 ```
 .
 ├── detection.py              # Main Flask application
 ├── requirements.txt          # Python dependencies
+├── dataset/                  # Labeled images for offline ML (see "Dataset" section)
+│   ├── cheating/
+│   └── not_cheating/
+├── scripts/                  # Dataset helpers (webcam capture, placeholders)
 ├── templates/                # HTML templates
 │   ├── index.html           # Exam interface (main proctoring page)
 │   ├── student_dashboard.html
