@@ -272,6 +272,57 @@
                 background-color: #1a1a1a;
             }
         }
+
+        /* User Guide modal (proctor dashboard) */
+        #proctorDashboardUserGuideModal .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+        }
+        #proctorDashboardUserGuideModal .modal-header {
+            background: rgba(0, 200, 83, 0.08);
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
+        }
+        #proctorDashboardUserGuideModal .modal-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+        }
+        #proctorDashboardUserGuideModal .ug-step-num {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 10px;
+            background: rgba(0, 200, 83, 0.12);
+            color: #009624;
+            font-weight: 700;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            margin-right: 0.75rem;
+        }
+        #proctorDashboardUserGuideModal .ug-step-key {
+            border-left: 4px solid #00c853;
+            background: linear-gradient(90deg, rgba(0, 200, 83, 0.08), transparent);
+        }
+        #proctorDashboardUserGuideModal .ug-badge-key {
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #009624;
+            background: rgba(0, 200, 83, 0.18);
+            padding: 0.15rem 0.45rem;
+            border-radius: 6px;
+        }
+        body.dark-mode #proctorDashboardUserGuideModal .list-group-item {
+            background-color: #1e1e1e;
+            color: #fff;
+            border-color: #333;
+        }
+        body.dark-mode #proctorDashboardUserGuideModal .text-muted {
+            color: #aaa !important;
+        }
     </style>
 </head>
 <body>
@@ -568,6 +619,67 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Guide (proctor) -->
+    <div class="modal fade" id="proctorDashboardUserGuideModal" tabindex="-1" aria-labelledby="proctorUserGuideTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title d-flex align-items-center gap-2" id="proctorUserGuideTitle">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-3 px-2 py-1" style="background: rgba(26, 95, 47, 0.2); color: #69f0ae;"><i class='bx bxs-camera fs-5'></i></span>
+                        Proctor Dashboard Guide
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">AI-based proctoring with camera monitoring — supervisory workflow from login through session actions.</p>
+                    <ul class="list-group list-group-flush border rounded overflow-hidden">
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">1</span>
+                            <div><strong class="d-block mb-1">Login to the system</strong><span class="text-muted small">Authenticate with your proctor account through the institutional login gateway.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">2</span>
+                            <div><strong class="d-block mb-1">Access proctor dashboard</strong><span class="text-muted small">Open the analytics dashboard to see aggregate activity and shortcuts to oversight tools.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">3</span>
+                            <div><strong class="d-block mb-1">View active student sessions</strong><span class="text-muted small">Identify learners currently seated for each linked exam or class roster.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3 ug-step-key">
+                            <span class="ug-step-num">4</span>
+                            <div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Monitor students via camera feed</strong><span class="ug-badge-key">Camera</span></div>
+                                <span class="text-muted small">Select a session or tile to inspect the live video stream routed through the monitoring service.</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex py-3 ug-step-key">
+                            <span class="ug-step-num">5</span>
+                            <div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Receive system-generated alerts</strong><span class="ug-badge-key">Alerts</span></div>
+                                <span class="text-muted small">Watch the alerts queue for model- or rule-based events prioritized for your review.</span>
+                            </div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">6</span>
+                            <div><strong class="d-block mb-1">Review suspicious activity logs</strong><span class="text-muted small">Open detailed timelines and summaries before deciding on formal follow-up.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">7</span>
+                            <div><strong class="d-block mb-1">Take action (flag/warning/report)</strong><span class="text-muted small">Document outcomes using warnings, flags, or institutional reporting channels as policy requires.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">8</span>
+                            <div><strong class="d-block mb-1">Logout</strong><span class="text-muted small">End your session from the profile menu when supervisory work is complete.</span></div>
+                        </li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary rounded-3" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
