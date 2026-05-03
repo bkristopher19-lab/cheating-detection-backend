@@ -31,3 +31,11 @@ static/recordings/
 
 # ⚙️ VS Code
 .vscode/
+
+# 📷 Cheating-detection training images (large); small samples stay tracked
+dataset/cheating/*
+!dataset/cheating/sample1.jpg
+!dataset/cheating/sample2.jpg
+dataset/not_cheating/*
+!dataset/not_cheating/sample1.jpg
+!dataset/not_cheating/sample2.jpg
