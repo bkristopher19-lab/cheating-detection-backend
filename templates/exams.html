@@ -661,22 +661,6 @@
             }
         }
 
-        // Logout handler
-        document.getElementById('logoutBtn').addEventListener('click', async (e) => {
-            e.preventDefault();
-            try {
-                const response = await fetch('/logout', {
-                    method: 'POST'
-                });
-                if (response.ok) {
-                    sessionStorage.removeItem('userId');
-                    window.location.href = '/';
-                }
-            } catch (err) {
-                console.error('Error during logout:', err);
-            }
-        });
-
         (async function initExamsPage() {
             await loadExams();
             refreshAlertDistribution();
