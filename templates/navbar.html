@@ -584,13 +584,18 @@ document.getElementById('mobileLogoutBtn').addEventListener('click', async funct
 
 async function performLogout() {
     try {
+        const uid = sessionStorage.getItem('userId');
         const response = await fetch('/logout', {
-            method: 'POST'
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: uid || '' })
         });
 
         if (response.ok) {
             // Clear session storage
             sessionStorage.removeItem('userId');
+            sessionStorage.removeItem('logged_admin_dash_open_v1');
+            sessionStorage.removeItem('logged_proctor_dash_open_v1');
             // Redirect to login page
             window.location.href = '/';
         } else {
