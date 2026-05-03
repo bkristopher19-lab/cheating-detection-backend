@@ -740,11 +740,16 @@
             e.preventDefault();
             
             try {
+                const uidLo = sessionStorage.getItem('userId');
                 const response = await fetch('/logout', {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: uidLo || '' })
                 });
                 
                 if (response.ok) {
+                    sessionStorage.removeItem('logged_admin_dash_open_v1');
+                    sessionStorage.removeItem('logged_proctor_dash_open_v1');
                     // Clear session storage
                     sessionStorage.clear();
                     // Redirect to login page
