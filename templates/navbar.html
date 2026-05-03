@@ -42,6 +42,10 @@
                                 <button type="button" class="mobile-menu-item w-100 text-start border-0 bg-transparent" data-bs-toggle="modal" data-bs-target="#proctorDashboardUserGuideModal" onclick="document.getElementById('mobile-menu').classList.remove('show')">
                                     <i class='bx bx-book-open'></i> User Guide
                                 </button>
+                                {% elif show_admin_dashboard_user_guide %}
+                                <button type="button" class="mobile-menu-item w-100 text-start border-0 bg-transparent" data-bs-toggle="modal" data-bs-target="#adminDashboardUserGuideModal" onclick="document.getElementById('mobile-menu').classList.remove('show')">
+                                    <i class='bx bx-book-open'></i> User Guide
+                                </button>
                                 {% endif %}
                             </div>
                             <div class="mobile-menu-section border-top">
@@ -66,6 +70,12 @@
                         {% if show_dashboard_user_guide %}
                         <li class="nav-item me-2 d-flex align-items-center">
                             <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#proctorDashboardUserGuideModal" title="Open user guide">
+                                <i class='bx bx-book-open'></i> User Guide
+                            </button>
+                        </li>
+                        {% elif show_admin_dashboard_user_guide %}
+                        <li class="nav-item me-2 d-flex align-items-center">
+                            <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#adminDashboardUserGuideModal" title="Open admin user guide">
                                 <i class='bx bx-book-open'></i> User Guide
                             </button>
                         </li>
