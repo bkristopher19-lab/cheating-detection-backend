@@ -498,14 +498,15 @@
     </div>
 </div>
 
-                <!-- Delete Reports Button (Admin Only) -->
+                <!-- Archive all reports (admin only): soft-archive + PDF summary download -->
                 <div class="col-xl-3 col-lg-6 col-md-6 mb-4" id="adminControls" style="display: none;">
                     <div class="stat-card card border-left-danger shadow h-100">
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
+                            <p class="small text-muted mb-2">Marks every session and score row as archived (hidden from main views). Recordings stay on the server. Your browser will download a PDF summary.</p>
                             <div class="mt-2">
-                                <button class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
-                                    <i class=''></i> Archive Report
+                                <button type="button" class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
+                                    <i class="bx bx-archive"></i> Archive reports
                                 </button>
                             </div>
                         </div>
@@ -1290,113 +1291,79 @@
             });
         })();
 
-        // Function to delete old reports (admin only)
-        async function deleteOldReports() {
-            const cutoffDays = document.getElementById('cutoffDays').value;
-            const cutoffDate = document.getElementById('cutoffDate').value;
-
-            let confirmMessage = 'Are you sure you want to delete all reports ';
-            if (cutoffDate) {
-                confirmMessage += `older than ${cutoffDate}?`;
-            } else {
-                confirmMessage += `older than ${cutoffDays} days?`;
+        async function downloadArchivePdfResponse(response) {
+            const ct = (response.headers.get('content-type') || '').toLowerCase();
+            if (response.ok && ct.includes('application/pdf')) {
+                const blob = await response.blob();
+                const dispo = response.headers.get('Content-Disposition') || '';
+                let fname = 'proctoring_archive.pdf';
+                const m = /filename="([^"]+)"/i.exec(dispo);
+                if (m) fname = m[1];
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = fname;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(url);
+                return { ok: true, pdf: true };
             }
-            confirmMessage += ' This action cannot be undone.';
-
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-
+            let data;
             try {
-                const btn = document.getElementById('deleteReportsBtn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Archiving...';
-                btn.disabled = true;
-
-                const requestBody = { user_id: sessionStorage.getItem('userId') || '' };
-                if (cutoffDate) {
-                    requestBody.cutoff_date = cutoffDate + 'T00:00:00Z';
-                } else {
-                    requestBody.cutoff_days = parseInt(cutoffDays);
-                }
-
-                const response = await fetch('/delete_old_reports', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
-
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(result.message);
-                    // Reload dashboard data
-                    loadDashboardData();
-                } else {
-                    alert('Error: ' + (result.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Archive reports error:', error);
-                alert('Failed to Archive reports. Please try again.');
-            } finally {
-                const btn = document.getElementById('deleteReportsBtn');
-                btn.innerHTML = '<i class="bx bx-trash"></i> Archive Old Reports';
-                btn.disabled = false;
+                data = await response.json();
+            } catch (e) {
+                data = { error: 'Invalid response' };
             }
+            return { ok: response.ok, data };
         }
 
-        // Function to clear date selection
-        function clearDateSelection() {
-            document.getElementById('cutoffDate').value = '';
-        }
-
-        // Function to delete ALL reports (admin only)
+        // Archive ALL sessions + exam results (admin only); PDF summary downloads automatically when rows are archived.
         async function deleteAllReports() {
-            const confirmationText = prompt('Type "CONFIRM ARCHIVE" to Archive ALL reports permanently:');
-            if (confirmationText !== 'CONFIRM ARCHIVE') {
-                alert('Deletion cancelled. You must type "CONFIRM ARCHIVE" exactly.');
+            const confirmationText = prompt('Type ARCHIVE ALL to archive every session and all exam results (data kept; hidden from dashboards):');
+            if (confirmationText !== 'ARCHIVE ALL') {
+                alert('Cancelled. Type ARCHIVE ALL exactly to confirm.');
                 return;
             }
 
-            if (!confirm('⚠️ WARNING: This will Archive ALL proctoring reports and associated files permanently. This action CANNOT be undone. Are you absolutely sure?')) {
+            if (!confirm('This will mark all reports as archived, hide them from the main views, and download a PDF summary. Recordings are not deleted from the server. Continue?')) {
                 return;
             }
 
             try {
                 const btn = document.getElementById('deleteAllBtn');
-                const originalText = btn.innerHTML;
-                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Archiving...';
                 btn.disabled = true;
 
-                const response = await fetch('/delete_old_reports', {
+                const response = await fetch('/archive_reports', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         delete_all: true,
                         user_id: sessionStorage.getItem('userId') || ''
                     })
                 });
 
-                const result = await response.json();
-
-                if (result.success) {
-                    alert(result.message);
-                    // Reload dashboard data
+                const handled = await downloadArchivePdfResponse(response);
+                if (handled.pdf && handled.ok) {
+                    const ns = response.headers.get('X-Archived-Sessions');
+                    const nr = response.headers.get('X-Archived-Results');
+                    alert(`Archive complete. Sessions archived: ${ns || '—'}, exam results archived: ${nr || '—'}. If no PDF appeared, check your Downloads folder or browser settings.`);
                     sessionStorage.removeItem('logged_admin_dash_open_v1');
                     loadDashboardData();
+                } else if (handled.data && handled.data.success) {
+                    alert(handled.data.message || 'Done.');
+                    loadDashboardData();
                 } else {
-                    alert('Error: ' + (result.error || 'Unknown error'));
+                    const err = (handled.data && (handled.data.error || handled.data.message)) || 'Unknown error';
+                    alert('Error: ' + err);
                 }
             } catch (error) {
-                console.error('Delete all reports error:', error);
-                alert('Failed to delete reports. Please try again.');
+                console.error('Archive all reports error:', error);
+                alert('Failed to archive reports. Please try again.');
             } finally {
                 const btn = document.getElementById('deleteAllBtn');
-                btn.innerHTML = '<i class="bx bx-trash"></i> Archive Report';
+                btn.innerHTML = '<i class="bx bx-archive"></i> Archive reports';
                 btn.disabled = false;
             }
         }
