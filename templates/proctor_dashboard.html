@@ -463,6 +463,7 @@
                                             <th>Date & Time Taken</th>
                                             <th>Duration</th>
                                             <th>Proctoring Flags</th>
+                                            <th>Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="studentScoresTable">
@@ -609,17 +610,17 @@
                     <div class="card shadow h-100">
                         <div class="card-header py-3">
                             <h6 class="m-0 fw-bold">System logs</h6>
-                            <div class="text-muted small mt-1">Recent sign-ins and session activity for students and exams linked to your assigned sections.</div>
+                            <div class="text-muted small mt-1">Shows who acted and when—including your dashboard visits (filtered to your roster and exams).</div>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
                                 <table class="table table-sm table-striped align-middle mb-0">
                                     <thead>
                                         <tr>
+                                            <th>User</th>
                                             <th>Date</th>
                                             <th>Time</th>
-                                            <th>Event</th>
-                                            <th>Details</th>
+                                            <th>What happened</th>
                                         </tr>
                                     </thead>
                                     <tbody id="systemLogsTableBody"></tbody>
@@ -693,6 +694,27 @@
         </div>
     </div>
 
+    <div class="modal fade" id="proctorNotifyChairModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Notify program chair</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small mb-3">Email summarizes recorded violations for this session (even a single event).</p>
+                    <label class="form-label">Program chair email</label>
+                    <input type="email" class="form-control" id="proctorNotifyChairEmail" placeholder="chair@institution.edu" autocomplete="email">
+                    <div id="proctorNotifyChairError" class="text-danger small mt-2" style="display:none;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-danger" id="proctorNotifyChairSubmit" onclick="submitProctorNotifyChair()"><i class='bx bx-send me-1'></i>Send</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function _escapeHtmlLog(s) {
@@ -708,17 +730,56 @@
             ];
         }
 
-        function renderSystemLogsTableBody(tbodyEl, logs) {
+        function resolveLogWhoProctor(r, usersById) {
+            let n = r.actor_name != null ? String(r.actor_name).trim() : '';
+            const uid = r.user_id != null ? String(r.user_id) : '';
+            if (!n && uid && usersById && usersById[uid])
+                n = (usersById[uid].name || usersById[uid].email || '').trim();
+            if (!n && uid)
+                return _escapeHtmlLog('User (' + uid.slice(0, 10) + '…)');
+            return n ? _escapeHtmlLog(n) : '—';
+        }
+
+        let __procUiLogTimers = {};
+
+        async function logProctorDashboardAction(action, detail) {
+            const uid = sessionStorage.getItem('userId');
+            if (!uid) return;
+            if (action === 'proctor_dashboard_open') {
+                if (sessionStorage.getItem('logged_proctor_dash_open_v1')) return;
+                sessionStorage.setItem('logged_proctor_dash_open_v1', '1');
+            }
+            if (action === 'proctor_dashboard_filter') {
+                const t = Date.now();
+                if (__procUiLogTimers[action] && t - __procUiLogTimers[action] < 120000) return;
+                __procUiLogTimers[action] = t;
+            }
+            try {
+                await fetch('/log_dashboard_activity', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: uid,
+                        action,
+                        detail: (detail || '').slice(0, 280)
+                    })
+                });
+            } catch (_) {}
+        }
+
+        function renderSystemLogsTableBody(tbodyEl, logs, usersById) {
             if (!tbodyEl) return;
+            usersById = usersById || {};
             if (!logs || !logs.length) {
                 tbodyEl.innerHTML = '<tr><td colspan="4" class="text-muted">No log entries yet.</td></tr>';
                 return;
             }
             tbodyEl.innerHTML = logs.map((r) => {
                 const [dateStr, timeStr] = _formatSystemLogDateTime(r.timestamp);
-                const ev = _escapeHtmlLog(((r.event_type || 'info') + '').trim());
-                const detail = _escapeHtmlLog((r.message || '').trim()) || '—';
-                return `<tr><td>${_escapeHtmlLog(dateStr)}</td><td>${_escapeHtmlLog(timeStr)}</td><td><code class="small">${ev}</code></td><td>${detail}</td></tr>`;
+                const who = resolveLogWhoProctor(r, usersById);
+                const act = _escapeHtmlLog((r.message || '').trim()) ||
+                    `<code class="small">${_escapeHtmlLog((r.event_type || 'activity') + '')}</code>`;
+                return `<tr><td>${who}</td><td>${_escapeHtmlLog(dateStr)}</td><td>${_escapeHtmlLog(timeStr)}</td><td>${act}</td></tr>`;
             }).join('');
         }
 
@@ -736,6 +797,8 @@
             });
             return rows.filter((r) => {
                 const uid = r.user_id != null ? String(r.user_id) : '';
+                const et = ((r.event_type || '') + '').toLowerCase();
+                if (et.startsWith('ui.dashboard.') && uid && viewerUserId != null && uid === String(viewerUserId)) return true;
                 if (uid && viewerUserId != null && uid === String(viewerUserId)) return true;
                 const mex = r.meta && r.meta.exam_id != null ? String(r.meta.exam_id) : '';
                 if (mex && examSet.has(mex)) return true;
@@ -934,7 +997,11 @@
                     filteredSessions,
                     filteredExamResults
                 }).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
-                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible);
+                const usersByIdLogs = {};
+                (users || []).forEach(uu => { if (uu && uu.id) usersByIdLogs[uu.id] = uu; });
+                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, usersByIdLogs);
+
+                logProctorDashboardAction('proctor_dashboard_open');
 
                 // (optional) Participation rate: users who appear in exam_results vs known students (visible exams)
                 const resultUserIds = new Set((filteredExamResults || []).map(r => r.user_id).filter(Boolean));
@@ -1054,6 +1121,13 @@
 
                 // Load filtered student scores
                 await loadStudentScoresWithFlags(users, proctorExams, proctorSessions, proctorExamResults, classMap, proctorClasses, selectedExamId, selectedClassId);
+
+                const exPick = selectedExamId ? (proctorExams || []).find(e => String(e.id) === String(selectedExamId)) : null;
+                const clsPick = selectedClassId ? (proctorClasses || []).find(c => String(c.id) === String(selectedClassId)) : null;
+                const detailParts = [];
+                detailParts.push('exam:' + (exPick && exPick.title ? exPick.title : (selectedExamId || 'All')));
+                detailParts.push('section:' + (clsPick ? `${clsPick.course}-${clsPick.section}` : (selectedClassId || 'All')));
+                logProctorDashboardAction('proctor_dashboard_filter', detailParts.join(', '));
 
             } catch (err) {
                 console.error('Error applying filters:', err);
@@ -1194,6 +1268,78 @@
             return 'N/A';
         }
 
+        function countViolationEventsForChair(flags) {
+            if (!flags || typeof flags !== 'object') return 0;
+            return Object.values(flags).reduce((s, arr) => s + (Array.isArray(arr) ? arr.length : 0), 0);
+        }
+
+        let proctorNotifyChairSessionId = '';
+
+        function openProctorNotifyChairModal(sessionId) {
+            proctorNotifyChairSessionId = (sessionId || '').trim();
+            const em = document.getElementById('proctorNotifyChairEmail');
+            const err = document.getElementById('proctorNotifyChairError');
+            if (em) em.value = '';
+            if (err) { err.style.display = 'none'; err.textContent = ''; }
+            const el = document.getElementById('proctorNotifyChairModal');
+            if (el) bootstrap.Modal.getOrCreateInstance(el).show();
+        }
+
+        async function submitProctorNotifyChair() {
+            const emailInput = document.getElementById('proctorNotifyChairEmail');
+            const errorEl = document.getElementById('proctorNotifyChairError');
+            const submitBtn = document.getElementById('proctorNotifyChairSubmit');
+            const email = (emailInput?.value || '').trim();
+            if (!proctorNotifyChairSessionId) {
+                errorEl.textContent = 'Missing session.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            if (!email) {
+                errorEl.textContent = 'Enter the program chair email address.';
+                errorEl.style.display = 'block';
+                return;
+            }
+            errorEl.style.display = 'none';
+            if (submitBtn) submitBtn.disabled = true;
+            try {
+                const res = await fetch('/notify_program_chair', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: proctorNotifyChairSessionId,
+                        program_chair_email: email,
+                        acting_user_id: sessionStorage.getItem('userId') || ''
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.status === 'ok') {
+                    const inst = bootstrap.Modal.getInstance(document.getElementById('proctorNotifyChairModal'));
+                    if (inst) inst.hide();
+                    alert('Email sent to the program chair.');
+                } else {
+                    errorEl.textContent = data.error || 'Failed to send email.';
+                    errorEl.style.display = 'block';
+                }
+            } catch (e) {
+                errorEl.textContent = 'Network error. Try again.';
+                errorEl.style.display = 'block';
+            } finally {
+                if (submitBtn) submitBtn.disabled = false;
+            }
+        }
+
+        (function initProctorChairNotifyDelegation() {
+            const tb = document.getElementById('studentScoresTable');
+            if (!tb || tb._proctorChairBound) return;
+            tb._proctorChairBound = true;
+            tb.addEventListener('click', (e) => {
+                const btn = e.target.closest('.btn-chair-notify-proctor');
+                if (!btn || !btn.dataset.chairSid) return;
+                openProctorNotifyChairModal(btn.dataset.chairSid);
+            });
+        })();
+
         async function loadStudentScoresWithFlags(users, exams, sessions, examResults, classMap, allClasses, selectedExamId = null, selectedClassId = null) {
             try {
                 const tbody = document.getElementById('studentScoresTable');
@@ -1217,7 +1363,7 @@
 
                 // If no students, show message
                 if (studentsToShow.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="7" class="text-center">No students found in selected section.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center">No students found in selected section.</td></tr>';
                     return;
                 }
 
@@ -1291,6 +1437,11 @@
                     const dateTimeTaken = formatDateTime(examResult ? examResult.timestamp : null);
                     const durationDisplay = formatDuration(examResult, session);
                     const flagsDisplay = formatProctoringFlags(session ? session.flags : null);
+                    const vChair = countViolationEventsForChair(session ? session.flags : null);
+                    const sidChair = session && session.id ? String(session.id) : '';
+                    const actionChair = vChair > 0 && sidChair
+                        ? `<button type="button" class="btn btn-sm btn-outline-danger btn-chair-notify-proctor" title="Notify program chair" data-chair-sid="${_escapeHtmlLog(sidChair)}"><i class='bx bx-envelope'></i></button>`
+                        : '<span class="text-muted small">—</span>';
 
                     const row = `
                         <tr data-student-name="${student.name || 'Unknown'}">
@@ -1301,6 +1452,7 @@
                             <td>${dateTimeTaken}</td>
                             <td>${durationDisplay}</td>
                             <td><span class="badge ${flagsDisplay !== 'None' ? 'bg-warning' : 'bg-success'}">${flagsDisplay}</span></td>
+                            <td>${actionChair}</td>
                         </tr>
                     `;
                     tbody.innerHTML += row;
@@ -1325,13 +1477,13 @@
                 }
 
                 if (tbody.innerHTML === '') {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No students found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center">No students found</td></tr>';
                 }
 
             } catch (err) {
                 console.error('Error loading student scores:', err);
                 document.getElementById('studentScoresTable').innerHTML =
-                    '<tr><td colspan="6" class="text-center text-danger">Error loading scores</td></tr>';
+                    '<tr><td colspan="8" class="text-center text-danger">Error loading scores</td></tr>';
             }
         }
 
