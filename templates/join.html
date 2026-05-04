@@ -73,7 +73,7 @@
             }
 
             try {
-                const classesRes = await fetch('/select?collection=classes');
+                const classesRes = await fetch('/select?collection=classes&limit=10');
                 const classes = await classesRes.json();
                 const targetClass = (classes || []).find(cls => (cls.join_code || '').toUpperCase() === code);
 
