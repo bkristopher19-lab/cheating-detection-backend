@@ -885,6 +885,31 @@
         }
 
         let __procUiLogTimers = {};
+        const __proctorDataCache = { users: [], exams: [], sessions: [], classes: [], examResults: [], systemLogs: [], ts: 0 };
+        const PROCTOR_CACHE_TTL_MS = 15000;
+
+        async function fetchProctorCollections(force = false) {
+            const now = Date.now();
+            if (!force && (now - __proctorDataCache.ts) < PROCTOR_CACHE_TTL_MS && __proctorDataCache.ts) {
+                return __proctorDataCache;
+            }
+            const [users, exams, sessions, classes, examResults, systemLogs] = await Promise.all([
+                fetch('/select?collection=users').then(r => r.json()),
+                fetch('/select?collection=exams').then(r => r.json()),
+                fetch('/select?collection=proctoring_sessions').then(r => r.json()),
+                fetch('/select?collection=classes').then(r => r.json()),
+                fetch('/select?collection=exam_results').then(r => r.json()),
+                fetch('/select?collection=system_logs').then(r => (r.ok ? r.json().catch(() => []) : []))
+            ]);
+            __proctorDataCache.users = users || [];
+            __proctorDataCache.exams = exams || [];
+            __proctorDataCache.sessions = sessions || [];
+            __proctorDataCache.classes = classes || [];
+            __proctorDataCache.examResults = examResults || [];
+            __proctorDataCache.systemLogs = systemLogs || [];
+            __proctorDataCache.ts = now;
+            return __proctorDataCache;
+        }
 
         async function logProctorDashboardAction(action, detail) {
             const uid = sessionStorage.getItem('userId');
@@ -1055,14 +1080,13 @@
                 }
 
                 // Fetch all required data (include classes + system_logs)
-                const [users, exams, sessions, classes, examResults, systemLogs] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json()),
-                    fetch('/select?collection=system_logs').then(r => (r.ok ? r.json().catch(() => []) : []))
-                ]);
+                const cache = await fetchProctorCollections();
+                const users = cache.users;
+                const exams = cache.exams;
+                const sessions = cache.sessions;
+                const classes = cache.classes;
+                const examResults = cache.examResults;
+                const systemLogs = cache.systemLogs;
 
                 // Determine current user role (normalized) and scope.
                 // Safety-first: only admin sees global data on this page.
@@ -1262,10 +1286,8 @@
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
 
                 // Fetch classes for section display
-                const classesResponse = await fetch('/select?collection=classes');
-                const allClasses = await classesResponse.json() || [];
                 const classMap = {};
-                allClasses.forEach(cls => classMap[cls.id] = cls);
+                (classes || []).forEach(cls => classMap[cls.id] = cls);
 
                 // Load student scores with proctoring flags, locked to assigned classes for proctors
                 if (isProctorScopedView && filteredClasses.length === 1) {
@@ -1301,7 +1323,9 @@
         loadDashboardData();
 
         // Real-time data updates every 30 seconds
-        setInterval(loadDashboardData, 30000);
+        setInterval(() => {
+            if (!document.hidden) loadDashboardData();
+        }, 45000);
 
         // Filter change handlers
         document.getElementById('examFilter').addEventListener('change', async function() {
@@ -1338,14 +1362,12 @@
                 const userId = sessionStorage.getItem('userId');
                 if (!userId) return;
 
-                // Fetch data
-                const [users, exams, sessions, classes, examResults] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json())
-                ]);
+                const cache = await fetchProctorCollections();
+                const users = cache.users;
+                const exams = cache.exams;
+                const sessions = cache.sessions;
+                const classes = cache.classes;
+                const examResults = cache.examResults;
 
                 // Determine current user role (normalized) and scope.
                 // Safety-first: only admin sees global data on this page.
