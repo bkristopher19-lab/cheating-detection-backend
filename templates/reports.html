@@ -221,8 +221,8 @@
 
             try {
                 const [er, cr] = await Promise.all([
-                    fetch('/select?collection=exams'),
-                    fetch('/select?collection=classes')
+                    fetch('/select?collection=exams&limit=10'),
+                    fetch('/select?collection=classes&limit=10')
                 ]);
                 const examsData = await er.json();
                 const classesData = await cr.json();
@@ -253,9 +253,9 @@
         async function loadStudents() {
             // Include students from BOTH exam_results (submitted) AND proctoring_sessions (started exam)
             const [resultsRes, sessionsRes, usersRes] = await Promise.all([
-                fetch('/select?collection=exam_results'),
-                fetch('/select?collection=proctoring_sessions'),
-                fetch('/select?collection=users')
+                fetch('/select?collection=exam_results&limit=10'),
+                fetch('/select?collection=proctoring_sessions&limit=10'),
+                fetch('/select?collection=users&limit=10')
             ]);
             const results = await resultsRes.json();
             const allSessions = await sessionsRes.json();
@@ -282,7 +282,7 @@
                 const sessionUserId = sessionStorage.getItem('userId');
                 const proctorClassIds = await (async () => {
                     try {
-                        const cr = await fetch('/select?collection=classes');
+                        const cr = await fetch('/select?collection=classes&limit=10');
                         const classesData = await cr.json();
                         const classes = Array.isArray(classesData) ? classesData : [];
                         return classes
@@ -314,8 +314,8 @@
 
         async function loadStudentExams(studentId) {
             const [resultsRes, sessionsRes] = await Promise.all([
-                fetch('/select?collection=exam_results'),
-                fetch('/select?collection=proctoring_sessions')
+                fetch('/select?collection=exam_results&limit=10'),
+                fetch('/select?collection=proctoring_sessions&limit=10')
             ]);
             const results = await resultsRes.json();
             const allSessions = await sessionsRes.json();
@@ -350,7 +350,7 @@
         }
 
         async function loadExamSessions(studentId, examId) {
-            const response = await fetch('/select?collection=proctoring_sessions');
+            const response = await fetch('/select?collection=proctoring_sessions&limit=10');
             const allSessions = await response.json();
             
             // Filter sessions - check both student_id and user_id fields
