@@ -893,20 +893,18 @@
             if (!force && (now - __proctorDataCache.ts) < PROCTOR_CACHE_TTL_MS && __proctorDataCache.ts) {
                 return __proctorDataCache;
             }
-            const [users, exams, sessions, classes, examResults, systemLogs] = await Promise.all([
-                fetch('/select?collection=users').then(r => r.json()),
-                fetch('/select?collection=exams').then(r => r.json()),
-                fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                fetch('/select?collection=classes').then(r => r.json()),
-                fetch('/select?collection=exam_results').then(r => r.json()),
-                fetch('/select?collection=system_logs').then(r => (r.ok ? r.json().catch(() => []) : []))
-            ]);
-            __proctorDataCache.users = users || [];
-            __proctorDataCache.exams = exams || [];
-            __proctorDataCache.sessions = sessions || [];
-            __proctorDataCache.classes = classes || [];
-            __proctorDataCache.examResults = examResults || [];
-            __proctorDataCache.systemLogs = systemLogs || [];
+            const res = await fetch('/select_bundle?collections=users,exams,proctoring_sessions,classes,exam_results,system_logs');
+            if (!res.ok) {
+                throw new Error('Failed to fetch proctor dashboard bundle');
+            }
+            const json = await res.json();
+            const data = (json && json.data) || {};
+            __proctorDataCache.users = data.users || [];
+            __proctorDataCache.exams = data.exams || [];
+            __proctorDataCache.sessions = data.proctoring_sessions || [];
+            __proctorDataCache.classes = data.classes || [];
+            __proctorDataCache.examResults = data.exam_results || [];
+            __proctorDataCache.systemLogs = data.system_logs || [];
             __proctorDataCache.ts = now;
             return __proctorDataCache;
         }
