@@ -800,6 +800,34 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCXjpscninjBMMiEth3faD4LsVolWYEjA",
+            authDomain: "myapplication-0405566f.firebaseapp.com",
+            projectId: "myapplication-0405566f",
+            storageBucket: "myapplication-0405566f.firebasestorage.app",
+            messagingSenderId: "929555638825",
+            appId: "1:929555638825:web:d3fe5c1421f0ae1fa24a38"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        window.__authBootstrap = new Promise((resolve) => {
+            const timeoutId = setTimeout(() => resolve({ user: auth.currentUser, timedOut: true }), 5000);
+            const unsub = onAuthStateChanged(auth, (user) => {
+                clearTimeout(timeoutId);
+                unsub();
+                resolve({ user, timedOut: false });
+            }, () => {
+                clearTimeout(timeoutId);
+                unsub();
+                resolve({ user: auth.currentUser, timedOut: false });
+            });
+        });
+    </script>
     <script>
         (function applyMobilePlatformClass() {
             const ua = navigator.userAgent || '';
@@ -834,6 +862,8 @@
         }
 
         let __procUiLogTimers = {};
+        let __proctorDataCache = null;
+        let __proctorRefreshTimer = null;
 
         async function logProctorDashboardAction(action, detail) {
             const uid = sessionStorage.getItem('userId');
@@ -911,14 +941,31 @@
                 }
 
                 // Fetch all required data (include classes + system_logs)
+                function fetchWithColdStart(url, options) {
+                    let timeoutId = null;
+                    const timeoutPromise = new Promise((resolve) => {
+                        timeoutId = setTimeout(() => resolve('cold-start'), 3500);
+                    });
+                    return Promise.race([fetch(url, options), timeoutPromise]).then(async (result) => {
+                        if (result === 'cold-start') {
+                            console.log('[PROCTOR DASHBOARD] Server is likely waking up, retrying request:', url);
+                            return fetch(url, options);
+                        }
+                        return result;
+                    }).finally(() => {
+                        if (timeoutId) clearTimeout(timeoutId);
+                    });
+                }
+
                 const [users, exams, sessions, classes, examResults, systemLogs] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json()),
-                    fetch('/select?collection=system_logs').then(r => (r.ok ? r.json().catch(() => []) : []))
+                    fetchWithColdStart('/select?collection=users').then(r => r.ok ? r.json() : []),
+                    fetchWithColdStart('/select?collection=exams').then(r => r.ok ? r.json() : []),
+                    fetchWithColdStart('/select?collection=proctoring_sessions&limit=500').then(r => r.ok ? r.json() : []),
+                    fetchWithColdStart('/select?collection=classes').then(r => r.ok ? r.json() : []),
+                    fetchWithColdStart('/select?collection=exam_results&limit=500').then(r => r.ok ? r.json() : []),
+                    fetchWithColdStart('/select?collection=system_logs&limit=80').then(r => (r.ok ? r.json().catch(() => []) : []))
                 ]);
+                __proctorDataCache = { users, exams, sessions, classes, examResults, systemLogs, cachedAt: Date.now() };
 
                 // Determine current user role (normalized) and scope.
                 // Safety-first: only admin sees global data on this page.
@@ -1104,9 +1151,8 @@
                 // set a tooltip or reuse element (here we set 'totalStudents' title)
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
 
-                // Fetch classes for section display
-                const classesResponse = await fetch('/select?collection=classes');
-                const allClasses = await classesResponse.json() || [];
+                // Reuse already loaded classes (no extra read)
+                const allClasses = classes || [];
                 const classMap = {};
                 allClasses.forEach(cls => classMap[cls.id] = cls);
 
@@ -1140,11 +1186,51 @@
             }
         }
 
-        // Load data when page loads
-        loadDashboardData();
+        async function bootstrapProctorDashboard() {
+            try {
+                const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
+                if (!authState.user) {
+                    window.location.replace('/');
+                    return;
+                }
+                const uid = authState.user.uid || sessionStorage.getItem('authUid') || '';
+                const email = authState.user.email || sessionStorage.getItem('authEmail') || '';
+                const qs = new URLSearchParams();
+                if (uid) qs.set('uid', uid);
+                if (email) qs.set('email', email);
+                const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
+                if (!profileRes.ok) {
+                    window.location.replace('/');
+                    return;
+                }
+                const profile = await profileRes.json();
+                const role = (profile.role || profile.type || '').toString().trim().toLowerCase();
+                sessionStorage.setItem('userId', profile.id || '');
+                sessionStorage.setItem('user', JSON.stringify(profile));
+                if (uid) sessionStorage.setItem('authUid', uid);
+                if (email) sessionStorage.setItem('authEmail', email);
 
-        // Real-time data updates every 30 seconds
-        setInterval(loadDashboardData, 30000);
+                if (role === 'student') {
+                    window.location.replace('/student_dashboard');
+                    return;
+                }
+                if (role !== 'admin' && role !== 'proctor' && role !== 'teacher') {
+                    window.location.replace('/');
+                    return;
+                }
+
+                loadDashboardData();
+                if (__proctorRefreshTimer) clearInterval(__proctorRefreshTimer);
+                __proctorRefreshTimer = setInterval(() => {
+                    if (!document.hidden) loadDashboardData();
+                }, 90000);
+            } catch (err) {
+                console.error('Proctor dashboard auth init failed:', err);
+                window.location.replace('/');
+            }
+        }
+
+        bootstrapProctorDashboard();
 
         // Filter change handlers
         document.getElementById('examFilter').addEventListener('change', async function() {
@@ -1180,15 +1266,18 @@
                 // Get current proctor user ID
                 const userId = sessionStorage.getItem('userId');
                 if (!userId) return;
-
-                // Fetch data
-                const [users, exams, sessions, classes, examResults] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json())
-                ]);
+                const cacheAgeMs = __proctorDataCache ? (Date.now() - (__proctorDataCache.cachedAt || 0)) : Number.POSITIVE_INFINITY;
+                if (!__proctorDataCache || cacheAgeMs > 120000) {
+                    await loadDashboardData();
+                }
+                if (!__proctorDataCache) return;
+                const {
+                    users = [],
+                    exams = [],
+                    sessions = [],
+                    classes = [],
+                    examResults = []
+                } = __proctorDataCache;
 
                 // Determine current user role (normalized) and scope.
                 // Safety-first: only admin sees global data on this page.
