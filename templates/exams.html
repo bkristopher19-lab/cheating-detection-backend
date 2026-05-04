@@ -296,7 +296,10 @@
         let examTable = $('#examsTable').DataTable({
             autoWidth: false,
             scrollX: true,
-            responsive: false
+            responsive: false,
+            deferRender: true,
+            pageLength: 10,
+            lengthMenu: [[10, 20, 50], [10, 20, 50]]
         });
 
         // undefined = not loaded yet; null = admin (all exams); array of ids = proctor scope
@@ -743,7 +746,9 @@
         (async function initExamsPage() {
             await loadExams();
             refreshAlertDistribution();
-            setInterval(refreshAlertDistribution, 5000);
+            setInterval(() => {
+                if (!document.hidden) refreshAlertDistribution();
+            }, 10000);
         })();
         loadUserName();
 
