@@ -429,7 +429,7 @@
                 }
             }
 
-            const response = await fetch('/select?collection=classes');
+            const response = await fetch('/select?collection=classes&limit=10');
             let classes = await response.json() || [];
 
             const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
@@ -461,9 +461,9 @@
             }
 
             const [examsResponse, classesResponse, resultsResponse] = await Promise.all([
-                fetch('/select?collection=exams'),
-                fetch('/select?collection=classes'),
-                fetch('/select?collection=exam_results')
+                fetch('/select?collection=exams&limit=10'),
+                fetch('/select?collection=classes&limit=10'),
+                fetch('/select?collection=exam_results&limit=10')
             ]);
 
             let exams = await examsResponse.json() || [];
@@ -743,7 +743,9 @@
         (async function initExamsPage() {
             await loadExams();
             refreshAlertDistribution();
-            setInterval(refreshAlertDistribution, 5000);
+            setInterval(() => {
+                if (!document.hidden) refreshAlertDistribution();
+            }, 30000);
         })();
         loadUserName();
 
@@ -1054,12 +1056,12 @@
                 return;
             }
             try {
-                const resultsRes = await fetch('/select?collection=exam_results');
+                const resultsRes = await fetch('/select?collection=exam_results&limit=10');
                 let latestResults = await resultsRes.json() || [];
                 if (!Array.isArray(latestResults)) latestResults = [];
                 cachedExamResultsList = latestResults.slice();
 
-                const res = await fetch('/select?collection=proctoring_sessions');
+                const res = await fetch('/select?collection=proctoring_sessions&limit=10');
                 let sessions = await res.json() || [];
                 if (!Array.isArray(sessions)) {
                     sessions = [];
