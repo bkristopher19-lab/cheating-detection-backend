@@ -912,6 +912,49 @@ def select():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/select_bundle')
+def select_bundle():
+    """
+    Fetch multiple collections in one roundtrip.
+    Query params:
+      - collections: comma-separated collection names (required)
+      - include_archived: 1|true|yes (optional; for sessions/results)
+    """
+    try:
+        raw = (request.args.get('collections') or '').strip()
+        if not raw:
+            return jsonify({'error': 'collections query param is required'}), 400
+
+        requested = [c.strip() for c in raw.split(',') if c.strip()]
+        if not requested:
+            return jsonify({'error': 'No valid collections requested'}), 400
+
+        for collection in requested:
+            valid, err = validate_collection(collection)
+            if not valid:
+                return jsonify({'error': err}), 400
+
+        include_archived = str(request.args.get('include_archived', '')).lower() in ('1', 'true', 'yes')
+        payload = {}
+        for collection in requested:
+            rows = []
+            for doc in db.collection(collection).stream():
+                data = doc.to_dict() or {}
+                if collection in ('proctoring_sessions', 'exam_results') and not include_archived:
+                    if data.get('archived'):
+                        continue
+                data['id'] = doc.id
+                rows.append(data)
+            payload[collection] = rows
+
+        return jsonify({
+            'data': payload,
+            'fetched_at': datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/edit/<id>', methods=['POST'])
 def edit(id):
     try:
