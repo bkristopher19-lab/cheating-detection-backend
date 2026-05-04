@@ -1005,19 +1005,22 @@
             if (!force && __dashDataCache.data && (now - __dashDataCache.ts) < DASH_CACHE_TTL_MS) {
                 return __dashDataCache.data;
             }
-            const base = '/select?collection=';
-            const [resUsers, resExams, resSessions, resClasses, resResults, resLogs] = await Promise.all([
-                fetch(base + 'users'),
-                fetch(base + 'exams'),
-                fetch(base + 'proctoring_sessions'),
-                fetch(base + 'classes'),
-                fetch(base + 'exam_results'),
-                fetch(base + 'system_logs')
-            ]);
-            const payload = { resUsers, resExams, resSessions, resClasses, resResults, resLogs };
-            __dashDataCache.data = payload;
+            const res = await fetch('/select_bundle?collections=users,exams,proctoring_sessions,classes,exam_results,system_logs');
+            if (!res.ok) {
+                throw new Error('Failed to fetch dashboard bundle');
+            }
+            const json = await res.json();
+            const data = (json && json.data) || {};
+            __dashDataCache.data = {
+                users: data.users || [],
+                exams: data.exams || [],
+                proctoring_sessions: data.proctoring_sessions || [],
+                classes: data.classes || [],
+                exam_results: data.exam_results || [],
+                system_logs: data.system_logs || []
+            };
             __dashDataCache.ts = now;
-            return payload;
+            return __dashDataCache.data;
         }
 
         // Load dashboard data
@@ -1028,19 +1031,16 @@
 
             loadingEl.classList.remove('d-none');
             errorEl.classList.add('d-none');
-            contentEl.classList.add('d-none');
+            contentEl.classList.remove('d-none');
+            contentEl.classList.add('is-skeleton-loading');
 
             try {
-                const { resUsers, resExams, resSessions, resClasses, resResults, resLogs } = await fetchDashboardCollections();
-
-                if (!resUsers.ok || !resExams.ok || !resSessions.ok || !resClasses.ok || !resResults.ok) {
-                    const failed = [resUsers.ok ? null : 'users', resExams.ok ? null : 'exams', resSessions.ok ? null : 'sessions', resClasses.ok ? null : 'classes', resResults.ok ? null : 'exam_results'].filter(Boolean);
-                    throw new Error('Failed to retrieve: ' + (failed.join(', ') || 'data'));
-                }
-
-                const [users, exams, sessions, classes, examResults] = await Promise.all([
-                    resUsers.json(), resExams.json(), resSessions.json(), resClasses.json(), resResults.json()
-                ]);
+                const bundle = await fetchDashboardCollections();
+                const users = bundle.users;
+                const exams = bundle.exams;
+                const sessions = bundle.proctoring_sessions;
+                const classes = bundle.classes;
+                const examResults = bundle.exam_results;
 
                 // Normalize: ensure arrays
                 const safeArr = (v) => Array.isArray(v) ? v : (v && typeof v === 'object' && !Array.isArray(v) ? [v] : []);
@@ -1153,14 +1153,7 @@
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
                 // System logs (admin: all entries from Firestore)
-                let logsRaw = [];
-                if (resLogs.ok) {
-                    try {
-                        logsRaw = safeArr(await resLogs.json());
-                    } catch (_) {
-                        logsRaw = [];
-                    }
-                }
+                const logsRaw = safeArr(bundle.system_logs);
                 const logsSorted = logsRaw.slice().sort((a, b) =>
                     new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
                 const usersById = {};
@@ -1179,10 +1172,12 @@
                 await loadStudentScoresWithFlags(u, e, s, er);
 
                 loadingEl.classList.add('d-none');
+                contentEl.classList.remove('is-skeleton-loading');
                 contentEl.classList.remove('d-none');
             } catch (err) {
                 console.error('Error loading dashboard data:', err);
                 loadingEl.classList.add('d-none');
+                contentEl.classList.remove('is-skeleton-loading');
                 document.getElementById('dashboardErrorMsg').textContent = err.message || 'Failed to load dashboard data.';
                 errorEl.classList.remove('d-none');
             }
