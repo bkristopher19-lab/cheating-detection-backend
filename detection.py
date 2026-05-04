@@ -912,49 +912,6 @@ def select():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/select_bundle')
-def select_bundle():
-    """
-    Fetch multiple collections in one roundtrip.
-    Query params:
-      - collections: comma-separated collection names (required)
-      - include_archived: 1|true|yes (optional; for sessions/results)
-    """
-    try:
-        raw = (request.args.get('collections') or '').strip()
-        if not raw:
-            return jsonify({'error': 'collections query param is required'}), 400
-
-        requested = [c.strip() for c in raw.split(',') if c.strip()]
-        if not requested:
-            return jsonify({'error': 'No valid collections requested'}), 400
-
-        for collection in requested:
-            valid, err = validate_collection(collection)
-            if not valid:
-                return jsonify({'error': err}), 400
-
-        include_archived = str(request.args.get('include_archived', '')).lower() in ('1', 'true', 'yes')
-        payload = {}
-        for collection in requested:
-            rows = []
-            for doc in db.collection(collection).stream():
-                data = doc.to_dict() or {}
-                if collection in ('proctoring_sessions', 'exam_results') and not include_archived:
-                    if data.get('archived'):
-                        continue
-                data['id'] = doc.id
-                rows.append(data)
-            payload[collection] = rows
-
-        return jsonify({
-            'data': payload,
-            'fetched_at': datetime.utcnow().isoformat()
-        }), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
 @app.route('/edit/<id>', methods=['POST'])
 def edit(id):
     try:
@@ -1422,27 +1379,27 @@ def user_guide():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html', show_admin_dashboard_user_guide=True, active_page='dashboard')
+    return render_template('dashboard.html', show_admin_dashboard_user_guide=True)
 
 
 @app.route('/student_dashboard')
 def student_dashboard():
-    return render_template('student_dashboard.html', show_student_dashboard_user_guide=True, active_page='student_dashboard')
+    return render_template('student_dashboard.html', show_student_dashboard_user_guide=True)
 
 
 @app.route('/users')
 def users():
-    return render_template('users.html', active_page='users')
+    return render_template('users.html')
 
 
 @app.route('/exams')
 def exams():
-    return render_template('exams.html', active_page='exams')
+    return render_template('exams.html')
 
 
 @app.route('/classes')
 def classes():
-    return render_template('classes.html', active_page='classes')
+    return render_template('classes.html')
 
 
 @app.route('/proctor_invites')
@@ -1459,7 +1416,7 @@ def join_class(code):
 
 @app.route('/reports')
 def reports():
-    return render_template('reports.html', active_page='reports')
+    return render_template('reports.html')
 
 
 @app.route('/view_recording')
@@ -1521,7 +1478,7 @@ def profile():
 
 @app.route('/proctor_dashboard')
 def proctor_dashboard():
-    return render_template('proctor_dashboard.html', show_dashboard_user_guide=True, active_page='dashboard')
+    return render_template('proctor_dashboard.html', show_dashboard_user_guide=True)
 
 
 @app.route('/logout', methods=['POST'])
