@@ -931,6 +931,8 @@
 
         // Cached rows for filtering (admin retrieval)
         let _cachedScoreRows = [];
+        const __dashDataCache = { data: null, ts: 0 };
+        const DASH_CACHE_TTL_MS = 15000;
 
         function _escapeHtml(s) {
             return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -998,6 +1000,26 @@
             }).join('');
         }
 
+        async function fetchDashboardCollections(force = false) {
+            const now = Date.now();
+            if (!force && __dashDataCache.data && (now - __dashDataCache.ts) < DASH_CACHE_TTL_MS) {
+                return __dashDataCache.data;
+            }
+            const base = '/select?collection=';
+            const [resUsers, resExams, resSessions, resClasses, resResults, resLogs] = await Promise.all([
+                fetch(base + 'users'),
+                fetch(base + 'exams'),
+                fetch(base + 'proctoring_sessions'),
+                fetch(base + 'classes'),
+                fetch(base + 'exam_results'),
+                fetch(base + 'system_logs')
+            ]);
+            const payload = { resUsers, resExams, resSessions, resClasses, resResults, resLogs };
+            __dashDataCache.data = payload;
+            __dashDataCache.ts = now;
+            return payload;
+        }
+
         // Load dashboard data
         async function loadDashboardData() {
             const loadingEl = document.getElementById('dashboardLoading');
@@ -1009,13 +1031,7 @@
             contentEl.classList.add('d-none');
 
             try {
-                const base = '/select?collection=';
-                const resUsers = await fetch(base + 'users');
-                const resExams = await fetch(base + 'exams');
-                const resSessions = await fetch(base + 'proctoring_sessions');
-                const resClasses = await fetch(base + 'classes');
-                const resResults = await fetch(base + 'exam_results');
-                const resLogs = await fetch(base + 'system_logs');
+                const { resUsers, resExams, resSessions, resClasses, resResults, resLogs } = await fetchDashboardCollections();
 
                 if (!resUsers.ok || !resExams.ok || !resSessions.ok || !resClasses.ok || !resResults.ok) {
                     const failed = [resUsers.ok ? null : 'users', resExams.ok ? null : 'exams', resSessions.ok ? null : 'sessions', resClasses.ok ? null : 'classes', resResults.ok ? null : 'exam_results'].filter(Boolean);
@@ -1214,7 +1230,9 @@
             }
 
             loadDashboardData();
-            setInterval(loadDashboardData, 30000);
+            setInterval(() => {
+                if (!document.hidden) loadDashboardData();
+            }, 45000);
         }
 
         // Load data when page loads (admin only)
