@@ -6,6 +6,7 @@
     <title>Student Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link href="/static/dashboard-system.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
@@ -437,6 +438,8 @@
     </style>
 </head>
 <body>
+    {% include 'sidebar.html' %}
+    <div class="main-content" id="main-content">
     {% include 'navbar.html' %}
 
     <div class="container py-4">
@@ -458,6 +461,33 @@
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
             <h2 class="section-title mb-0">Available Exams</h2>
             <span class="section-badge"><i class='bx bx-info-circle'></i> Your section only</span>
+        </div>
+
+        <div class="row dashboard-row section">
+            <div class="col-md-4">
+                <div class="card dash-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Available Exams</div>
+                        <div class="kpi-value" id="availableExamsCount">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card dash-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Completed Exams</div>
+                        <div class="kpi-value text-success" id="completedExamsCount">0</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card dash-card">
+                    <div class="card-body">
+                        <div class="kpi-label">Upcoming Exams</div>
+                        <div class="kpi-value text-primary" id="upcomingExamsCount">0</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="row" id="examsList">
@@ -489,6 +519,7 @@
                 </div>
             </div>
         </div>
+    </div>
     </div>
 
     <!-- User Guide (student) -->
@@ -695,6 +726,9 @@
             });
 
             const now = new Date();
+            let availableCount = 0;
+            let completedCount = 0;
+            let upcomingCount = 0;
 
             exams.forEach(exam => {
                 // Check if user has already taken this exam
@@ -723,10 +757,14 @@
 
                 let buttonHtml = '';
                 let violationNoteHtml = '';
+                let statusBadgeHtml = '';
                 if (taken) {
                     buttonHtml = '<button class="btn btn-secondary" disabled>Completed</button>';
+                    statusBadgeHtml = '<span class="badge bg-success">Completed</span>';
+                    completedCount++;
                 } else if (blockedForViolations) {
                     buttonHtml = '<button class="btn btn-danger" disabled>Blocked (prior violations)</button>';
+                    statusBadgeHtml = '<span class="badge bg-secondary">Locked</span>';
                     if (vInfo && vInfo.hasPhone) {
                         violationNoteHtml = '<p class="card-text small text-danger mb-0">Previous attempt blocked: phone detected.</p>';
                     } else if (vInfo && vInfo.terminated) {
@@ -734,10 +772,15 @@
                     }
                 } else if (deadlineStatus === 'not-started') {
                     buttonHtml = '<button class="btn btn-warning" disabled>Not Started</button>';
+                    statusBadgeHtml = '<span class="badge bg-secondary">Locked</span>';
+                    upcomingCount++;
                 } else if (deadlineStatus === 'expired') {
                     buttonHtml = '<button class="btn btn-danger" disabled>Expired</button>';
+                    statusBadgeHtml = '<span class="badge bg-secondary">Locked</span>';
                 } else {
                     buttonHtml = `<button class="btn btn-primary" onclick="showProctoring('${exam.id}')">Take Exam</button>`;
+                    statusBadgeHtml = '<span class="badge bg-primary">Available</span>';
+                    availableCount++;
                 }
 
                 const card = `
@@ -746,6 +789,7 @@
                             <div class="card-body">
                                 <h5 class="card-title">${exam.title}</h5>
                                 <p class="card-text">${exam.subject}</p>
+                                <p class="card-text">${statusBadgeHtml}</p>
                                 <p class="card-text">Duration: ${Math.floor(exam.duration).toString().padStart(2, '0')}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}</p>
                                 <p class="card-text">Questions: ${exam.questions.length}</p>
                                 <p class="card-text small text-muted">${deadlineText}</p>
@@ -757,6 +801,13 @@
                 `;
                 examsList.innerHTML += card;
             });
+
+            const aEl = document.getElementById('availableExamsCount');
+            const cEl = document.getElementById('completedExamsCount');
+            const uEl = document.getElementById('upcomingExamsCount');
+            if (aEl) aEl.textContent = String(availableCount);
+            if (cEl) cEl.textContent = String(completedCount);
+            if (uEl) uEl.textContent = String(upcomingCount);
         }
 
         // Show proctoring consent modal
