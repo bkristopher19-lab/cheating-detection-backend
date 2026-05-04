@@ -296,10 +296,7 @@
         let examTable = $('#examsTable').DataTable({
             autoWidth: false,
             scrollX: true,
-            responsive: false,
-            deferRender: true,
-            pageLength: 10,
-            lengthMenu: [[10, 20, 50], [10, 20, 50]]
+            responsive: false
         });
 
         // undefined = not loaded yet; null = admin (all exams); array of ids = proctor scope
@@ -307,21 +304,6 @@
         // Same rows as Exams table — used with exam_results for per-exam average scores on the chart
         let cachedExamsList = [];
         let cachedExamResultsList = [];
-        const __examBundleCache = { data: null, ts: 0 };
-        const EXAMS_BUNDLE_TTL_MS = 15000;
-
-        async function fetchExamBundle(force = false) {
-            const now = Date.now();
-            if (!force && __examBundleCache.data && (now - __examBundleCache.ts) < EXAMS_BUNDLE_TTL_MS) {
-                return __examBundleCache.data;
-            }
-            const res = await fetch('/select_bundle?collections=exams,classes,exam_results,proctoring_sessions,users');
-            if (!res.ok) throw new Error('Failed to fetch exams bundle');
-            const json = await res.json();
-            __examBundleCache.data = (json && json.data) || {};
-            __examBundleCache.ts = now;
-            return __examBundleCache.data;
-        }
 
         // Question Template (changes based on exam type)
         function getQuestionTemplate(index, examType) {
@@ -447,8 +429,8 @@
                 }
             }
 
-            const data = await fetchExamBundle();
-            let classes = data.classes || [];
+            const response = await fetch('/select?collection=classes');
+            let classes = await response.json() || [];
 
             const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
             // Registration stores "teacher" for proctoring staff; treat same as "proctor" for data scope
@@ -478,10 +460,15 @@
                 }
             }
 
-            const data = await fetchExamBundle();
-            let exams = data.exams || [];
-            const classes = data.classes || [];
-            const examResults = data.exam_results || [];
+            const [examsResponse, classesResponse, resultsResponse] = await Promise.all([
+                fetch('/select?collection=exams'),
+                fetch('/select?collection=classes'),
+                fetch('/select?collection=exam_results')
+            ]);
+
+            let exams = await examsResponse.json() || [];
+            const classes = await classesResponse.json() || [];
+            const examResults = await resultsResponse.json() || [];
 
             const classMap = {};
             classes.forEach(cls => classMap[cls.id] = cls);
@@ -756,9 +743,7 @@
         (async function initExamsPage() {
             await loadExams();
             refreshAlertDistribution();
-            setInterval(() => {
-                if (!document.hidden) refreshAlertDistribution();
-            }, 10000);
+            setInterval(refreshAlertDistribution, 5000);
         })();
         loadUserName();
 
@@ -1069,12 +1054,13 @@
                 return;
             }
             try {
-                const data = await fetchExamBundle();
-                let latestResults = data.exam_results || [];
+                const resultsRes = await fetch('/select?collection=exam_results');
+                let latestResults = await resultsRes.json() || [];
                 if (!Array.isArray(latestResults)) latestResults = [];
                 cachedExamResultsList = latestResults.slice();
 
-                let sessions = data.proctoring_sessions || [];
+                const res = await fetch('/select?collection=proctoring_sessions');
+                let sessions = await res.json() || [];
                 if (!Array.isArray(sessions)) {
                     sessions = [];
                 }
