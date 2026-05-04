@@ -1379,27 +1379,27 @@ def user_guide():
 
 @app.route('/dashboard')
 def dashboard():
-    return render_template('dashboard.html', show_admin_dashboard_user_guide=True)
+    return render_template('dashboard.html', show_admin_dashboard_user_guide=True, active_page='dashboard')
 
 
 @app.route('/student_dashboard')
 def student_dashboard():
-    return render_template('student_dashboard.html', show_student_dashboard_user_guide=True)
+    return render_template('student_dashboard.html', show_student_dashboard_user_guide=True, active_page='student_dashboard')
 
 
 @app.route('/users')
 def users():
-    return render_template('users.html')
+    return render_template('users.html', active_page='users')
 
 
 @app.route('/exams')
 def exams():
-    return render_template('exams.html')
+    return render_template('exams.html', active_page='exams')
 
 
 @app.route('/classes')
 def classes():
-    return render_template('classes.html')
+    return render_template('classes.html', active_page='classes')
 
 
 @app.route('/proctor_invites')
@@ -1416,7 +1416,7 @@ def join_class(code):
 
 @app.route('/reports')
 def reports():
-    return render_template('reports.html')
+    return render_template('reports.html', active_page='reports')
 
 
 @app.route('/view_recording')
@@ -1478,7 +1478,7 @@ def profile():
 
 @app.route('/proctor_dashboard')
 def proctor_dashboard():
-    return render_template('proctor_dashboard.html', show_dashboard_user_guide=True)
+    return render_template('proctor_dashboard.html', show_dashboard_user_guide=True, active_page='dashboard')
 
 
 @app.route('/logout', methods=['POST'])
