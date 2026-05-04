@@ -1556,6 +1556,110 @@ def _commit_updates_in_batches(db_client, ref_patch_pairs):
         batch.commit()
 
 
+def _is_admin_user(uid):
+    """Return True only when uid belongs to an admin account."""
+    if not uid:
+        return False
+    ok, _ = validate_firestore_id(uid, 'user_id')
+    if not ok:
+        return False
+    doc = db.collection('users').document(uid).get()
+    if not doc.exists:
+        return False
+    data = doc.to_dict() or {}
+    role = ((data.get('role') or data.get('type') or '') + '').strip().lower()
+    return role == 'admin'
+
+
+@app.route('/cleanup_exams_taken_stale_ids', methods=['POST'])
+def cleanup_exams_taken_stale_ids():
+    """
+    Admin-only maintenance endpoint.
+    Removes stale/non-existent exam IDs from users.exams_taken arrays.
+    """
+    try:
+        data = request.get_json() or {}
+        acting_uid = (data.get('user_id') or '').strip()
+        if not _is_admin_user(acting_uid):
+            return jsonify({'error': 'Admin access required'}), 403
+
+        exam_ids = set()
+        for exam_doc in db.collection('exams').stream():
+            exam_ids.add(str(exam_doc.id).strip())
+
+        updates = []
+        users_checked = 0
+        users_updated = 0
+        stale_removed_total = 0
+
+        for user_doc in db.collection('users').stream():
+            users_checked += 1
+            udata = user_doc.to_dict() or {}
+            exams_taken = udata.get('exams_taken')
+            if not isinstance(exams_taken, list):
+                continue
+
+            # Preserve order while removing duplicates and stale IDs.
+            seen = set()
+            cleaned = []
+            stale_count = 0
+            for raw in exams_taken:
+                eid = str(raw or '').strip()
+                if not eid:
+                    stale_count += 1
+                    continue
+                if eid not in exam_ids:
+                    stale_count += 1
+                    continue
+                if eid in seen:
+                    continue
+                seen.add(eid)
+                cleaned.append(eid)
+
+            if cleaned != exams_taken:
+                updates.append((
+                    user_doc.reference,
+                    {
+                        'exams_taken': cleaned,
+                        'exams_taken_cleaned_at': datetime.utcnow().isoformat()
+                    }
+                ))
+                users_updated += 1
+                stale_removed_total += stale_count
+
+        if updates:
+            _commit_updates_in_batches(db, updates)
+
+        actor_name = _resolve_user_display_name(acting_uid) or acting_uid[:16]
+        append_system_log(
+            f'{actor_name} cleaned stale exam references in student records '
+            f'({users_updated} user(s) updated, {stale_removed_total} stale id(s) removed).',
+            event_type='admin.users.cleanup_exams_taken',
+            user_id=acting_uid,
+            meta={
+                'users_checked': users_checked,
+                'users_updated': users_updated,
+                'stale_removed': stale_removed_total
+            }
+        )
+
+        cleaned_at_utc = datetime.utcnow().isoformat()
+        return jsonify({
+            'success': True,
+            'users_checked': users_checked,
+            'users_updated': users_updated,
+            'stale_removed': stale_removed_total,
+            'cleaned_at_utc': cleaned_at_utc,
+            'message': (
+                f'Cleanup complete: {users_updated} user(s) updated, '
+                f'{stale_removed_total} stale exam reference(s) removed.'
+            )
+        }), 200
+    except Exception as e:
+        print(f'Error during cleanup_exams_taken_stale_ids: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/archive_reports', methods=['POST'])
 @app.route('/delete_old_reports', methods=['POST'])
 def archive_reports():
