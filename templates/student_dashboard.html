@@ -21,7 +21,13 @@
             --text-muted: #5a7a5a;
         }
         * { font-family: 'DM Sans', system-ui, sans-serif; }
-        body { background: var(--bg-page); }
+        body {
+            background: var(--bg-page);
+            padding-top: max(0px, env(safe-area-inset-top));
+            padding-right: max(0px, env(safe-area-inset-right));
+            padding-bottom: max(0px, env(safe-area-inset-bottom));
+            padding-left: max(0px, env(safe-area-inset-left));
+        }
 
         /* Navbar */
         .navbar-student {
@@ -33,6 +39,20 @@
             font-family: 'Outfit', sans-serif;
             font-weight: 700;
             color: white !important;
+        }
+        .navbar-student .container {
+            min-height: 64px;
+            padding-top: 0.35rem;
+            padding-bottom: 0.35rem;
+        }
+        .navbar-student .navbar-toggler {
+            border-color: rgba(255,255,255,0.35);
+        }
+        .navbar-student .navbar-toggler:focus {
+            box-shadow: 0 0 0 3px rgba(105, 240, 174, 0.25);
+        }
+        .navbar-student .navbar-toggler-icon {
+            filter: invert(1) brightness(1.2);
         }
         .navbar-student .navbar-text,
         .navbar-student .nav-link { color: rgba(255,255,255,0.9) !important; }
@@ -139,6 +159,79 @@
         }
         .scores-card .table tbody td { padding: 0.85rem 1rem; }
         .scores-card .table-striped tbody tr:nth-of-type(odd) { background: rgba(0, 200, 83, 0.03); }
+
+        /* Student header cleanup for phones/tablets */
+        @media (max-width: 991px) {
+            .navbar-student .container {
+                min-height: 56px;
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+            }
+
+            .navbar-student .navbar-brand {
+                font-size: 1rem;
+                line-height: 1.2;
+                max-width: calc(100% - 56px);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            #navbarNav {
+                background: rgba(9, 24, 9, 0.98);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 12px;
+                margin-top: 0.6rem;
+                padding: 0.65rem 0.75rem;
+            }
+
+            .navbar-student .navbar-nav {
+                align-items: stretch !important;
+                gap: 0.4rem;
+            }
+
+            .navbar-student .navbar-text {
+                display: block;
+                width: 100%;
+                background: rgba(255,255,255,0.06);
+                border: 1px solid rgba(255,255,255,0.12);
+                border-radius: 10px;
+                padding: 0.55rem 0.7rem;
+                margin: 0 !important;
+                line-height: 1.35;
+            }
+
+            .navbar-student .navbar-text strong {
+                display: block;
+                font-size: 0.93rem;
+                word-break: break-word;
+            }
+
+            .navbar-student .navbar-text small {
+                display: block;
+                word-break: break-word;
+            }
+
+            .navbar-student .dropdown-menu {
+                min-width: 100%;
+                margin-top: 0.35rem;
+            }
+
+            .navbar-student .dropdown-toggle {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 40px;
+                height: 40px;
+                border-radius: 10px;
+                background: rgba(255,255,255,0.08);
+                border: 1px solid rgba(255,255,255,0.14);
+            }
+
+            .join-card .card-body {
+                padding: 1rem;
+            }
+        }
 
         /* Modal */
         #proctoringModal .modal-content {
@@ -915,87 +1008,118 @@
         // Load student scores
         async function loadStudentScores() {
             const userId = sessionStorage.getItem('userId');
-            const userResponse = await fetch('/select?collection=users&id=' + userId);
-            const user = await userResponse.json();
+            if (!userId) return;
 
             const tbody = document.getElementById('scoresTable');
             tbody.innerHTML = '';
 
-            if (user.exams_taken && user.exams_taken.length > 0) {
-                // Get proctoring sessions for violations
-                const sessionsResponse = await fetch('/select?collection=proctoring_sessions');
+            try {
+                const [userResponse, examsResponse, resultsResponse, sessionsResponse] = await Promise.all([
+                    fetch('/select?collection=users&id=' + userId),
+                    fetch('/select?collection=exams'),
+                    fetch('/select?collection=exam_results'),
+                    fetch('/select?collection=proctoring_sessions')
+                ]);
+
+                if (!userResponse.ok || !examsResponse.ok || !resultsResponse.ok || !sessionsResponse.ok) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load exam scores</td></tr>';
+                    return;
+                }
+
+                const user = await userResponse.json();
+                const exams = await examsResponse.json();
+                const allResults = await resultsResponse.json();
                 const allSessions = await sessionsResponse.json();
 
-                for (const examId of user.exams_taken) {
-                    try {
-                        // Get exam details
-                        const examResponse = await fetch(`/select?collection=exams&id=${examId}`);
-                        const exam = await examResponse.json();
+                const toKey = (v) => String(v ?? '').trim();
+                const examById = {};
+                (exams || []).forEach(ex => {
+                    if (ex && ex.id != null) examById[toKey(ex.id)] = ex;
+                });
 
-                        // Get exam results to calculate score
-                        const resultsResponse = await fetch('/select?collection=exam_results');
-                        const allResults = await resultsResponse.json();
+                // Prefer canonical data from exam_results, then supplement with valid exams_taken entries.
+                const userResults = (allResults || []).filter(result => toKey(result.user_id) === toKey(userId));
+                const examIdSet = new Set();
+                userResults.forEach(r => {
+                    const id = toKey(r.exam_id);
+                    if (id) examIdSet.add(id);
+                });
+                (user.exams_taken || []).forEach(id => {
+                    const key = toKey(id);
+                    if (key && examById[key]) examIdSet.add(key);
+                });
 
-                        // Find the result for this user and exam
-                        const userResult = allResults.find(result =>
-                            result.user_id === userId && result.exam_id === examId
-                        );
+                const sortedExamIds = Array.from(examIdSet).sort((a, b) => {
+                    const ra = userResults.find(r => toKey(r.exam_id) === a);
+                    const rb = userResults.find(r => toKey(r.exam_id) === b);
+                    return new Date(rb?.timestamp || 0) - new Date(ra?.timestamp || 0);
+                });
 
-                        let scoreDisplay = 'N/A';
-                        let dateTaken = 'N/A';
-                        let statusBadge = '';
-
-                        if (userResult) {
-                            // Show forced/terminated as 0
-                            if (userResult.forced_score === 0 || userResult.terminated) {
-                                scoreDisplay = '0 (terminated)';
-                                statusBadge = '<span class="badge bg-danger">Terminated</span>';
-                            } else if (exam.questions) {
-                                const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
-                                let correctAnswers = 0;
-                                exam.questions.forEach((question, index) => {
-                                    if (userResult.answers && normalizeAnswer(userResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
-                                        correctAnswers++;
-                                    }
-                                });
-                                scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
-                                statusBadge = '<span class="badge bg-success">Completed</span>';
-                            }
-                            dateTaken = formatDateTime(userResult.timestamp);
-                        }
-
-                        // Find violations for this exam and user
-                        const userSession = allSessions.find(session =>
-                            (session.student_id === userId || session.user_id === userId) &&
-                            session.exam_id === examId
-                        );
-
-                        // Use unified flag formatting function
-                        const violationsDisplay = formatProctoringFlags(userSession ? userSession.flags : null);
-
-                        // Use unified duration formatting function
-                        const durationDisplay = formatDuration(userResult, userSession);
-
-                        // Format exam duration
-                        const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
-
-                        const row = `
-                            <tr>
-                                <td>${user.name || 'Unknown'}</td>
-                                <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
-                                <td>${scoreDisplay} ${statusBadge}</td>
-                                <td>${dateTaken}</td>
-                                <td>${durationDisplay} / ${examDurationDisplay}</td>
-                                <td>${violationsDisplay}</td>
-                            </tr>
-                        `;
-                        tbody.innerHTML += row;
-                    } catch (err) {
-                        console.warn('Error loading score for exam:', examId, err);
-                    }
+                if (sortedExamIds.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No exams taken yet</td></tr>';
+                    return;
                 }
-            } else {
-                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No exams taken yet</td></tr>';
+
+                for (const examId of sortedExamIds) {
+                    const exam = examById[examId];
+                    // Skip stale IDs that no longer exist to avoid "Unknown" ghost rows.
+                    if (!exam) continue;
+
+                    const userResult = userResults.find(result => toKey(result.exam_id) === examId) || null;
+
+                    let scoreDisplay = 'N/A';
+                    let dateTaken = 'N/A';
+                    let statusBadge = '';
+
+                    if (userResult) {
+                        // Show forced/terminated as 0
+                        if (userResult.forced_score === 0 || userResult.terminated) {
+                            scoreDisplay = '0 (terminated)';
+                            statusBadge = '<span class="badge bg-danger">Terminated</span>';
+                        } else if (Array.isArray(exam.questions) && exam.questions.length > 0) {
+                            const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
+                            let correctAnswers = 0;
+                            exam.questions.forEach((question, index) => {
+                                if (userResult.answers && normalizeAnswer(userResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
+                                    correctAnswers++;
+                                }
+                            });
+                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                            statusBadge = '<span class="badge bg-success">Completed</span>';
+                        }
+                        dateTaken = formatDateTime(userResult.timestamp);
+                    }
+
+                    // Find violations for this exam and user
+                    const userSession = (allSessions || []).find(session =>
+                        (toKey(session.student_id) === toKey(userId) || toKey(session.user_id) === toKey(userId)) &&
+                        toKey(session.exam_id) === examId
+                    );
+
+                    const violationsDisplay = formatProctoringFlags(userSession ? userSession.flags : null);
+                    const durationDisplay = formatDuration(userResult, userSession);
+                    const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
+
+                    const row = `
+                        <tr>
+                            <td>${user.name || 'Student'}</td>
+                            <td>${exam.title || 'Untitled Exam'} (${exam.subject || 'No Subject'})</td>
+                            <td>${scoreDisplay} ${statusBadge}</td>
+                            <td>${dateTaken}</td>
+                            <td>${durationDisplay} / ${examDurationDisplay}</td>
+                            <td>${violationsDisplay}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                }
+
+                // If all IDs were stale and got skipped.
+                if (!tbody.innerHTML.trim()) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No exams taken yet</td></tr>';
+                }
+            } catch (err) {
+                console.error('Error loading student scores:', err);
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading scores</td></tr>';
             }
         }
 
