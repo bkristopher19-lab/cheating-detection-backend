@@ -8,7 +8,6 @@
     <link rel="apple-touch-icon" href="/static/images/192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-    <link href="/static/dashboard-system.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -423,7 +422,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div class="text-xs text-uppercase mb-1 text-primary fw-bold">Students Being Monitored</div>
+                                    <div class="text-xs text-uppercase mb-1 text-primary fw-bold">Total Students</div>
                                     <div class="h3 mb-0 fw-bold" id="totalStudents">0</div>
                                     <div class="text-muted small">Active Users</div>
                                 </div>
@@ -459,7 +458,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div class="text-xs text-uppercase mb-1 text-info fw-bold">Live Sessions</div>
+                                    <div class="text-xs text-uppercase mb-1 text-info fw-bold">Total Sessions</div>
                                     <div class="h3 mb-0 fw-bold" id="totalSessions">0</div>
                                     <div class="text-muted small">Exam Attempts</div>
                                 </div>
@@ -477,7 +476,7 @@
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Alerts Today</div>
+                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Total Alerts</div>
                                     <div class="h3 mb-0 fw-bold" id="totalAlerts">0</div>
                                     <div class="text-muted small">Detected Issues</div>
                                 </div>
@@ -556,58 +555,8 @@
                 </div>
             </div>
 
-            <div class="row section">
-                <div class="col-xl-8">
-                    <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Live Monitoring</h6>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th>Student Name</th>
-                                            <th>Exam</th>
-                                            <th>Status</th>
-                                            <th>Alerts</th>
-                                            <th>Time Remaining</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="liveMonitoringTableBody"></tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-xl-4">
-                    <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Recent Alerts</h6>
-                        </div>
-                        <div class="card-body" id="recentAlertsList"></div>
-                    </div>
-                </div>
-            </div>
-
             <!-- Additional Stats Row -->
             <div class="row mb-4">
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card border-left-warning shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Suspicious Activities</div>
-                                    <div class="h3 mb-0 fw-bold" id="suspiciousActivities">0</div>
-                                </div>
-                                <div class="stat-icon bg-warning bg-opacity-10">
-                                    <i class='bx bxs-shield-x text-warning fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 <!-- Teachers Count -->
                 <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-secondary shadow h-100">
@@ -885,29 +834,6 @@
         }
 
         let __procUiLogTimers = {};
-        const __proctorDataCache = { users: [], exams: [], sessions: [], classes: [], examResults: [], systemLogs: [], ts: 0 };
-        const PROCTOR_CACHE_TTL_MS = 15000;
-
-        async function fetchProctorCollections(force = false) {
-            const now = Date.now();
-            if (!force && (now - __proctorDataCache.ts) < PROCTOR_CACHE_TTL_MS && __proctorDataCache.ts) {
-                return __proctorDataCache;
-            }
-            const res = await fetch('/select_bundle?collections=users,exams,proctoring_sessions,classes,exam_results,system_logs');
-            if (!res.ok) {
-                throw new Error('Failed to fetch proctor dashboard bundle');
-            }
-            const json = await res.json();
-            const data = (json && json.data) || {};
-            __proctorDataCache.users = data.users || [];
-            __proctorDataCache.exams = data.exams || [];
-            __proctorDataCache.sessions = data.proctoring_sessions || [];
-            __proctorDataCache.classes = data.classes || [];
-            __proctorDataCache.examResults = data.exam_results || [];
-            __proctorDataCache.systemLogs = data.system_logs || [];
-            __proctorDataCache.ts = now;
-            return __proctorDataCache;
-        }
 
         async function logProctorDashboardAction(action, detail) {
             const uid = sessionStorage.getItem('userId');
@@ -974,99 +900,6 @@
             });
         }
 
-        function _totalSessionAlerts(flags) {
-            if (!flags || typeof flags !== 'object') return 0;
-            return Object.values(flags).reduce((sum, arr) => sum + (Array.isArray(arr) ? arr.length : 0), 0);
-        }
-
-        function renderLiveMonitoringTableBody(tbody, sessions, users, exams) {
-            if (!tbody) return;
-            const usersById = {};
-            (users || []).forEach(u => { usersById[String(u.id)] = u; });
-            const examsById = {};
-            (exams || []).forEach(e => { examsById[String(e.id)] = e; });
-
-            if (!sessions || !sessions.length) {
-                tbody.innerHTML = '<tr><td colspan="6" class="text-muted">No active monitoring sessions.</td></tr>';
-                return;
-            }
-
-            const rows = sessions.map((s) => {
-                const studentId = String(s.student_id || s.user_id || '');
-                const student = usersById[studentId];
-                const exam = examsById[String(s.exam_id || '')];
-                const alerts = _totalSessionAlerts(s.flags);
-                const st = String(s.status || 'active').toLowerCase();
-                const statusBadge = st === 'active'
-                    ? '<span class="badge bg-success">Active</span>'
-                    : (alerts > 0 ? '<span class="badge bg-warning text-dark">Flagged</span>' : '<span class="badge bg-secondary">Ended</span>');
-
-                const rem = exam && exam.duration ? `${Math.max(0, Math.round(Number(exam.duration)))} mins` : '—';
-                const action = s.id
-                    ? `<a class="btn btn-sm btn-outline-primary" href="/view_recording?session_id=${encodeURIComponent(String(s.id))}">View</a>`
-                    : '<span class="text-muted">—</span>';
-
-                return `
-                    <tr>
-                        <td>${(student && student.name) ? student.name : 'Unknown Student'}</td>
-                        <td>${(exam && exam.title) ? exam.title : 'Unknown Exam'}</td>
-                        <td>${statusBadge}</td>
-                        <td><span class="badge ${alerts > 0 ? 'bg-danger' : 'bg-secondary'}">${alerts}</span></td>
-                        <td>${rem}</td>
-                        <td>${action}</td>
-                    </tr>
-                `;
-            }).join('');
-
-            tbody.innerHTML = rows;
-        }
-
-        function renderRecentAlerts(container, sessions, users, exams) {
-            if (!container) return;
-            const usersById = {};
-            (users || []).forEach(u => { usersById[String(u.id)] = u; });
-            const examsById = {};
-            (exams || []).forEach(e => { examsById[String(e.id)] = e; });
-
-            const items = [];
-            (sessions || []).forEach((s) => {
-                const flags = s.flags || {};
-                Object.entries(flags).forEach(([type, arr]) => {
-                    if (!Array.isArray(arr) || !arr.length) return;
-                    arr.forEach((evt) => {
-                        items.push({
-                            ts: new Date(evt.timestamp || s.start_time || 0).getTime(),
-                            type,
-                            studentId: String(s.student_id || s.user_id || ''),
-                            examId: String(s.exam_id || '')
-                        });
-                    });
-                });
-            });
-
-            items.sort((a, b) => b.ts - a.ts);
-            const top = items.slice(0, 8);
-            if (!top.length) {
-                container.innerHTML = '<div class="text-muted">No recent alerts.</div>';
-                return;
-            }
-
-            container.innerHTML = top.map((it) => {
-                const student = usersById[it.studentId];
-                const exam = examsById[it.examId];
-                const label = String(it.type || '').replace(/_/g, ' ');
-                return `
-                    <div class="alert-item">
-                        <div>
-                            <div class="fw-semibold">${student && student.name ? student.name : 'Unknown Student'}</div>
-                            <div class="small text-muted">${exam && exam.title ? exam.title : 'Unknown Exam'} • ${label}</div>
-                        </div>
-                        <span class="badge bg-danger">!</span>
-                    </div>
-                `;
-            }).join('');
-        }
-
         // Load dashboard data
         async function loadDashboardData() {
             try {
@@ -1078,13 +911,14 @@
                 }
 
                 // Fetch all required data (include classes + system_logs)
-                const cache = await fetchProctorCollections();
-                const users = cache.users;
-                const exams = cache.exams;
-                const sessions = cache.sessions;
-                const classes = cache.classes;
-                const examResults = cache.examResults;
-                const systemLogs = cache.systemLogs;
+                const [users, exams, sessions, classes, examResults, systemLogs] = await Promise.all([
+                    fetch('/select?collection=users').then(r => r.json()),
+                    fetch('/select?collection=exams').then(r => r.json()),
+                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
+                    fetch('/select?collection=classes').then(r => r.json()),
+                    fetch('/select?collection=exam_results').then(r => r.json()),
+                    fetch('/select?collection=system_logs').then(r => (r.ok ? r.json().catch(() => []) : []))
+                ]);
 
                 // Determine current user role (normalized) and scope.
                 // Safety-first: only admin sees global data on this page.
@@ -1216,7 +1050,6 @@
                 document.getElementById('totalQuestions').textContent = totalQuestions;
                 document.getElementById('avgDuration').textContent = `${avgDuration} min`;
                 document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (filteredSessions || []).length))} per exam`;
-                document.getElementById('suspiciousActivities') && (document.getElementById('suspiciousActivities').textContent = (filteredSessions || []).filter(s => _totalSessionAlerts(s.flags) > 0).length);
 
                 // Update alert types distribution
                 const alertTypesHtml = Object.entries(alertTypes)
@@ -1262,18 +1095,6 @@
                 const usersByIdLogs = {};
                 (users || []).forEach(uu => { if (uu && uu.id) usersByIdLogs[uu.id] = uu; });
                 renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, usersByIdLogs);
-                renderLiveMonitoringTableBody(
-                    document.getElementById('liveMonitoringTableBody'),
-                    (filteredSessions || []).filter(s => String((s.status || '').toLowerCase()) !== 'completed'),
-                    users,
-                    filteredExams
-                );
-                renderRecentAlerts(
-                    document.getElementById('recentAlertsList'),
-                    filteredSessions,
-                    users,
-                    filteredExams
-                );
 
                 logProctorDashboardAction('proctor_dashboard_open');
 
@@ -1284,8 +1105,10 @@
                 document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
 
                 // Fetch classes for section display
+                const classesResponse = await fetch('/select?collection=classes');
+                const allClasses = await classesResponse.json() || [];
                 const classMap = {};
-                (classes || []).forEach(cls => classMap[cls.id] = cls);
+                allClasses.forEach(cls => classMap[cls.id] = cls);
 
                 // Load student scores with proctoring flags, locked to assigned classes for proctors
                 if (isProctorScopedView && filteredClasses.length === 1) {
@@ -1321,9 +1144,7 @@
         loadDashboardData();
 
         // Real-time data updates every 30 seconds
-        setInterval(() => {
-            if (!document.hidden) loadDashboardData();
-        }, 45000);
+        setInterval(loadDashboardData, 30000);
 
         // Filter change handlers
         document.getElementById('examFilter').addEventListener('change', async function() {
@@ -1360,12 +1181,14 @@
                 const userId = sessionStorage.getItem('userId');
                 if (!userId) return;
 
-                const cache = await fetchProctorCollections();
-                const users = cache.users;
-                const exams = cache.exams;
-                const sessions = cache.sessions;
-                const classes = cache.classes;
-                const examResults = cache.examResults;
+                // Fetch data
+                const [users, exams, sessions, classes, examResults] = await Promise.all([
+                    fetch('/select?collection=users').then(r => r.json()),
+                    fetch('/select?collection=exams').then(r => r.json()),
+                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
+                    fetch('/select?collection=classes').then(r => r.json()),
+                    fetch('/select?collection=exam_results').then(r => r.json())
+                ]);
 
                 // Determine current user role (normalized) and scope.
                 // Safety-first: only admin sees global data on this page.
