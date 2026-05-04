@@ -121,7 +121,7 @@
         // Load Proctors into Select
         async function loadProctorsInto(selector) {
             try {
-                const res = await fetch('/select?collection=users');
+                const res = await fetch('/select?collection=users&limit=10');
                 const users = await res.json();
                 const proctors = users.filter(u => {
                     const r = ((u.role || u.type) + '').toString().toLowerCase().trim();
@@ -150,10 +150,10 @@
 
         // Load Classes
         async function loadClasses() {
-            const response = await fetch('/select?collection=classes');
+            const response = await fetch('/select?collection=classes&limit=10');
             const classes = await response.json();
             // Also fetch users map for proctor names
-            const usersRes = await fetch('/select?collection=users');
+            const usersRes = await fetch('/select?collection=users&limit=10');
             const users = await usersRes.json();
             const userMap = {};
             users.forEach(u => userMap[u.id] = u.name);
