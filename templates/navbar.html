@@ -713,16 +713,38 @@ if ('serviceWorker' in navigator) {
 
 // Load user name when navbar loads
 async function loadUserName() {
-    const userId = sessionStorage.getItem('userId');
+    let userId = sessionStorage.getItem('userId');
     if (!userId) {
-        window.location.href = '/';
-        return;
+        const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
+        const user = authState && authState.user ? authState.user : null;
+        const uid = user ? user.uid : (sessionStorage.getItem('authUid') || '');
+        const email = user ? user.email : (sessionStorage.getItem('authEmail') || '');
+        if (uid || email) {
+            try {
+                const qs = new URLSearchParams();
+                if (uid) qs.set('uid', uid);
+                if (email) qs.set('email', email);
+                const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
+                if (profileRes.ok) {
+                    const profile = await profileRes.json();
+                    userId = profile.id || '';
+                    sessionStorage.setItem('userId', userId);
+                    sessionStorage.setItem('user', JSON.stringify(profile));
+                    if (uid) sessionStorage.setItem('authUid', uid);
+                    if (email) sessionStorage.setItem('authEmail', email);
+                }
+            } catch (_) {
+                // Page-level auth handlers decide redirect on failure.
+            }
+        }
     }
+    if (!userId) return;
 
     try {
         const response = await fetch(`/select?collection=users&id=${userId}`);
+        if (!response.ok) return;
         const user = await response.json();
-        document.getElementById('userName').textContent = user.name;
+        document.getElementById('userName').textContent = user.name || 'Profile';
     } catch (err) {
         console.error('Error loading user:', err);
     }
