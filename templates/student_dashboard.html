@@ -589,31 +589,73 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCXjpscninjBMMiEth3faD4LsVolWYEjA",
+            authDomain: "myapplication-0405566f.firebaseapp.com",
+            projectId: "myapplication-0405566f",
+            storageBucket: "myapplication-0405566f.firebasestorage.app",
+            messagingSenderId: "929555638825",
+            appId: "1:929555638825:web:d3fe5c1421f0ae1fa24a38"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        window.__authBootstrap = new Promise((resolve) => {
+            const timeoutId = setTimeout(() => resolve({ user: auth.currentUser, timedOut: true }), 5000);
+            const unsub = onAuthStateChanged(auth, (user) => {
+                clearTimeout(timeoutId);
+                unsub();
+                resolve({ user, timedOut: false });
+            }, () => {
+                clearTimeout(timeoutId);
+                unsub();
+                resolve({ user: auth.currentUser, timedOut: false });
+            });
+        });
+    </script>
     <script>
         let selectedExamId = null;
+        const __studentFetchCache = new Map();
+        let __studentLastRefreshAt = 0;
+
+        async function fetchJsonCached(url, ttlMs = 45000) {
+            const now = Date.now();
+            const hit = __studentFetchCache.get(url);
+            if (hit && hit.expiresAt > now) return hit.data;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`Request failed: ${url}`);
+            const data = await res.json();
+            __studentFetchCache.set(url, { data, expiresAt: now + ttlMs });
+            return data;
+        }
+
+        function invalidateStudentCache(prefix) {
+            for (const key of __studentFetchCache.keys()) {
+                if (!prefix || key.includes(prefix)) __studentFetchCache.delete(key);
+            }
+        }
 
         // Load available exams (filtered by student's section)
         async function loadExams() {
             const userId = sessionStorage.getItem('userId');
             if (!userId) return;
 
-            // Load user, classes, exams, and proctoring sessions in parallel
-            const [userResponse, classesResponse, examsResponse, sessionsResponse] = await Promise.all([
-                fetch('/select?collection=users&id=' + userId),
-                fetch('/select?collection=classes'),
-                fetch('/select?collection=exams'),
-                fetch('/select?collection=proctoring_sessions')
-            ]);
-
-            if (!userResponse.ok || !classesResponse.ok || !examsResponse.ok || !sessionsResponse.ok) {
-                console.error('Failed to load user, classes, exams, or sessions');
+            let user, classes, allExams, allSessions;
+            try {
+                [user, classes, allExams, allSessions] = await Promise.all([
+                    fetchJsonCached('/select?collection=users&id=' + userId, 15000),
+                    fetchJsonCached('/select?collection=classes', 60000),
+                    fetchJsonCached('/select?collection=exams', 45000),
+                    fetchJsonCached('/select?collection=proctoring_sessions&limit=300', 30000)
+                ]);
+            } catch (err) {
+                console.error('Failed to load user, classes, exams, or sessions', err);
                 return;
             }
-
-            const user = await userResponse.json();
-            const classes = await classesResponse.json();
-            const allExams = await examsResponse.json();
-            const allSessions = await sessionsResponse.json();
 
             // Get student's class_id
             const studentClassId = user.class_id;
@@ -795,8 +837,7 @@
 
             try {
                 // Load classes and find by join_code (case-insensitive match)
-                const classesResponse = await fetch('/select?collection=classes');
-                const classes = await classesResponse.json();
+                const classes = await fetchJsonCached('/select?collection=classes', 60000);
                 const targetClass = classes.find(cls => (cls.join_code || '').toUpperCase() === rawCode);
 
                 if (!targetClass) {
@@ -834,6 +875,7 @@
 
                 msgEl.textContent = `Joined section: ${targetClass.course} - ${targetClass.section}`;
                 msgEl.classList.add('text-success');
+                invalidateStudentCache('/select?collection=users&id=');
 
                 // Refresh UI
                 loadExams();
@@ -869,8 +911,7 @@
         // Load user information
         async function loadUserInfo() {
             const userId = sessionStorage.getItem('userId');
-            const userResponse = await fetch('/select?collection=users&id=' + userId);
-            const user = await userResponse.json();
+            const user = await fetchJsonCached('/select?collection=users&id=' + userId, 15000);
             
             const userNameEl = document.getElementById('userName');
             if (userNameEl) userNameEl.textContent = user.name || 'Student';
@@ -881,8 +922,7 @@
             // Load student's section
             const sectionDisplayEl = document.getElementById('sectionDisplay');
             if (user.class_id) {
-                const classesResponse = await fetch('/select?collection=classes');
-                const classes = await classesResponse.json();
+                const classes = await fetchJsonCached('/select?collection=classes', 60000);
                 const studentClass = classes.find(cls => cls.id === user.class_id);
                 if (sectionDisplayEl) {
                     if (studentClass) {
@@ -996,22 +1036,12 @@
             tbody.innerHTML = '';
 
             try {
-                const [userResponse, examsResponse, resultsResponse, sessionsResponse] = await Promise.all([
-                    fetch('/select?collection=users&id=' + userId),
-                    fetch('/select?collection=exams'),
-                    fetch('/select?collection=exam_results'),
-                    fetch('/select?collection=proctoring_sessions')
+                const [user, exams, allResults, allSessions] = await Promise.all([
+                    fetchJsonCached('/select?collection=users&id=' + userId, 15000),
+                    fetchJsonCached('/select?collection=exams', 45000),
+                    fetchJsonCached('/select?collection=exam_results&limit=300', 30000),
+                    fetchJsonCached('/select?collection=proctoring_sessions&limit=300', 30000)
                 ]);
-
-                if (!userResponse.ok || !examsResponse.ok || !resultsResponse.ok || !sessionsResponse.ok) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load exam scores</td></tr>';
-                    return;
-                }
-
-                const user = await userResponse.json();
-                const exams = await examsResponse.json();
-                const allResults = await resultsResponse.json();
-                const allSessions = await sessionsResponse.json();
 
                 const toKey = (v) => String(v ?? '').trim();
                 const examById = {};
@@ -1117,23 +1147,72 @@
             window.history.replaceState({}, '', window.location.pathname);
         }
 
-        // Load exams when page loads
-        loadExams();
-        loadStudentScores();
+        async function bootstrapStudentDashboard() {
+            try {
+                const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
+                if (!authState.user) {
+                    window.location.replace('/');
+                    return;
+                }
+                const uid = authState.user.uid || sessionStorage.getItem('authUid') || '';
+                const email = authState.user.email || sessionStorage.getItem('authEmail') || '';
+                const qs = new URLSearchParams();
+                if (uid) qs.set('uid', uid);
+                if (email) qs.set('email', email);
+                const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
+                if (!profileRes.ok) {
+                    window.location.replace('/');
+                    return;
+                }
+                const profile = await profileRes.json();
+                const role = (profile.role || profile.type || '').toString().trim().toLowerCase();
+                sessionStorage.setItem('userId', profile.id || '');
+                sessionStorage.setItem('user', JSON.stringify(profile));
+                if (uid) sessionStorage.setItem('authUid', uid);
+                if (email) sessionStorage.setItem('authEmail', email);
+
+                if (role !== 'student') {
+                    if (role === 'admin') {
+                        window.location.replace('/dashboard');
+                    } else if (role === 'proctor' || role === 'teacher') {
+                        window.location.replace('/proctor_dashboard');
+                    } else {
+                        window.location.replace('/');
+                    }
+                    return;
+                }
+
+                loadExams();
+                loadStudentScores();
+            } catch (err) {
+                console.error('Student dashboard auth init failed:', err);
+                window.location.replace('/');
+            }
+        }
+
+        bootstrapStudentDashboard();
+
+        function refreshStudentData() {
+            const now = Date.now();
+            if (now - __studentLastRefreshAt < 12000) return;
+            __studentLastRefreshAt = now;
+            invalidateStudentCache('/select?collection=users&id=');
+            invalidateStudentCache('/select?collection=exam_results');
+            invalidateStudentCache('/select?collection=proctoring_sessions');
+            loadExams();
+            loadStudentScores();
+        }
         
         // Refresh exams when page becomes visible (user returns from exam)
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
-                // Page is now visible, refresh exams to show updated completion status
-                loadExams();
-                loadStudentScores();
+                refreshStudentData();
             }
         });
         
         // Also refresh on focus (when user switches back to tab)
         window.addEventListener('focus', () => {
-            loadExams();
-            loadStudentScores();
+            refreshStudentData();
         });
     </script>
 </body>
