@@ -140,6 +140,33 @@ table tbody tr:hover {
   font-size: 12px;
 }
 
+.is-skeleton-loading .dash-card .kpi-value,
+.is-skeleton-loading #alertTypes,
+.is-skeleton-loading #studentScoresTable,
+.is-skeleton-loading #systemLogsTableBody {
+  position: relative;
+  color: transparent !important;
+}
+
+.is-skeleton-loading .dash-card .kpi-value::after,
+.is-skeleton-loading #alertTypes::after,
+.is-skeleton-loading #studentScoresTable::after,
+.is-skeleton-loading #systemLogsTableBody::after {
+  content: '';
+  display: block;
+  width: 100%;
+  min-height: 22px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, #eef2f1 25%, #e5ebe9 50%, #eef2f1 75%);
+  background-size: 200% 100%;
+  animation: dash-skeleton 1.2s linear infinite;
+}
+
+@keyframes dash-skeleton {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 @media (max-width: 768px) {
   .dashboard-row > [class*="col-"] {
     width: 100%;
@@ -158,5 +185,11 @@ table tbody tr:hover {
   .btn,
   table tbody tr {
     transition: none !important;
+  }
+  .is-skeleton-loading .dash-card .kpi-value::after,
+  .is-skeleton-loading #alertTypes::after,
+  .is-skeleton-loading #studentScoresTable::after,
+  .is-skeleton-loading #systemLogsTableBody::after {
+    animation: none !important;
   }
 }
