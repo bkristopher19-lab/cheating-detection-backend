@@ -6,7 +6,7 @@
   --text-main: #1f2937;
   --text-muted: #6b7280;
   --border: #e5e7eb;
-  --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+  --shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
   --radius: 14px;
 }
 
@@ -38,7 +38,7 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  transition: all 0.2s ease;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
 }
 
 .dash-card:hover,
@@ -86,7 +86,7 @@ body {
   border-radius: 8px;
   padding: 8px 14px;
   font-size: 14px;
-  transition: all 0.2s ease;
+  transition: transform 0.16s ease, filter 0.16s ease;
 }
 
 .btn:hover {
@@ -143,5 +143,20 @@ table tbody tr:hover {
 @media (max-width: 768px) {
   .dashboard-row > [class*="col-"] {
     width: 100%;
+  }
+
+  .dash-card:hover,
+  .card:hover,
+  .btn:hover {
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-card,
+  .card,
+  .btn,
+  table tbody tr {
+    transition: none !important;
   }
 }
