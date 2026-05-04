@@ -8,62 +8,31 @@
     <link rel="apple-touch-icon" href="/static/images/192.png">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-    <link href="/static/dashboard-system.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #166534;
-            --primary-light: #22c55e;
-            --bg: #f5f7f6;
-            --card-bg: #ffffff;
-            --text-main: #1f2937;
-            --text-muted: #6b7280;
-            --border: #e5e7eb;
-            --shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-            --radius: 14px;
-
-            --bs-primary: #166534;
-            --bs-success: #22c55e;
-            --bs-info: #10b981;
-            --bs-warning: #f59e0b;
-            --bs-danger: #dc2626;
-            --bs-secondary: #6b7280;
+            --bs-primary: #00c853;
+            --bs-success: #009624;
+            --bs-info: #00FF7F;
+            --bs-warning: #808000;
+            --bs-danger: #FF0000;
+            --bs-secondary: #6c757d;
         }
 
         body {
             font-family: 'DM Sans', system-ui, sans-serif;
-            background: var(--bg);
-            color: var(--text-main);
+            background: #f0f7f0;
             padding-top: max(0px, env(safe-area-inset-top));
             padding-right: max(0px, env(safe-area-inset-right));
             padding-bottom: max(0px, env(safe-area-inset-bottom));
             padding-left: max(0px, env(safe-area-inset-left));
         }
-        .main-content { background: var(--bg); }
-        .main-content .container-fluid {
-            max-width: 1400px;
-        }
-        .main-content .row {
-            row-gap: 20px;
-        }
-        .section {
-            margin-bottom: 28px;
-        }
-        .main-content .btn {
-            border-radius: 8px;
-            padding: 8px 14px;
-            font-size: 14px;
-            transition: all 0.2s ease;
-        }
-        .main-content .btn:hover {
-            transform: translateY(-1px);
-        }
+        .main-content { background: #f0f7f0; }
         .stat-card {
-            border-radius: var(--radius);
-            transition: all 0.2s ease;
-            border: 1px solid var(--border);
-            box-shadow: var(--shadow);
-            background: var(--card-bg);
+            border-radius: 16px;
+            transition: transform 0.2s;
+            border: 1px solid rgba(0,200,83,0.15);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
         }
         .stat-card .card-body {
             padding: 20px;
@@ -78,13 +47,11 @@
             font-weight: 700;
             letter-spacing: 0.03em;
             margin-bottom: 10px !important;
-            color: var(--text-muted);
         }
         .stat-card .card-text,
         .stat-card p.small.text-muted {
             margin-bottom: 16px !important;
             line-height: 1.5;
-            color: var(--text-muted) !important;
         }
         .card-actions {
             display: flex;
@@ -97,13 +64,12 @@
             justify-content: center;
         }
         .stat-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+            transform: translateY(-5px);
         }
         .stat-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 10px;
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -112,59 +78,9 @@
             height: 300px;
         }
         .alert-type {
-            padding: 10px 12px;
-            border-radius: 10px;
+            padding: 8px;
+            border-radius: 8px;
             margin-bottom: 8px;
-            background: #f9fafb !important;
-            border: 1px solid var(--border);
-        }
-        .badge {
-            border-radius: 999px;
-            padding: 4px 10px;
-            font-size: 12px;
-        }
-
-        .main-content .card {
-            border-radius: var(--radius);
-            border: 1px solid var(--border);
-            background: var(--card-bg);
-            box-shadow: var(--shadow);
-        }
-        .main-content .card-header {
-            background: #ffffff;
-            border-bottom: 1px solid var(--border);
-            padding: 12px 16px;
-        }
-        .main-content .card-header h6 {
-            color: var(--text-main);
-            font-weight: 600;
-            letter-spacing: 0.01em;
-        }
-        .main-content .table {
-            width: 100%;
-            border-collapse: separate;
-            border-spacing: 0;
-        }
-        .main-content .table th {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            color: var(--text-muted);
-            padding: 12px;
-            background: #f9fafb;
-            border-bottom: 1px solid var(--border);
-        }
-        .main-content .table td {
-            padding: 14px 12px;
-            color: var(--text-main);
-            border-top: 1px solid #f3f4f6;
-            background: #fff;
-        }
-        .main-content .table tbody tr {
-            transition: 0.15s ease;
-        }
-        .main-content .table tbody tr:hover td {
-            background: #f9fafb;
         }
 
         .back-btn-mobile {
@@ -531,7 +447,7 @@
             </div>
             <div id="dashboardContent" class="d-none">
             <!-- Main Stats -->
-            <div class="row section">
+            <div class="row">
                 <!-- Users Stats -->
                 <div class="col-xl-3 col-md-6 mb-4">
                     <div class="stat-card card border-left-primary shadow h-100">
@@ -606,7 +522,7 @@
             </div>
 
             <!-- Detailed Stats -->
-            <div class="row section">
+            <div class="row">
                 <!-- Alert Types Distribution -->
                 <div class="col-xl-4 mb-4">
                     <div class="card shadow h-100">
@@ -663,7 +579,7 @@
             </div>
 
             <!-- Additional Stats Row -->
-            <div class="row section">
+            <div class="row mb-4">
                 <!-- Teachers Count -->
                 <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card border-left-secondary shadow h-100">
@@ -753,7 +669,7 @@
             </div>
     
             <!-- Additional Statistics -->
-            <div class="row section">
+            <div class="row mb-4">
                 <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
                     <div class="stat-card card shadow h-100">
                         <div class="card-body">
@@ -796,7 +712,7 @@
             </div>
 
             <!-- System logs -->
-            <div class="row section">
+            <div class="row">
                 <div class="col-lg-12 mb-4">
                     <div class="card shadow h-100">
                         <div class="card-header py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
@@ -931,8 +847,6 @@
 
         // Cached rows for filtering (admin retrieval)
         let _cachedScoreRows = [];
-        const __dashDataCache = { data: null, ts: 0 };
-        const DASH_CACHE_TTL_MS = 15000;
 
         function _escapeHtml(s) {
             return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1000,29 +914,6 @@
             }).join('');
         }
 
-        async function fetchDashboardCollections(force = false) {
-            const now = Date.now();
-            if (!force && __dashDataCache.data && (now - __dashDataCache.ts) < DASH_CACHE_TTL_MS) {
-                return __dashDataCache.data;
-            }
-            const res = await fetch('/select_bundle?collections=users,exams,proctoring_sessions,classes,exam_results,system_logs');
-            if (!res.ok) {
-                throw new Error('Failed to fetch dashboard bundle');
-            }
-            const json = await res.json();
-            const data = (json && json.data) || {};
-            __dashDataCache.data = {
-                users: data.users || [],
-                exams: data.exams || [],
-                proctoring_sessions: data.proctoring_sessions || [],
-                classes: data.classes || [],
-                exam_results: data.exam_results || [],
-                system_logs: data.system_logs || []
-            };
-            __dashDataCache.ts = now;
-            return __dashDataCache.data;
-        }
-
         // Load dashboard data
         async function loadDashboardData() {
             const loadingEl = document.getElementById('dashboardLoading');
@@ -1031,16 +922,25 @@
 
             loadingEl.classList.remove('d-none');
             errorEl.classList.add('d-none');
-            contentEl.classList.remove('d-none');
-            contentEl.classList.add('is-skeleton-loading');
+            contentEl.classList.add('d-none');
 
             try {
-                const bundle = await fetchDashboardCollections();
-                const users = bundle.users;
-                const exams = bundle.exams;
-                const sessions = bundle.proctoring_sessions;
-                const classes = bundle.classes;
-                const examResults = bundle.exam_results;
+                const base = '/select?collection=';
+                const resUsers = await fetch(base + 'users');
+                const resExams = await fetch(base + 'exams');
+                const resSessions = await fetch(base + 'proctoring_sessions');
+                const resClasses = await fetch(base + 'classes');
+                const resResults = await fetch(base + 'exam_results');
+                const resLogs = await fetch(base + 'system_logs');
+
+                if (!resUsers.ok || !resExams.ok || !resSessions.ok || !resClasses.ok || !resResults.ok) {
+                    const failed = [resUsers.ok ? null : 'users', resExams.ok ? null : 'exams', resSessions.ok ? null : 'sessions', resClasses.ok ? null : 'classes', resResults.ok ? null : 'exam_results'].filter(Boolean);
+                    throw new Error('Failed to retrieve: ' + (failed.join(', ') || 'data'));
+                }
+
+                const [users, exams, sessions, classes, examResults] = await Promise.all([
+                    resUsers.json(), resExams.json(), resSessions.json(), resClasses.json(), resResults.json()
+                ]);
 
                 // Normalize: ensure arrays
                 const safeArr = (v) => Array.isArray(v) ? v : (v && typeof v === 'object' && !Array.isArray(v) ? [v] : []);
@@ -1153,7 +1053,14 @@
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
                 // System logs (admin: all entries from Firestore)
-                const logsRaw = safeArr(bundle.system_logs);
+                let logsRaw = [];
+                if (resLogs.ok) {
+                    try {
+                        logsRaw = safeArr(await resLogs.json());
+                    } catch (_) {
+                        logsRaw = [];
+                    }
+                }
                 const logsSorted = logsRaw.slice().sort((a, b) =>
                     new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
                 const usersById = {};
@@ -1172,12 +1079,10 @@
                 await loadStudentScoresWithFlags(u, e, s, er);
 
                 loadingEl.classList.add('d-none');
-                contentEl.classList.remove('is-skeleton-loading');
                 contentEl.classList.remove('d-none');
             } catch (err) {
                 console.error('Error loading dashboard data:', err);
                 loadingEl.classList.add('d-none');
-                contentEl.classList.remove('is-skeleton-loading');
                 document.getElementById('dashboardErrorMsg').textContent = err.message || 'Failed to load dashboard data.';
                 errorEl.classList.remove('d-none');
             }
@@ -1225,9 +1130,7 @@
             }
 
             loadDashboardData();
-            setInterval(() => {
-                if (!document.hidden) loadDashboardData();
-            }, 45000);
+            setInterval(loadDashboardData, 30000);
         }
 
         // Load data when page loads (admin only)
