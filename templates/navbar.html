@@ -545,6 +545,22 @@
         }
 
         /* DataTables sort icons: clean active-only indicators */
+        table.dataTable {
+            display: table;
+            width: 100% !important;
+            border-collapse: collapse;
+        }
+        table.dataTable thead { display: table-header-group; }
+        table.dataTable tbody { display: table-row-group; }
+        table.dataTable thead tr,
+        table.dataTable tbody tr { display: table-row; }
+        table.dataTable thead th,
+        table.dataTable thead td,
+        table.dataTable tbody td {
+            display: table-cell;
+            vertical-align: middle;
+        }
+
         table.dataTable thead th.sorting,
         table.dataTable thead th.sorting_asc,
         table.dataTable thead th.sorting_desc,
@@ -552,13 +568,9 @@
         table.dataTable thead td.sorting_asc,
         table.dataTable thead td.sorting_desc {
             background-image: none !important;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 0.4rem;
-            padding-right: 0.85rem !important;
-            white-space: nowrap;
             position: relative;
+            padding-right: 1.1rem !important;
+            white-space: nowrap;
         }
 
         table.dataTable thead th.sorting:before,
@@ -581,7 +593,10 @@
         table.dataTable thead th.sorting_asc::after,
         table.dataTable thead td.sorting_asc::after {
             content: '↑';
-            margin-left: auto;
+            position: absolute;
+            right: 0.35rem;
+            top: 50%;
+            transform: translateY(-50%);
             font-size: 12px;
             font-weight: 700;
             opacity: 1;
@@ -590,7 +605,10 @@
         table.dataTable thead th.sorting_desc::after,
         table.dataTable thead td.sorting_desc::after {
             content: '↓';
-            margin-left: auto;
+            position: absolute;
+            right: 0.35rem;
+            top: 50%;
+            transform: translateY(-50%);
             font-size: 12px;
             font-weight: 700;
             opacity: 1;
