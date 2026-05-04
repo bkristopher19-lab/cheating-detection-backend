@@ -835,6 +835,34 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBCXjpscninjBMMiEth3faD4LsVolWYEjA",
+            authDomain: "myapplication-0405566f.firebaseapp.com",
+            projectId: "myapplication-0405566f",
+            storageBucket: "myapplication-0405566f.firebasestorage.app",
+            messagingSenderId: "929555638825",
+            appId: "1:929555638825:web:d3fe5c1421f0ae1fa24a38"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        window.__authBootstrap = new Promise((resolve) => {
+            const timeoutId = setTimeout(() => resolve({ user: auth.currentUser, timedOut: true }), 5000);
+            const unsub = onAuthStateChanged(auth, (user) => {
+                clearTimeout(timeoutId);
+                unsub();
+                resolve({ user, timedOut: false });
+            }, () => {
+                clearTimeout(timeoutId);
+                unsub();
+                resolve({ user: auth.currentUser, timedOut: false });
+            });
+        });
+    </script>
     <script>
         (function applyMobilePlatformClass() {
             const ua = navigator.userAgent || '';
@@ -847,6 +875,8 @@
 
         // Cached rows for filtering (admin retrieval)
         let _cachedScoreRows = [];
+        let __adminDashboardLoadInFlight = false;
+        let __adminDashboardRefreshTimer = null;
 
         function _escapeHtml(s) {
             return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -916,22 +946,43 @@
 
         // Load dashboard data
         async function loadDashboardData() {
+            if (__adminDashboardLoadInFlight) return;
+            __adminDashboardLoadInFlight = true;
             const loadingEl = document.getElementById('dashboardLoading');
             const errorEl = document.getElementById('dashboardError');
             const contentEl = document.getElementById('dashboardContent');
+            const loadingText = loadingEl ? loadingEl.querySelector('p') : null;
 
             loadingEl.classList.remove('d-none');
             errorEl.classList.add('d-none');
             contentEl.classList.add('d-none');
+            if (loadingText) loadingText.textContent = 'Retrieving dashboard data...';
+
+            function fetchWithColdStart(url, options) {
+                let timeoutId = null;
+                const timeoutPromise = new Promise((resolve) => {
+                    timeoutId = setTimeout(() => resolve('cold-start'), 3500);
+                });
+                return Promise.race([fetch(url, options), timeoutPromise]).then(async (result) => {
+                    if (result === 'cold-start') {
+                        if (loadingText) loadingText.textContent = 'Server is waking up (Render cold start). Loading data...';
+                        const res = await fetch(url, options);
+                        return res;
+                    }
+                    return result;
+                }).finally(() => {
+                    if (timeoutId) clearTimeout(timeoutId);
+                });
+            }
 
             try {
                 const base = '/select?collection=';
-                const resUsers = await fetch(base + 'users');
-                const resExams = await fetch(base + 'exams');
-                const resSessions = await fetch(base + 'proctoring_sessions');
-                const resClasses = await fetch(base + 'classes');
-                const resResults = await fetch(base + 'exam_results');
-                const resLogs = await fetch(base + 'system_logs');
+                const resUsers = await fetchWithColdStart(base + 'users');
+                const resExams = await fetchWithColdStart(base + 'exams');
+                const resSessions = await fetchWithColdStart(base + 'proctoring_sessions&limit=500');
+                const resClasses = await fetchWithColdStart(base + 'classes');
+                const resResults = await fetchWithColdStart(base + 'exam_results&limit=500');
+                const resLogs = await fetchWithColdStart(base + 'system_logs&limit=80');
 
                 if (!resUsers.ok || !resExams.ok || !resSessions.ok || !resClasses.ok || !resResults.ok) {
                     const failed = [resUsers.ok ? null : 'users', resExams.ok ? null : 'exams', resSessions.ok ? null : 'sessions', resClasses.ok ? null : 'classes', resResults.ok ? null : 'exam_results'].filter(Boolean);
@@ -1085,52 +1136,67 @@
                 loadingEl.classList.add('d-none');
                 document.getElementById('dashboardErrorMsg').textContent = err.message || 'Failed to load dashboard data.';
                 errorEl.classList.remove('d-none');
+            } finally {
+                __adminDashboardLoadInFlight = false;
             }
         }
 
         async function resolveCurrentRole() {
-            const fromSession = (() => {
-                try {
-                    const raw = sessionStorage.getItem('user');
-                    if (!raw) return '';
-                    const parsed = JSON.parse(raw);
-                    return (parsed.role || parsed.type || '').toString().trim().toLowerCase();
-                } catch (_) {
-                    return '';
-                }
-            })();
-            if (fromSession) return fromSession;
-
-            const userId = sessionStorage.getItem('userId');
-            if (!userId) return '';
-            try {
-                const res = await fetch(`/select?collection=users&id=${encodeURIComponent(userId)}`);
-                if (!res.ok) return '';
-                const user = await res.json();
-                return (user.role || user.type || '').toString().trim().toLowerCase();
-            } catch (_) {
-                return '';
+            const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null, timedOut: true };
+            if (!authState.user) {
+                throw new Error('Session expired. Please log in again.');
             }
+
+            const uid = authState.user.uid || sessionStorage.getItem('authUid') || '';
+            const email = authState.user.email || sessionStorage.getItem('authEmail') || '';
+            const qs = new URLSearchParams();
+            if (uid) qs.set('uid', uid);
+            if (email) qs.set('email', email);
+
+            const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
+            if (!profileRes.ok) {
+                const errData = await profileRes.json().catch(() => ({}));
+                throw new Error(errData.error || 'Unable to load your profile.');
+            }
+            const profile = await profileRes.json();
+            const resolvedRole = (profile.role || profile.type || '').toString().trim().toLowerCase();
+            sessionStorage.setItem('userId', profile.id || '');
+            sessionStorage.setItem('user', JSON.stringify(profile));
+            if (uid) sessionStorage.setItem('authUid', uid);
+            if (email) sessionStorage.setItem('authEmail', email);
+            return resolvedRole;
         }
 
         async function initDashboardPage() {
-            const role = await resolveCurrentRole();
-            if (role === 'student') {
-                window.location.replace('/student_dashboard');
-                return;
+            const loadingEl = document.getElementById('dashboardLoading');
+            const errorEl = document.getElementById('dashboardError');
+            const contentEl = document.getElementById('dashboardContent');
+            try {
+                const role = await resolveCurrentRole();
+                if (role === 'student') {
+                    window.location.replace('/student_dashboard');
+                    return;
+                }
+                if (role === 'proctor' || role === 'teacher') {
+                    window.location.replace('/proctor_dashboard');
+                    return;
+                }
+                if (role && role !== 'admin') {
+                    window.location.replace('/');
+                    return;
+                }
+                loadDashboardData();
+                if (__adminDashboardRefreshTimer) clearInterval(__adminDashboardRefreshTimer);
+                __adminDashboardRefreshTimer = setInterval(() => {
+                    if (!document.hidden) loadDashboardData();
+                }, 90000);
+            } catch (err) {
+                console.error('Dashboard auth init failed:', err);
+                loadingEl.classList.add('d-none');
+                contentEl.classList.add('d-none');
+                document.getElementById('dashboardErrorMsg').textContent = err.message || 'Failed to initialize authentication.';
+                errorEl.classList.remove('d-none');
             }
-            if (role === 'proctor' || role === 'teacher') {
-                window.location.replace('/proctor_dashboard');
-                return;
-            }
-            // Only admin can load global analytics dashboard data.
-            if (role && role !== 'admin') {
-                window.location.replace('/');
-                return;
-            }
-
-            loadDashboardData();
-            setInterval(loadDashboardData, 30000);
         }
 
         // Load data when page loads (admin only)
