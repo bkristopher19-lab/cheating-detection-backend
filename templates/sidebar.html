@@ -1,8 +1,8 @@
 <style>
         :root {
             --sidebar-width: 250px;
-            --accent: #00c853;
-            --accent-dark: #009624;
+            --accent: #22c55e;
+            --accent-dark: #166534;
         }
         
         .sidebar {
@@ -11,8 +11,8 @@
             position: fixed;
             top: 0;
             left: 0;
-            background: linear-gradient(180deg, #0d1f0d 0%, #1a3d1a 100%);
-            border-right: 1px solid rgba(0, 200, 83, 0.2);
+            background: linear-gradient(180deg, #064e3b 0%, #022c22 100%);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
             transition: all 0.3s;
             box-shadow: 2px 0 20px rgba(0,0,0,0.1);
             z-index: 1035;
@@ -144,6 +144,13 @@
         {# determine role safely; templates may pass current_user for server-side rendering, but we also handle client-side sessionStorage #}
         {% set role = current_user.role if current_user is defined and current_user.role is defined else (current_user.type if current_user is defined and current_user.type is defined else '') %}
         <ul class="nav nav-pills flex-column mb-auto">
+            <li class="nav-item student-only" style="display: none;">
+                <a href="/student_dashboard" class="nav-link {{ 'active' if active_page is defined and active_page == 'student_dashboard' else 'text-white' }}">
+                    <i class='bx bxs-graduation'></i>
+                    Student Dashboard
+                </a>
+            </li>
+
             <li class="nav-item proctor-only">
                 <a href="/proctor_dashboard" id="sidebarDashboardLink" class="nav-link {{ 'active' if active_page == 'dashboard' else 'text-white' }}">
                     <i class='bx bxs-dashboard'></i>
@@ -221,8 +228,10 @@
             // Hide proctor-only items for students
             if (role === 'student') {
                 document.querySelectorAll('.proctor-only').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('.student-only').forEach(el => el.style.display = '');
             } else {
                 document.querySelectorAll('.proctor-only').forEach(el => el.style.display = '');
+                document.querySelectorAll('.student-only').forEach(el => el.style.display = 'none');
             }
 
             // Section invites: not for admins (proctor/teacher workflow only)
