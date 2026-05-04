@@ -109,7 +109,7 @@
             }
 
             try {
-                const res = await fetch('/select?collection=classes');
+                const res = await fetch('/select?collection=classes&limit=10');
                 if (!res.ok) throw new Error('Could not load classes.');
                 const allClasses = await res.json();
                 const mine = (allClasses || []).filter(function (cls) {
