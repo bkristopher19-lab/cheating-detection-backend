@@ -649,6 +649,76 @@
 if (!window.__sessionGuardInitialized) {
     window.__sessionGuardInitialized = true;
     window.__sessionExpiryRedirectTimer = null;
+    window.__sessionReconnectTimer = null;
+
+    function sleep(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
+    function isSameOriginApiRequest(input) {
+        try {
+            const reqUrl = typeof input === 'string' ? input : (input && input.url ? input.url : '');
+            if (!reqUrl) return true;
+            const urlObj = new URL(reqUrl, window.location.origin);
+            if (urlObj.origin !== window.location.origin) return false;
+            return !urlObj.pathname.startsWith('/static/');
+        } catch (_) {
+            return true;
+        }
+    }
+
+    function getInputUrl(input) {
+        if (typeof input === 'string') return input;
+        if (input && input.url) return input.url;
+        return '';
+    }
+
+    async function waitForAuthBootstrap() {
+        if (!window.__authBootstrap) return { user: null, timedOut: true };
+        const timeoutMs = 3500;
+        return Promise.race([
+            window.__authBootstrap,
+            new Promise((resolve) => setTimeout(() => resolve({ user: null, timedOut: true }), timeoutMs))
+        ]);
+    }
+
+    async function getAuthTokenForRequest(forceRefresh) {
+        const cachedToken = localStorage.getItem('authToken') || '';
+        if (!forceRefresh && cachedToken) return cachedToken;
+        try {
+            const authState = await waitForAuthBootstrap();
+            if (!authState || !authState.user) {
+                console.warn('[SESSION GUARD] No Firebase user after auth bootstrap wait');
+                return cachedToken || '';
+            }
+            if (typeof window.__getFreshFirebaseToken === 'function') {
+                const freshToken = await window.__getFreshFirebaseToken();
+                return freshToken || cachedToken || '';
+            }
+            return cachedToken || '';
+        } catch (err) {
+            console.warn('[SESSION GUARD] Token refresh failed:', err);
+            return cachedToken || '';
+        }
+    }
+
+    async function withAuthHeaders(input, options, forceRefresh) {
+        const nextOptions = { ...(options || {}) };
+        if (!isSameOriginApiRequest(input)) return nextOptions;
+        const token = await getAuthTokenForRequest(forceRefresh);
+        const headers = new Headers(nextOptions.headers || {});
+        if (token) {
+            headers.set('Authorization', `Bearer ${token}`);
+        }
+        nextOptions.headers = headers;
+        const urlForLog = getInputUrl(input);
+        console.log('[SESSION GUARD] Request auth header set:', {
+            url: urlForLog || '(request)',
+            hasToken: Boolean(token),
+            hasAuthorizationHeader: headers.has('Authorization')
+        });
+        return nextOptions;
+    }
 
     window.__notifySessionExpired = function __notifySessionExpired(message) {
         const msg = message || 'Session expired, please login again';
@@ -671,16 +741,27 @@ if (!window.__sessionGuardInitialized) {
         }, 3000);
     };
 
-    window.__refreshSessionAndRetry = async function __refreshSessionAndRetry() {
-        if (typeof window.__getFreshFirebaseToken === 'function') {
-            try {
-                await window.__getFreshFirebaseToken();
-                return true;
-            } catch (_) {
-                return false;
-            }
+    window.__showReconnecting = function __showReconnecting() {
+        let banner = document.getElementById('sessionExpiredBanner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'sessionExpiredBanner';
+            banner.style.position = 'fixed';
+            banner.style.top = '12px';
+            banner.style.right = '12px';
+            banner.style.zIndex = '9999';
+            banner.style.maxWidth = '420px';
+            banner.className = 'alert alert-info shadow';
+            document.body.appendChild(banner);
+        } else {
+            banner.className = 'alert alert-info shadow';
         }
-        return false;
+        banner.textContent = 'Reconnecting...';
+    };
+
+    window.__refreshSessionAndRetry = async function __refreshSessionAndRetry() {
+        const token = await getAuthTokenForRequest(true);
+        return Boolean(token);
     };
 
     const nativeFetch = window.fetch.bind(window);
@@ -688,17 +769,47 @@ if (!window.__sessionGuardInitialized) {
         const options = init || {};
         const skipGuard = Boolean(options.__skipSessionGuard);
         const alreadyRetried = Boolean(options.__sessionRetried);
-        const response = await nativeFetch(input, options);
+        const safeOptions = { ...options };
+        delete safeOptions.__skipSessionGuard;
+        delete safeOptions.__sessionRetried;
+
+        const firstAttemptOptions = await withAuthHeaders(input, safeOptions, false);
+        const response = await nativeFetch(input, firstAttemptOptions);
         if (skipGuard || response.status !== 401) {
             return response;
         }
 
+        console.warn('[SESSION GUARD] 401 response detected:', {
+            url: getInputUrl(input),
+            status: response.status,
+            alreadyRetried
+        });
+
         const canRetry = !alreadyRetried && await window.__refreshSessionAndRetry();
         if (canRetry) {
-            const retryOptions = { ...options, __sessionRetried: true };
-            return nativeFetch(input, retryOptions);
+            const retryOptions = await withAuthHeaders(input, safeOptions, true);
+            const retriedResponse = await nativeFetch(input, retryOptions);
+            if (retriedResponse.status !== 401) return retriedResponse;
+            console.warn('[SESSION GUARD] Retry still returned 401:', {
+                url: getInputUrl(input),
+                status: retriedResponse.status
+            });
+            window.__showReconnecting();
+            if (window.__sessionReconnectTimer) clearTimeout(window.__sessionReconnectTimer);
+            await sleep(1200);
+            window.__sessionReconnectTimer = setTimeout(() => {
+                sessionStorage.removeItem('user');
+                sessionStorage.removeItem('userId');
+                sessionStorage.removeItem('authUid');
+                sessionStorage.removeItem('authEmail');
+                localStorage.removeItem('authToken');
+                window.__notifySessionExpired('Session expired, please login again');
+            }, 200);
+            return retriedResponse;
         }
 
+        window.__showReconnecting();
+        await sleep(1200);
         sessionStorage.removeItem('user');
         sessionStorage.removeItem('userId');
         sessionStorage.removeItem('authUid');
