@@ -617,6 +617,9 @@
                                 <h6 class="m-0 fw-bold">System logs</h6>
                                 <div class="text-muted small mt-1">Who did what across the platform, with browser date/time (exam sessions, escalations, and dashboard visits).</div>
                             </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="systemLogsNextBtn" onclick="loadNextSystemLogsPage()" disabled>
+                                Next 20
+                            </button>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -735,6 +738,8 @@
     <script>
         // Cached rows for filtering (admin retrieval)
         let _cachedScoreRows = [];
+        let systemLogsCursor = null;
+        let cachedUsersByIdForLogs = {};
 
         function _escapeHtml(s) {
             return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -800,6 +805,33 @@
                     `<code class="small">${_escapeHtml((r.event_type || 'activity') + '')}</code>`;
                 return `<tr><td>${who}</td><td>${_escapeHtml(dateStr)}</td><td>${_escapeHtml(timeStr)}</td><td>${act}</td></tr>`;
             }).join('');
+        }
+
+        async function fetchSystemLogsPage(startAfterTs) {
+            const params = new URLSearchParams({
+                collection: 'system_logs',
+                limit: '20',
+            });
+            if (startAfterTs) params.set('start_after', startAfterTs);
+            const res = await fetch('/select?' + params.toString());
+            if (!res.ok) throw new Error('Failed to load system logs');
+            return res.json();
+        }
+
+        async function loadNextSystemLogsPage() {
+            if (!systemLogsCursor) return;
+            try {
+                const payload = await fetchSystemLogsPage(systemLogsCursor);
+                renderSystemLogsTableBody(
+                    document.getElementById('systemLogsTableBody'),
+                    Array.isArray(payload.data) ? payload.data : [],
+                    cachedUsersByIdForLogs
+                );
+                systemLogsCursor = payload.next_cursor || null;
+                document.getElementById('systemLogsNextBtn').disabled = !payload.has_more;
+            } catch (e) {
+                console.error('Failed loading next system logs page:', e);
+            }
         }
 
         // Load dashboard data
@@ -940,20 +972,25 @@
                 const avgAlertsPerSession = s.length ? (totalAlerts / s.length).toFixed(2) : 0;
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
-                // System logs (admin: all entries from Firestore)
-                let logsRaw = [];
+                // System logs are fetched paginated from backend (max 20, newest first).
+                let logsSorted = [];
+                let logsHasMore = false;
                 if (resLogs.ok) {
                     try {
-                        logsRaw = safeArr(await resLogs.json());
+                        const logsPayload = await resLogs.json();
+                        logsSorted = safeArr(logsPayload.data);
+                        systemLogsCursor = logsPayload.next_cursor || null;
+                        logsHasMore = !!logsPayload.has_more;
                     } catch (_) {
-                        logsRaw = [];
+                        logsSorted = [];
+                        systemLogsCursor = null;
                     }
                 }
-                const logsSorted = logsRaw.slice().sort((a, b) =>
-                    new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
                 const usersById = {};
                 u.forEach(usr => { if (usr && usr.id) usersById[usr.id] = usr; });
+                cachedUsersByIdForLogs = usersById;
                 renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsSorted, usersById);
+                document.getElementById('systemLogsNextBtn').disabled = !logsHasMore;
 
                 logDashboardStaffAction('admin_dashboard_open');
 
