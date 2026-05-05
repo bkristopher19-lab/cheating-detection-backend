@@ -1171,20 +1171,27 @@
         }
 
         async function bootstrapStudentDashboard() {
+            const rootEl = document.getElementById('main-content');
+            const safeReplace = (path) => {
+                if (window.location.pathname !== path) {
+                    window.location.replace(path);
+                }
+            };
+            if (rootEl) rootEl.classList.add('d-none');
             try {
                 const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
-                if (!authState.user) {
-                    window.location.replace('/');
-                    return;
-                }
                 const uid = (authState.user && authState.user.uid) || sessionStorage.getItem('authUid') || localStorage.getItem('authUid') || '';
                 const email = (authState.user && authState.user.email) || sessionStorage.getItem('authEmail') || localStorage.getItem('authEmail') || '';
+                if (!authState.user && !uid && !email) {
+                    safeReplace('/');
+                    return;
+                }
                 const qs = new URLSearchParams();
                 if (uid) qs.set('uid', uid);
                 if (email) qs.set('email', email);
                 const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
                 if (!profileRes.ok) {
-                    window.location.replace('/');
+                    safeReplace('/');
                     return;
                 }
                 const profile = await profileRes.json();
@@ -1196,23 +1203,27 @@
 
                 if (role !== 'student') {
                     if (role === 'admin') {
-                        window.location.replace('/dashboard');
+                        safeReplace('/dashboard');
                     } else if (role === 'proctor' || role === 'teacher') {
-                        window.location.replace('/proctor_dashboard');
+                        safeReplace('/proctor_dashboard');
                     } else {
-                        window.location.replace('/');
+                        safeReplace('/');
                     }
                     return;
                 }
 
+                await new Promise((resolve) => setTimeout(resolve, 100));
                 loadExams();
                 loadStudentScores();
+                if (rootEl) rootEl.classList.remove('d-none');
             } catch (err) {
                 console.error('Student dashboard auth init failed:', err);
                 if (typeof window.__notifySessionExpired === 'function') {
                     window.__notifySessionExpired('Session expired, please login again.');
                 }
-                window.location.replace('/');
+                safeReplace('/');
+            } finally {
+                if (rootEl) rootEl.classList.remove('d-none');
             }
         }
 
