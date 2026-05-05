@@ -648,6 +648,7 @@
 <script>
 if (!window.__sessionGuardInitialized) {
     window.__sessionGuardInitialized = true;
+    window.__authReady = false;
     window.__sessionExpiryRedirectTimer = null;
     window.__sessionReconnectTimer = null;
 
@@ -673,13 +674,36 @@ if (!window.__sessionGuardInitialized) {
         return '';
     }
 
+    function getPathForInput(input) {
+        try {
+            const raw = getInputUrl(input);
+            const parsed = new URL(raw || window.location.href, window.location.origin);
+            return parsed.pathname || '/';
+        } catch (_) {
+            return '/';
+        }
+    }
+
+    function isPublicAuthPath(pathname) {
+        return pathname === '/' ||
+            pathname === '/login' ||
+            pathname === '/send_otp' ||
+            pathname === '/verify_otp' ||
+            pathname === '/register';
+    }
+
     async function waitForAuthBootstrap() {
-        if (!window.__authBootstrap) return { user: null, timedOut: true };
+        if (!window.__authBootstrap) {
+            window.__authReady = true;
+            return { user: null, timedOut: true };
+        }
         const timeoutMs = 3500;
-        return Promise.race([
+        const result = await Promise.race([
             window.__authBootstrap,
             new Promise((resolve) => setTimeout(() => resolve({ user: null, timedOut: true }), timeoutMs))
         ]);
+        window.__authReady = true;
+        return result;
     }
 
     async function getAuthTokenForRequest(forceRefresh) {
@@ -705,7 +729,13 @@ if (!window.__sessionGuardInitialized) {
     async function withAuthHeaders(input, options, forceRefresh) {
         const nextOptions = { ...(options || {}) };
         if (!isSameOriginApiRequest(input)) return nextOptions;
+        const path = getPathForInput(input);
+        if (isPublicAuthPath(path)) return nextOptions;
         const token = await getAuthTokenForRequest(forceRefresh);
+        if (!window.__authReady) {
+            nextOptions.__authPending = true;
+        }
+        nextOptions.__authMissing = !token;
         const headers = new Headers(nextOptions.headers || {});
         if (token) {
             headers.set('Authorization', `Bearer ${token}`);
@@ -769,16 +799,34 @@ if (!window.__sessionGuardInitialized) {
         const options = init || {};
         const skipGuard = Boolean(options.__skipSessionGuard);
         const alreadyRetried = Boolean(options.__sessionRetried);
+        const path = getPathForInput(input);
         const safeOptions = { ...options };
         delete safeOptions.__skipSessionGuard;
         delete safeOptions.__sessionRetried;
 
         const firstAttemptOptions = await withAuthHeaders(input, safeOptions, false);
+        if (firstAttemptOptions.__authPending || firstAttemptOptions.__authMissing) {
+            console.warn('[SESSION GUARD] Skipping protected request: Firebase auth not ready', {
+                url: getInputUrl(input),
+                path,
+                authReady: Boolean(window.__authReady)
+            });
+            return new Response(JSON.stringify({ error: 'auth_not_ready' }), {
+                status: 499,
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+        delete firstAttemptOptions.__authMissing;
+        delete firstAttemptOptions.__authPending;
         const response = await nativeFetch(input, firstAttemptOptions);
+        if (response.status === 499) {
+            return response;
+        }
         if (skipGuard || response.status !== 401) {
             return response;
         }
 
+        window.__showReconnecting();
         console.warn('[SESSION GUARD] 401 response detected:', {
             url: getInputUrl(input),
             status: response.status,
@@ -788,13 +836,23 @@ if (!window.__sessionGuardInitialized) {
         const canRetry = !alreadyRetried && await window.__refreshSessionAndRetry();
         if (canRetry) {
             const retryOptions = await withAuthHeaders(input, safeOptions, true);
+            if (retryOptions.__authMissing) {
+                console.warn('[SESSION GUARD] Retry skipped: token still missing after refresh', {
+                    url: getInputUrl(input),
+                    path
+                });
+                return response;
+            }
+            delete retryOptions.__authMissing;
+            delete retryOptions.__authPending;
             const retriedResponse = await nativeFetch(input, retryOptions);
             if (retriedResponse.status !== 401) return retriedResponse;
             console.warn('[SESSION GUARD] Retry still returned 401:', {
                 url: getInputUrl(input),
                 status: retriedResponse.status
             });
-            window.__showReconnecting();
+            if (isPublicAuthPath(path)) return retriedResponse;
+            if (!window.__authReady) return retriedResponse;
             if (window.__sessionReconnectTimer) clearTimeout(window.__sessionReconnectTimer);
             await sleep(1200);
             window.__sessionReconnectTimer = setTimeout(() => {
@@ -808,7 +866,8 @@ if (!window.__sessionGuardInitialized) {
             return retriedResponse;
         }
 
-        window.__showReconnecting();
+        if (isPublicAuthPath(path)) return response;
+        if (!window.__authReady) return response;
         await sleep(1200);
         sessionStorage.removeItem('user');
         sessionStorage.removeItem('userId');
@@ -818,6 +877,16 @@ if (!window.__sessionGuardInitialized) {
         window.__notifySessionExpired('Session expired, please login again');
         return response;
     };
+
+    if (window.__authBootstrap && typeof window.__authBootstrap.then === 'function') {
+        window.__authBootstrap.then(() => {
+            window.__authReady = true;
+        }).catch(() => {
+            window.__authReady = true;
+        });
+    } else {
+        window.__authReady = true;
+    }
 }
 
 // Menu toggle functionality
