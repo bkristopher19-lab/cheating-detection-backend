@@ -650,8 +650,8 @@
                                 <h6 class="m-0 fw-bold">System logs</h6>
                                 <div class="text-muted small mt-1">Who did what across the platform, with browser date/time (exam sessions, escalations, and dashboard visits).</div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="systemLogsNextBtn" onclick="loadNextSystemLogsPage()" disabled>
-                                Next 20
+                            <button type="button" class="btn btn-sm btn-outline-danger" id="systemLogsNextBtn" onclick="deleteSystemLogs()">
+                                Delete Logs
                             </button>
                         </div>
                         <div class="card-body">
@@ -851,19 +851,31 @@
             return res.json();
         }
 
-        async function loadNextSystemLogsPage() {
-            if (!systemLogsCursor) return;
+        async function deleteSystemLogs() {
+            if (!confirm('Delete all system logs now? This action cannot be undone.')) return;
+            const btn = document.getElementById('systemLogsNextBtn');
+            const old = btn.innerHTML;
             try {
-                const payload = await fetchSystemLogsPage(systemLogsCursor);
-                renderSystemLogsTableBody(
-                    document.getElementById('systemLogsTableBody'),
-                    Array.isArray(payload.data) ? payload.data : [],
-                    cachedUsersByIdForLogs
-                );
-                systemLogsCursor = payload.next_cursor || null;
-                document.getElementById('systemLogsNextBtn').disabled = !payload.has_more;
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                const res = await fetch('/delete_system_logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: sessionStorage.getItem('userId') || '' })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) {
+                    alert('Error: ' + (data.error || data.message || 'Failed to delete logs.'));
+                    return;
+                }
+                alert(`Deleted ${data.deleted_total || 0} log row(s).`);
+                loadDashboardData();
             } catch (e) {
-                console.error('Failed loading next system logs page:', e);
+                console.error('Failed deleting logs:', e);
+                alert('Failed to delete logs. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = old;
             }
         }
 
@@ -1023,7 +1035,7 @@
                 u.forEach(usr => { if (usr && usr.id) usersById[usr.id] = usr; });
                 cachedUsersByIdForLogs = usersById;
                 renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsSorted, usersById);
-                document.getElementById('systemLogsNextBtn').disabled = !logsHasMore;
+                document.getElementById('systemLogsNextBtn').disabled = false;
 
                 logDashboardStaffAction('admin_dashboard_open');
 
