@@ -636,8 +636,8 @@
                                 <h6 class="m-0 fw-bold">System logs</h6>
                                 <div class="text-muted small mt-1">Shows who acted and when—including your dashboard visits (filtered to your roster and exams).</div>
                             </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="systemLogsNextBtn" onclick="loadNextSystemLogsPage()" disabled>
-                                Next 20
+                            <button type="button" class="btn btn-sm btn-outline-danger d-none" id="systemLogsNextBtn" onclick="deleteSystemLogs()">
+                                Delete Logs
                             </button>
                         </div>
                         <div class="card-body">
@@ -832,22 +832,31 @@
             return res.json();
         }
 
-        async function loadNextSystemLogsPage() {
-            if (!systemLogsCursor) return;
+        async function deleteSystemLogs() {
+            if (!confirm('Delete all system logs now? This action cannot be undone.')) return;
+            const btn = document.getElementById('systemLogsNextBtn');
+            const old = btn.innerHTML;
             try {
-                const logsPayload = await fetchSystemLogsPage(systemLogsCursor);
-                const logsVisible = filterLogsForViewer(logsPayload.data, {
-                    isAdmin: systemLogsViewerScope.isAdmin,
-                    viewerUserId: systemLogsViewerScope.viewerUserId,
-                    proctorExamIds: systemLogsViewerScope.proctorExamIds,
-                    filteredSessions: systemLogsViewerScope.filteredSessions,
-                    filteredExamResults: systemLogsViewerScope.filteredExamResults
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Deleting...';
+                const res = await fetch('/delete_system_logs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: sessionStorage.getItem('userId') || '' })
                 });
-                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, systemLogsViewerScope.usersById);
-                systemLogsCursor = logsPayload.next_cursor || null;
-                document.getElementById('systemLogsNextBtn').disabled = !logsPayload.has_more;
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.success) {
+                    alert('Error: ' + (data.error || data.message || 'Failed to delete logs.'));
+                    return;
+                }
+                alert(`Deleted ${data.deleted_total || 0} log row(s).`);
+                loadDashboardData();
             } catch (e) {
-                console.error('Failed loading next system logs page:', e);
+                console.error('Failed deleting logs:', e);
+                alert('Failed to delete logs. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = old;
             }
         }
 
@@ -1079,7 +1088,16 @@
                     usersById: usersByIdLogs,
                 };
                 systemLogsCursor = systemLogsPayload.next_cursor || null;
-                document.getElementById('systemLogsNextBtn').disabled = !systemLogsPayload.has_more;
+                const deleteBtn = document.getElementById('systemLogsNextBtn');
+                if (deleteBtn) {
+                    if (isAdmin) {
+                        deleteBtn.classList.remove('d-none');
+                        deleteBtn.disabled = false;
+                    } else {
+                        deleteBtn.classList.add('d-none');
+                        deleteBtn.disabled = true;
+                    }
+                }
 
                 logProctorDashboardAction('proctor_dashboard_open');
 
