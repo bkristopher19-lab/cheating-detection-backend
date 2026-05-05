@@ -38,8 +38,6 @@ import librosa
 import pydub
 from pydub import AudioSegment
 import io
-import threading
-import time
 
 # Scheduler for automatic cleanup
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -248,38 +246,6 @@ if not firebase_admin._apps:
     db = firestore.client()
 
 
-# Short-lived in-process cache to reduce duplicate Firestore reads.
-SELECT_CACHE_TTL_S = int(os.environ.get('SELECT_CACHE_TTL_S', '12'))
-_select_cache = {}
-_select_cache_lock = threading.Lock()
-
-
-def _select_cache_get(key):
-    now = time.time()
-    with _select_cache_lock:
-        item = _select_cache.get(key)
-        if not item:
-            return None
-        expires_at, payload = item
-        if expires_at < now:
-            _select_cache.pop(key, None)
-            return None
-        return payload
-
-
-def _select_cache_put(key, payload):
-    if SELECT_CACHE_TTL_S <= 0:
-        return
-    expires_at = time.time() + SELECT_CACHE_TTL_S
-    with _select_cache_lock:
-        _select_cache[key] = (expires_at, payload)
-
-
-def _select_cache_clear():
-    with _select_cache_lock:
-        _select_cache.clear()
-
-
 def _resolve_user_display_name(user_id):
     """Return a short label for dashboards (name, email, or trimmed id)."""
     if not user_id:
@@ -378,16 +344,10 @@ def append_system_log(message, event_type='info', user_id=None, meta=None):
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'user_id': user_id,
         }
-        if meta and isinstance(meta, dict) and meta.get('actor_name'):
-            row['actor_name'] = str(meta.get('actor_name')).strip()[:120]
-        elif user_id:
-            # Best effort only; avoid repeated extra reads for hot paths like login.
-            try:
-                who = _resolve_user_display_name(user_id)
-                if who:
-                    row['actor_name'] = who[:120]
-            except Exception:
-                pass
+        if user_id:
+            who = _resolve_user_display_name(user_id)
+            if who:
+                row['actor_name'] = who[:120]
         if meta and isinstance(meta, dict):
             row['meta'] = meta
         db.collection('system_logs').add(row)
@@ -418,49 +378,30 @@ def count_faces_bounding_boxes(image, min_confidence=0.4):
 MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
 YOLO_ONNX = os.path.join(MODEL_DIR, 'yolov5s.onnx')
 
-# Lazy-loaded models (avoid heavy initialization during server boot/cold start)
+# Load ML models once at startup (not per request) - CRITICAL for Render free tier memory optimization
 yolo_net = None
-holistic_model = None
-face_detection_model = None
-_models_ready = False
-_models_lock = threading.Lock()
+if os.path.exists(YOLO_ONNX):
+    try:
+        yolo_net = cv2.dnn.readNet(YOLO_ONNX)
+        yolo_net.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
+        yolo_net.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
+        print("YOLO model loaded successfully")
+    except Exception as e:
+        print(f"Failed to load YOLO model: {e}")
+        yolo_net = None
 
-
-def ensure_ml_models_loaded():
-    """Load ML models only on first /predict use to reduce cold-start memory pressure."""
-    global yolo_net, holistic_model, face_detection_model, _models_ready
-    if _models_ready:
-        return
-    with _models_lock:
-        if _models_ready:
-            return
-
-        local_yolo = None
-        if os.path.exists(YOLO_ONNX):
-            try:
-                local_yolo = cv2.dnn.readNet(YOLO_ONNX)
-                local_yolo.setPreferableBackend(cv2.dnn.DNN_BACKEND_OPENCV)
-                local_yolo.setPreferableTarget(cv2.dnn.DNN_TARGET_CPU)
-                print("YOLO model loaded successfully (lazy)")
-            except Exception as e:
-                print(f"Failed to load YOLO model: {e}")
-                local_yolo = None
-
-        local_holistic = mp_holistic.Holistic(
-            min_detection_confidence=0.5,
-            min_tracking_confidence=0.5,
-            static_image_mode=False
-        )
-        local_face = mp_face_detection.FaceDetection(
-            model_selection=0,
-            min_detection_confidence=0.4
-        )
-
-        yolo_net = local_yolo
-        holistic_model = local_holistic
-        face_detection_model = local_face
-        _models_ready = True
-        print("MediaPipe models initialized (lazy, reused per request)")
+# Initialize MediaPipe models once (not per request) - CRITICAL for memory optimization
+# These are thread-safe and can be reused across requests
+holistic_model = mp_holistic.Holistic(
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5,
+    static_image_mode=False  # Video mode for better performance
+)
+face_detection_model = mp_face_detection.FaceDetection(
+    model_selection=0,  # 0 = short-range, 1 = full-range (0 is faster)
+    min_detection_confidence=0.4
+)
+print("MediaPipe models initialized (loaded once, reused per request)")
 
 
 def estimate_head_pose_from_mesh(results, image):
@@ -669,7 +610,6 @@ def predict():
     """
     session_id = request.args.get('session_id')
     user_id = request.form.get('user_id') or request.args.get('user_id')
-    ensure_ml_models_loaded()
 
     file = None
     for key in ('frame', 'file', 'image'):
@@ -930,7 +870,6 @@ def add():
             if not valid:
                 return jsonify({'error': err}), 400
         doc_ref = db.collection(collection).add(data)
-        _select_cache_clear()
         return jsonify({'id': doc_ref[1].id}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -944,21 +883,13 @@ def select():
         if not valid:
             return jsonify({'error': err}), 400
         doc_id = request.args.get('id')
-        no_cache = str(request.args.get('no_cache', '')).lower() in ('1', 'true', 'yes')
 
         if doc_id:
-            cache_key = f'id:{collection}:{doc_id}'
-            if not no_cache:
-                cached = _select_cache_get(cache_key)
-                if cached is not None:
-                    return jsonify(cached), 200
             # Get single document
             doc = db.collection(collection).document(doc_id).get()
             if doc.exists:
                 data = doc.to_dict()
                 data['id'] = doc.id
-                if not no_cache:
-                    _select_cache_put(cache_key, data)
                 return jsonify(data), 200
             return jsonify({'error': 'Document not found'}), 404
 
@@ -968,98 +899,15 @@ def select():
             'true',
             'yes',
         )
-        default_limit_by_collection = {
-            'users': 20,
-            'exams': 20,
-            'classes': 20,
-            'proctoring_sessions': 200,
-            'exam_results': 200,
-            'system_logs': 80,
-        }
-        limit_raw = request.args.get('limit')
-        offset_raw = request.args.get('offset', '0')
-        if limit_raw in (None, ''):
-            default_limit = default_limit_by_collection.get(collection)
-            limit_raw = '' if default_limit is None else str(default_limit)
-        try:
-            limit = int(limit_raw) if limit_raw not in (None, '') else None
-            offset = int(offset_raw)
-        except (TypeError, ValueError):
-            return jsonify({'error': 'limit/offset must be integers'}), 400
-        if limit is not None and (limit < 1 or limit > 500):
-            return jsonify({'error': 'limit must be between 1 and 500'}), 400
-        if offset < 0 or offset > 2000:
-            return jsonify({'error': 'offset must be between 0 and 2000'}), 400
-
-        query_ref = db.collection(collection)
-        if collection == 'system_logs':
-            query_ref = query_ref.order_by('timestamp', direction=firestore.Query.DESCENDING)
-
-        cache_key = f'list:{collection}:{include_archived}:{limit}:{offset}'
-        if not no_cache:
-            cached = _select_cache_get(cache_key)
-            if cached is not None:
-                return jsonify(cached), 200
-
         docs = []
-        skipped = 0
-        for doc in query_ref.stream():
+        for doc in db.collection(collection).stream():
             data = doc.to_dict()
             if collection in ('proctoring_sessions', 'exam_results') and not include_archived:
                 if data.get('archived'):
                     continue
-            if skipped < offset:
-                skipped += 1
-                continue
             data['id'] = doc.id
             docs.append(data)
-            if limit is not None and len(docs) >= limit:
-                break
-        if not no_cache:
-            _select_cache_put(cache_key, docs)
         return jsonify(docs), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/resolve_user')
-def resolve_user():
-    """
-    Resolve a user document by uid and/or email.
-    Used by dashboards after Firebase auth so login can stay authentication-only.
-    """
-    try:
-        uid = (request.args.get('uid') or '').strip()
-        email = (request.args.get('email') or '').strip().lower()
-        if not uid and not email:
-            return jsonify({'error': 'uid or email is required'}), 400
-
-        user_doc = None
-        if uid:
-            by_id = db.collection('users').document(uid).get()
-            if by_id.exists:
-                user_doc = by_id
-            else:
-                by_uid = next(
-                    db.collection('users').where('uid', '==', uid).limit(1).stream(),
-                    None,
-                )
-                if by_uid:
-                    user_doc = by_uid
-        if user_doc is None and email:
-            by_email = next(
-                db.collection('users').where('email', '==', email).limit(1).stream(),
-                None,
-            )
-            if by_email:
-                user_doc = by_email
-
-        if user_doc is None:
-            return jsonify({'error': 'User profile not found'}), 404
-
-        user_data = user_doc.to_dict() or {}
-        user_data['id'] = user_doc.id
-        return jsonify(user_data), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1084,7 +932,6 @@ def edit(id):
             if not valid:
                 return jsonify({'error': err}), 400
         db.collection(collection).document(id).update(data)
-        _select_cache_clear()
         return jsonify({'message': 'Updated'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1103,7 +950,6 @@ def delete(id):
         if not valid:
             return jsonify({'error': err}), 400
         db.collection(collection).document(id).delete()
-        _select_cache_clear()
         return jsonify({'message': 'Deleted'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1111,23 +957,16 @@ def delete(id):
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.get_json(silent=True) or {}
-    email = str(data.get('email') or '').strip().lower()
-    password = str(data.get('password') or '')
-    if not email or not password:
-        return jsonify({'success': False, 'error': 'Email and password are required'}), 400
+    data = request.get_json()
+    email = data.get('email')
+    password = data.get('password')
 
-    # Lightweight auth path: single-field lookup, local password check.
     users_ref = db.collection('users')
-    user = next(users_ref.where('email', '==', email).limit(1).stream(), None)
+    query = users_ref.where('email', '==', email).where('password', '==', password).limit(1)
+    user = next(query.stream(), None)
 
     if user:
-        user_data = user.to_dict() or {}
-        if str(user_data.get('password') or '') != password:
-            return jsonify({
-                'success': False,
-                'error': 'Invalid credentials'
-            }), 401
+        user_data = user.to_dict()
         user_data['id'] = user.id  # Add document ID to user data
         utype = (
             ((user_data.get('role') or user_data.get('type')) or '')
@@ -1139,7 +978,7 @@ def login():
             f'{who} logged in ({utype}).',
             event_type='auth.login',
             user_id=user.id,
-            meta={'role': utype, 'actor_name': who[:120]},
+            meta={'role': utype},
         )
         return jsonify({
             'success': True,
@@ -1545,7 +1384,7 @@ def dashboard():
 
 @app.route('/student_dashboard')
 def student_dashboard():
-    return render_template('student_dashboard.html', show_student_dashboard_user_guide=True)
+    return render_template('student_dashboard.html')
 
 
 @app.route('/users')
@@ -1715,110 +1554,6 @@ def _commit_updates_in_batches(db_client, ref_patch_pairs):
             n = 0
     if n:
         batch.commit()
-
-
-def _is_admin_user(uid):
-    """Return True only when uid belongs to an admin account."""
-    if not uid:
-        return False
-    ok, _ = validate_firestore_id(uid, 'user_id')
-    if not ok:
-        return False
-    doc = db.collection('users').document(uid).get()
-    if not doc.exists:
-        return False
-    data = doc.to_dict() or {}
-    role = ((data.get('role') or data.get('type') or '') + '').strip().lower()
-    return role == 'admin'
-
-
-@app.route('/cleanup_exams_taken_stale_ids', methods=['POST'])
-def cleanup_exams_taken_stale_ids():
-    """
-    Admin-only maintenance endpoint.
-    Removes stale/non-existent exam IDs from users.exams_taken arrays.
-    """
-    try:
-        data = request.get_json() or {}
-        acting_uid = (data.get('user_id') or '').strip()
-        if not _is_admin_user(acting_uid):
-            return jsonify({'error': 'Admin access required'}), 403
-
-        exam_ids = set()
-        for exam_doc in db.collection('exams').stream():
-            exam_ids.add(str(exam_doc.id).strip())
-
-        updates = []
-        users_checked = 0
-        users_updated = 0
-        stale_removed_total = 0
-
-        for user_doc in db.collection('users').stream():
-            users_checked += 1
-            udata = user_doc.to_dict() or {}
-            exams_taken = udata.get('exams_taken')
-            if not isinstance(exams_taken, list):
-                continue
-
-            # Preserve order while removing duplicates and stale IDs.
-            seen = set()
-            cleaned = []
-            stale_count = 0
-            for raw in exams_taken:
-                eid = str(raw or '').strip()
-                if not eid:
-                    stale_count += 1
-                    continue
-                if eid not in exam_ids:
-                    stale_count += 1
-                    continue
-                if eid in seen:
-                    continue
-                seen.add(eid)
-                cleaned.append(eid)
-
-            if cleaned != exams_taken:
-                updates.append((
-                    user_doc.reference,
-                    {
-                        'exams_taken': cleaned,
-                        'exams_taken_cleaned_at': datetime.utcnow().isoformat()
-                    }
-                ))
-                users_updated += 1
-                stale_removed_total += stale_count
-
-        if updates:
-            _commit_updates_in_batches(db, updates)
-
-        actor_name = _resolve_user_display_name(acting_uid) or acting_uid[:16]
-        append_system_log(
-            f'{actor_name} cleaned stale exam references in student records '
-            f'({users_updated} user(s) updated, {stale_removed_total} stale id(s) removed).',
-            event_type='admin.users.cleanup_exams_taken',
-            user_id=acting_uid,
-            meta={
-                'users_checked': users_checked,
-                'users_updated': users_updated,
-                'stale_removed': stale_removed_total
-            }
-        )
-
-        cleaned_at_utc = datetime.utcnow().isoformat()
-        return jsonify({
-            'success': True,
-            'users_checked': users_checked,
-            'users_updated': users_updated,
-            'stale_removed': stale_removed_total,
-            'cleaned_at_utc': cleaned_at_utc,
-            'message': (
-                f'Cleanup complete: {users_updated} user(s) updated, '
-                f'{stale_removed_total} stale exam reference(s) removed.'
-            )
-        }), 200
-    except Exception as e:
-        print(f'Error during cleanup_exams_taken_stale_ids: {e}')
-        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/archive_reports', methods=['POST'])
@@ -2523,28 +2258,20 @@ def cleanup_old_reports():
         print(f'Error during cleanup: {e}')
 
 
-# Initialize scheduler only when explicitly enabled.
-# This avoids N schedulers running across multiple Gunicorn workers.
-SCHEDULER_ENABLED = str(os.environ.get('ENABLE_SCHEDULER', '')).lower() in ('1', 'true', 'yes')
-scheduler = None
-if SCHEDULER_ENABLED:
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(
-        func=cleanup_old_reports,
-        trigger=CronTrigger(hour=2, minute=0),  # Run daily at 2 AM
-        id='cleanup_old_reports',
-        name='Clean up old proctoring reports',
-        replace_existing=True
-    )
-    scheduler.start()
-    print('Background scheduler enabled')
-else:
-    print('Background scheduler disabled (set ENABLE_SCHEDULER=true to enable)')
+# Initialize scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    func=cleanup_old_reports,
+    trigger=CronTrigger(hour=2, minute=0),  # Run daily at 2 AM
+    id='cleanup_old_reports',
+    name='Clean up old proctoring reports',
+    replace_existing=True
+)
+scheduler.start()
 
 # Ensure scheduler shuts down gracefully
 import atexit
-if scheduler is not None:
-    atexit.register(lambda: scheduler.shutdown())
+atexit.register(lambda: scheduler.shutdown())
 
 
 if __name__ == '__main__':
