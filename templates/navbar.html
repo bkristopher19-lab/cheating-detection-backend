@@ -1,6 +1,6 @@
 <!-- Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-proctor border-bottom">
-            <div class="container-fluid">
+        <nav class="navbar navbar-expand-lg navbar-proctor border-bottom dashboard-topbar">
+            <div class="container-fluid dashboard-topbar-inner">
                 <button class="btn btn-link d-lg-none" id="menu-toggle">
                     <i class='bx bx-menu fs-4'></i>
                 </button>
@@ -61,21 +61,21 @@
                 </div>
 
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                    <ul class="navbar-nav ms-auto">
+                    <ul class="navbar-nav ms-auto align-items-center gap-2">
                         <li class="nav-item me-2 d-none" id="installNavItem">
-                            <button class="btn btn-outline-primary btn-sm" id="installBtn" type="button" title="Install app (Chrome or Microsoft Edge)">
+                            <button class="btn btn-outline-primary btn-sm top-action-btn" id="installBtn" type="button" title="Install app (Chrome or Microsoft Edge)">
                                 <i class='bx bx-download'></i> Install App
                             </button>
                         </li>
                         {% if show_dashboard_user_guide %}
-                        <li class="nav-item me-2 d-flex align-items-center">
-                            <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#proctorDashboardUserGuideModal" title="Open user guide">
+                        <li class="nav-item d-flex align-items-center">
+                            <button type="button" class="btn btn-outline-light btn-sm top-action-btn" data-bs-toggle="modal" data-bs-target="#proctorDashboardUserGuideModal" title="Open user guide">
                                 <i class='bx bx-book-open'></i> User Guide
                             </button>
                         </li>
                         {% elif show_admin_dashboard_user_guide %}
-                        <li class="nav-item me-2 d-flex align-items-center">
-                            <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#adminDashboardUserGuideModal" title="Open admin user guide">
+                        <li class="nav-item d-flex align-items-center">
+                            <button type="button" class="btn btn-outline-light btn-sm top-action-btn" data-bs-toggle="modal" data-bs-target="#adminDashboardUserGuideModal" title="Open admin user guide">
                                 <i class='bx bx-book-open'></i> User Guide
                             </button>
                         </li>
@@ -86,8 +86,9 @@
                             </button>
                         </li>
                         <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
                                 <i class='bx bxs-user'></i>
+                                <span class="role-pill" id="roleBadge">User</span>
                                 <span id="userName">User</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
@@ -110,9 +111,23 @@
         </nav>
 
     <style>
-        .navbar-proctor {
-            background: linear-gradient(135deg, #0d1f0d 0%, #1a3d1a 100%) !important;
+        * { box-sizing: border-box; }
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+        .dashboard-topbar {
+            min-height: 72px;
+            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%) !important;
             border-bottom: 1px solid rgba(0, 200, 83, 0.2) !important;
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
+        }
+        .dashboard-topbar-inner {
+            padding-left: 24px;
+            padding-right: 24px;
+        }
+        .navbar-proctor {
+            background: transparent !important;
         }
         .navbar-proctor .navbar-brand {
             font-weight: 700;
@@ -126,6 +141,56 @@
         }
         .navbar-proctor .dropdown-item:hover { background: rgba(0, 200, 83, 0.1); }
         .navbar-brand { font-weight: 600; }
+        .top-action-btn {
+            min-height: 38px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.45rem 0.85rem;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .top-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+        }
+        .role-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 72px;
+            min-height: 24px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            background: rgba(105, 240, 174, 0.2);
+            color: #d9ffe9;
+            border: 1px solid rgba(105, 240, 174, 0.35);
+        }
+        @media (max-width: 768px) {
+            .dashboard-topbar {
+                min-height: 64px;
+            }
+            .dashboard-topbar-inner {
+                padding-left: 12px;
+                padding-right: 12px;
+            }
+            .top-action-btn {
+                min-height: 34px;
+                font-size: 0.8rem;
+                padding: 0.35rem 0.7rem;
+            }
+            #navbarDropdown #userName {
+                max-width: 96px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                display: inline-block;
+                vertical-align: bottom;
+            }
+        }
 
         .back-btn-mobile {
             color: #6c757d;
@@ -222,7 +287,7 @@
 
         body.dark-mode .navbar,
         body.dark-mode .navbar-proctor {
-            background: #1e1e1e !important;
+            background: transparent !important;
             border-bottom: 1px solid #333 !important;
         }
 
@@ -562,7 +627,12 @@ async function loadUserName() {
     try {
         const response = await fetch(`/select?collection=users&id=${userId}`);
         const user = await response.json();
-        document.getElementById('userName').textContent = user.name;
+        const role = (user.role || user.type || 'user').toString().trim().toLowerCase();
+        document.getElementById('userName').textContent = user.name || 'User';
+        const roleBadge = document.getElementById('roleBadge');
+        if (roleBadge) {
+            roleBadge.textContent = role || 'user';
+        }
     } catch (err) {
         console.error('Error loading user:', err);
     }
