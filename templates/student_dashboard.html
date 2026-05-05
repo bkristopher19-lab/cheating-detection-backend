@@ -553,6 +553,10 @@
             return `${_normToken(course)}|${_normToken(section)}`;
         }
 
+        function _normId(v) {
+            return String(v == null ? '' : v).trim();
+        }
+
         function _readBoolFlag(v) {
             if (typeof v === 'boolean') return v;
             if (typeof v === 'number') return v === 1;
@@ -636,16 +640,26 @@
             const exams = studentClassId
                 ? (allExams || []).filter((exam) => {
                     if (!_isExamPublished(exam)) return false;
-                    const classIdMatch = String(exam.class_id || '') === String(studentClassId);
+                    const classIdMatch = _normId(exam.class_id) === _normId(studentClassId);
                     if (classIdMatch) return true;
 
-                    // Fallback matching if some exam docs have section strings instead of class_id.
+                    // Fallback A: use class document referenced by exam.class_id
+                    const examClass = classMap[_normId(exam.class_id)] || null;
+                    const examClassSectionKey = examClass
+                        ? _normSectionKey(examClass.course, examClass.section)
+                        : '';
+
+                    // Fallback B: match direct section/course fields in exam doc
                     const examSectionKey = _normSectionKey(
                         exam.course || exam.class_course || exam.section_course || '',
                         exam.section || exam.class_section || exam.section_name || ''
                     );
-                    const sectionMatch = !!studentSectionKey && !!examSectionKey && examSectionKey === studentSectionKey;
-                    return sectionMatch;
+
+                    const sectionMatch = !!studentSectionKey && (
+                        (examClassSectionKey && examClassSectionKey === studentSectionKey) ||
+                        (examSectionKey && examSectionKey === studentSectionKey)
+                    );
+                    return !!sectionMatch;
                 })
                 : []; // If student has no class_id, show no exams
 
@@ -662,17 +676,26 @@
                 });
                 (allExams || []).forEach((exam) => {
                     const examSectionRaw = `${exam.course || exam.class_course || exam.section_course || ''} - ${exam.section || exam.class_section || exam.section_name || ''}`;
+                    const examClass = classMap[_normId(exam.class_id)] || null;
+                    const examClassSectionKey = examClass
+                        ? _normSectionKey(examClass.course, examClass.section)
+                        : '';
                     const examSectionKey = _normSectionKey(
                         exam.course || exam.class_course || exam.section_course || '',
                         exam.section || exam.class_section || exam.section_name || ''
                     );
-                    const classIdMatch = String(exam.class_id || '') === String(studentClassId || '');
-                    const sectionMatch = !!studentSectionKey && !!examSectionKey && examSectionKey === studentSectionKey;
+                    const classIdMatch = _normId(exam.class_id) === _normId(studentClassId || '');
+                    const sectionMatch = !!studentSectionKey && (
+                        (examClassSectionKey && examClassSectionKey === studentSectionKey) ||
+                        (examSectionKey && examSectionKey === studentSectionKey)
+                    );
                     console.log('[StudentDashboard] Exam match check', {
                         examId: exam.id,
                         title: exam.title,
                         published: _isExamPublished(exam),
                         examClassId: exam.class_id || null,
+                        examClassSection: examClass ? `${examClass.course || ''} - ${examClass.section || ''}` : 'N/A',
+                        examClassSectionKey,
                         classIdMatch,
                         examSection: examSectionRaw,
                         examSectionKey,
