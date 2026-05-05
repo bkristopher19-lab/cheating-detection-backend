@@ -769,13 +769,14 @@
         }
 
         function resolveLogWhoProctor(r, usersById) {
-            let n = r.actor_name != null ? String(r.actor_name).trim() : '';
+            let n = r.user_name != null ? String(r.user_name).trim() : '';
+            if (!n || n.toLowerCase() === 'unknown user') {
+                n = r.actor_name != null ? String(r.actor_name).trim() : '';
+            }
             const uid = r.user_id != null ? String(r.user_id) : '';
             if (!n && uid && usersById && usersById[uid])
                 n = (usersById[uid].name || usersById[uid].email || '').trim();
-            if (!n && uid)
-                return _escapeHtmlLog('User (' + uid.slice(0, 10) + '…)');
-            return n ? _escapeHtmlLog(n) : '—';
+            return n ? _escapeHtmlLog(n) : 'Unknown User';
         }
 
         let __procUiLogTimers = {};
