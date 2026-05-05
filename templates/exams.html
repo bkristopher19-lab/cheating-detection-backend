@@ -18,6 +18,18 @@
         .card { border-radius: 16px; border: 1px solid rgba(0,200,83,0.15); box-shadow: 0 4px 20px rgba(0,200,83,0.08); }
         .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 10px !important; }
         .list-group-item { border-radius: 8px !important; margin: 0.2rem 0; }
+        /* Hide DataTables sort arrows (keep header text only) */
+        #examsTable.dataTable thead .sorting::before,
+        #examsTable.dataTable thead .sorting::after,
+        #examsTable.dataTable thead .sorting_asc::before,
+        #examsTable.dataTable thead .sorting_asc::after,
+        #examsTable.dataTable thead .sorting_desc::before,
+        #examsTable.dataTable thead .sorting_desc::after {
+            display: none !important;
+        }
+        #examsTable.dataTable thead th {
+            padding-right: 10px !important;
+        }
         /* Keep table semantics intact on desktop/tablet */
         table, .table {
             display: table;
