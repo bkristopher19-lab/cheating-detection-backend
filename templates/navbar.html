@@ -1,13 +1,13 @@
 <!-- Navbar -->
         <nav class="navbar navbar-expand-lg navbar-proctor border-bottom">
-            <div class="container-fluid dashboard-header-shell">
+            <div class="container-fluid">
                 <button class="btn btn-link d-lg-none" id="menu-toggle">
                     <i class='bx bx-menu fs-4'></i>
                 </button>
 
-                <a class="navbar-brand dashboard-header-left" href="#">Online Proctoring System</a>
+                <a class="navbar-brand" href="#">Online Proctoring System</a>
 
-                <button class="navbar-toggler d-none d-lg-block" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
+                <button class="navbar-toggler d-lg-block" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent">
                     <span class="navbar-toggler-icon"></span>
                 </button>
 
@@ -61,42 +61,41 @@
                 </div>
 
                 <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                    <ul class="navbar-nav ms-auto dashboard-header-right">
+                    <ul class="navbar-nav ms-auto">
+                        <li class="nav-item me-2 d-none" id="installNavItem">
+                            <button class="btn btn-outline-primary btn-sm" id="installBtn" type="button" title="Install app (Chrome or Microsoft Edge)">
+                                <i class='bx bx-download'></i> Install App
+                            </button>
+                        </li>
                         {% if show_dashboard_user_guide %}
-                        <li class="nav-item d-flex align-items-center">
+                        <li class="nav-item me-2 d-flex align-items-center">
                             <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#proctorDashboardUserGuideModal" title="Open user guide">
                                 <i class='bx bx-book-open'></i> User Guide
                             </button>
                         </li>
                         {% elif show_admin_dashboard_user_guide %}
-                        <li class="nav-item d-flex align-items-center">
+                        <li class="nav-item me-2 d-flex align-items-center">
                             <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#adminDashboardUserGuideModal" title="Open admin user guide">
                                 <i class='bx bx-book-open'></i> User Guide
                             </button>
                         </li>
-                        {% elif show_student_dashboard_user_guide %}
-                        <li class="nav-item d-flex align-items-center">
-                            <button type="button" class="btn btn-outline-light btn-sm" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal" title="Open student user guide">
-                                <i class='bx bx-book-open'></i> User Guide
-                            </button>
-                        </li>
                         {% endif %}
-                        <li class="nav-item d-flex align-items-center">
-                            <a class="btn btn-outline-light btn-sm" href="/profile" id="headerProfileBtn">
-                                <i class='bx bxs-user'></i>
-                                <span id="userName">Profile</span>
-                            </a>
+                        <li class="nav-item">
+                            <button class="btn btn-link nav-link" id="darkModeToggle" title="Toggle Dark Mode">
+                                <i class='bx bx-moon'></i>
+                            </button>
                         </li>
                         <li class="nav-item dropdown">
-                            <button class="btn btn-link nav-link dropdown-toggle" type="button" id="navbarDropdown" data-bs-toggle="dropdown" aria-label="Open menu">
-                                <i class='bx bx-menu'></i>
-                            </button>
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class='bx bxs-user'></i>
+                                <span id="userName">User</span>
+                            </a>
                             <ul class="dropdown-menu dropdown-menu-end">
-                                {% if show_student_dashboard_user_guide %}
-                                <li><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal"><i class='bx bx-book-open'></i> User Guide</button></li>
-                                <li><hr class="dropdown-divider"></li>
-                                {% endif %}
-                                <li><button class="dropdown-item" id="darkModeToggle"><i class='bx bx-moon'></i> Toggle Dark Mode</button></li>
+                                <li>
+                                    <a class="dropdown-item" href="/profile">
+                                        <i class='bx bxs-user-detail'></i> Profile
+                                    </a>
+                                </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <a class="dropdown-item" href="#" id="logoutBtn">
@@ -127,65 +126,6 @@
         }
         .navbar-proctor .dropdown-item:hover { background: rgba(0, 200, 83, 0.1); }
         .navbar-brand { font-weight: 600; }
-        .dashboard-header-shell {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            min-height: 56px;
-            padding-top: 0.35rem;
-            padding-bottom: 0.35rem;
-            max-width: 100%;
-        }
-        .dashboard-header-left {
-            font-size: 1.05rem;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            margin: 0;
-            line-height: 1;
-            max-width: 60vw;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .dashboard-header-right {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .dashboard-header-right > * {
-            margin: 0 !important;
-        }
-        .dashboard-header-right .btn,
-        .dashboard-header-right .nav-link,
-        .dashboard-header-right button,
-        .dashboard-header-right .dropdown-toggle {
-            height: 40px;
-            min-height: 40px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 14px;
-            font-size: 14px;
-            border-radius: 6px;
-            line-height: 1;
-        }
-        .dashboard-header-right button i,
-        .dashboard-header-right .btn i,
-        .dashboard-header-right .nav-link i {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-        }
-        .dashboard-header-right .dropdown-toggle {
-            gap: 0.35rem;
-            width: 40px;
-            padding: 0;
-        }
-        .navbar-proctor,
-        .navbar-proctor * {
-            box-sizing: border-box;
-        }
 
         .back-btn-mobile {
             color: #6c757d;
@@ -470,7 +410,7 @@
             position: absolute;
             top: 0;
             left: 0;
-            width: min(280px, 82vw);
+            width: 280px;
             height: 100%;
             background: #ffffff;
             box-shadow: 2px 0 10px rgba(0,0,0,0.1);
@@ -543,352 +483,9 @@
             margin-top: 0.5rem;
             padding-top: 0.5rem;
         }
-
-        /* DataTables sort icons: clean active-only indicators */
-        table.dataTable {
-            display: table;
-            width: 100% !important;
-            border-collapse: collapse;
-        }
-        table.dataTable thead { display: table-header-group; }
-        table.dataTable tbody { display: table-row-group; }
-        table.dataTable thead tr,
-        table.dataTable tbody tr { display: table-row; }
-        table.dataTable thead th,
-        table.dataTable thead td,
-        table.dataTable tbody td {
-            display: table-cell;
-            vertical-align: middle;
-        }
-
-        table.dataTable thead th.sorting,
-        table.dataTable thead th.sorting_asc,
-        table.dataTable thead th.sorting_desc,
-        table.dataTable thead td.sorting,
-        table.dataTable thead td.sorting_asc,
-        table.dataTable thead td.sorting_desc {
-            background-image: none !important;
-            position: relative;
-            padding-right: 1.1rem !important;
-            white-space: nowrap;
-        }
-
-        table.dataTable thead th.sorting:before,
-        table.dataTable thead th.sorting:after,
-        table.dataTable thead th.sorting_asc:before,
-        table.dataTable thead th.sorting_asc:after,
-        table.dataTable thead th.sorting_desc:before,
-        table.dataTable thead th.sorting_desc:after,
-        table.dataTable thead td.sorting:before,
-        table.dataTable thead td.sorting:after,
-        table.dataTable thead td.sorting_asc:before,
-        table.dataTable thead td.sorting_asc:after,
-        table.dataTable thead td.sorting_desc:before,
-        table.dataTable thead td.sorting_desc:after {
-            display: none !important;
-            content: none !important;
-        }
-
-        /* Show indicator only for active sorted columns */
-        table.dataTable thead th.sorting_asc::after,
-        table.dataTable thead td.sorting_asc::after {
-            content: '↑';
-            position: absolute;
-            right: 0.35rem;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 12px;
-            font-weight: 700;
-            opacity: 1;
-        }
-
-        table.dataTable thead th.sorting_desc::after,
-        table.dataTable thead td.sorting_desc::after {
-            content: '↓';
-            position: absolute;
-            right: 0.35rem;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 12px;
-            font-weight: 700;
-            opacity: 1;
-        }
-
-        @media (max-width: 768px) {
-            .dashboard-header-shell {
-                padding-left: 0.65rem;
-                padding-right: 0.65rem;
-            }
-
-            .dashboard-header-left {
-                font-size: 0.95rem;
-                max-width: calc(100vw - 130px);
-            }
-
-            .dashboard-header-right {
-                width: 100%;
-                margin-top: 0.5rem;
-                gap: 0.25rem;
-            }
-            .dashboard-header-right .btn,
-            .dashboard-header-right .nav-link,
-            .dashboard-header-right button,
-            .dashboard-header-right .dropdown-toggle {
-                height: 38px;
-                min-height: 38px;
-            }
-
-            .navbar-proctor .dropdown-menu {
-                width: 100%;
-                max-width: 100%;
-            }
-        }
     </style>
 
 <script>
-if (!window.__sessionGuardInitialized) {
-    window.__sessionGuardInitialized = true;
-    window.__authReady = false;
-    window.__sessionExpiryRedirectTimer = null;
-    window.__sessionReconnectTimer = null;
-
-    function sleep(ms) {
-        return new Promise((resolve) => setTimeout(resolve, ms));
-    }
-
-    function isSameOriginApiRequest(input) {
-        try {
-            const reqUrl = typeof input === 'string' ? input : (input && input.url ? input.url : '');
-            if (!reqUrl) return true;
-            const urlObj = new URL(reqUrl, window.location.origin);
-            if (urlObj.origin !== window.location.origin) return false;
-            return !urlObj.pathname.startsWith('/static/');
-        } catch (_) {
-            return true;
-        }
-    }
-
-    function getInputUrl(input) {
-        if (typeof input === 'string') return input;
-        if (input && input.url) return input.url;
-        return '';
-    }
-
-    function getPathForInput(input) {
-        try {
-            const raw = getInputUrl(input);
-            const parsed = new URL(raw || window.location.href, window.location.origin);
-            return parsed.pathname || '/';
-        } catch (_) {
-            return '/';
-        }
-    }
-
-    function isPublicAuthPath(pathname) {
-        return pathname === '/' ||
-            pathname === '/login' ||
-            pathname === '/send_otp' ||
-            pathname === '/verify_otp' ||
-            pathname === '/register';
-    }
-
-    async function waitForAuthBootstrap() {
-        if (!window.__authBootstrap) {
-            window.__authReady = true;
-            return { user: null, timedOut: true };
-        }
-        const timeoutMs = 3500;
-        const result = await Promise.race([
-            window.__authBootstrap,
-            new Promise((resolve) => setTimeout(() => resolve({ user: null, timedOut: true }), timeoutMs))
-        ]);
-        window.__authReady = true;
-        return result;
-    }
-
-    async function getAuthTokenForRequest(forceRefresh) {
-        const cachedToken = localStorage.getItem('authToken') || '';
-        if (!forceRefresh && cachedToken) return cachedToken;
-        try {
-            const authState = await waitForAuthBootstrap();
-            if (!authState || !authState.user) {
-                console.warn('[SESSION GUARD] No Firebase user after auth bootstrap wait');
-                return cachedToken || '';
-            }
-            if (typeof window.__getFreshFirebaseToken === 'function') {
-                const freshToken = await window.__getFreshFirebaseToken();
-                return freshToken || cachedToken || '';
-            }
-            return cachedToken || '';
-        } catch (err) {
-            console.warn('[SESSION GUARD] Token refresh failed:', err);
-            return cachedToken || '';
-        }
-    }
-
-    async function withAuthHeaders(input, options, forceRefresh) {
-        const nextOptions = { ...(options || {}) };
-        if (!isSameOriginApiRequest(input)) return nextOptions;
-        const path = getPathForInput(input);
-        if (isPublicAuthPath(path)) return nextOptions;
-        const token = await getAuthTokenForRequest(forceRefresh);
-        if (!window.__authReady) {
-            nextOptions.__authPending = true;
-        }
-        nextOptions.__authMissing = !token;
-        const headers = new Headers(nextOptions.headers || {});
-        if (token) {
-            headers.set('Authorization', `Bearer ${token}`);
-        }
-        nextOptions.headers = headers;
-        const urlForLog = getInputUrl(input);
-        console.log('[SESSION GUARD] Request auth header set:', {
-            url: urlForLog || '(request)',
-            hasToken: Boolean(token),
-            hasAuthorizationHeader: headers.has('Authorization')
-        });
-        return nextOptions;
-    }
-
-    window.__notifySessionExpired = function __notifySessionExpired(message) {
-        const msg = message || 'Session expired, please login again';
-        let banner = document.getElementById('sessionExpiredBanner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'sessionExpiredBanner';
-            banner.style.position = 'fixed';
-            banner.style.top = '12px';
-            banner.style.right = '12px';
-            banner.style.zIndex = '9999';
-            banner.style.maxWidth = '420px';
-            banner.className = 'alert alert-warning shadow';
-            document.body.appendChild(banner);
-        }
-        banner.textContent = `${msg}. Redirecting to login...`;
-        if (window.__sessionExpiryRedirectTimer) clearTimeout(window.__sessionExpiryRedirectTimer);
-        window.__sessionExpiryRedirectTimer = setTimeout(() => {
-            window.location.replace('/');
-        }, 3000);
-    };
-
-    window.__showReconnecting = function __showReconnecting() {
-        let banner = document.getElementById('sessionExpiredBanner');
-        if (!banner) {
-            banner = document.createElement('div');
-            banner.id = 'sessionExpiredBanner';
-            banner.style.position = 'fixed';
-            banner.style.top = '12px';
-            banner.style.right = '12px';
-            banner.style.zIndex = '9999';
-            banner.style.maxWidth = '420px';
-            banner.className = 'alert alert-info shadow';
-            document.body.appendChild(banner);
-        } else {
-            banner.className = 'alert alert-info shadow';
-        }
-        banner.textContent = 'Reconnecting...';
-    };
-
-    window.__refreshSessionAndRetry = async function __refreshSessionAndRetry() {
-        const token = await getAuthTokenForRequest(true);
-        return Boolean(token);
-    };
-
-    const nativeFetch = window.fetch.bind(window);
-    window.fetch = async function guardedFetch(input, init) {
-        const options = init || {};
-        const skipGuard = Boolean(options.__skipSessionGuard);
-        const alreadyRetried = Boolean(options.__sessionRetried);
-        const path = getPathForInput(input);
-        const safeOptions = { ...options };
-        delete safeOptions.__skipSessionGuard;
-        delete safeOptions.__sessionRetried;
-
-        const firstAttemptOptions = await withAuthHeaders(input, safeOptions, false);
-        if (firstAttemptOptions.__authPending || firstAttemptOptions.__authMissing) {
-            console.warn('[SESSION GUARD] Skipping protected request: Firebase auth not ready', {
-                url: getInputUrl(input),
-                path,
-                authReady: Boolean(window.__authReady)
-            });
-            return new Response(JSON.stringify({ error: 'auth_not_ready' }), {
-                status: 499,
-                headers: { 'Content-Type': 'application/json' }
-            });
-        }
-        delete firstAttemptOptions.__authMissing;
-        delete firstAttemptOptions.__authPending;
-        const response = await nativeFetch(input, firstAttemptOptions);
-        if (response.status === 499) {
-            return response;
-        }
-        if (skipGuard || response.status !== 401) {
-            return response;
-        }
-
-        window.__showReconnecting();
-        console.warn('[SESSION GUARD] 401 response detected:', {
-            url: getInputUrl(input),
-            status: response.status,
-            alreadyRetried
-        });
-
-        const canRetry = !alreadyRetried && await window.__refreshSessionAndRetry();
-        if (canRetry) {
-            const retryOptions = await withAuthHeaders(input, safeOptions, true);
-            if (retryOptions.__authMissing) {
-                console.warn('[SESSION GUARD] Retry skipped: token still missing after refresh', {
-                    url: getInputUrl(input),
-                    path
-                });
-                return response;
-            }
-            delete retryOptions.__authMissing;
-            delete retryOptions.__authPending;
-            const retriedResponse = await nativeFetch(input, retryOptions);
-            if (retriedResponse.status !== 401) return retriedResponse;
-            console.warn('[SESSION GUARD] Retry still returned 401:', {
-                url: getInputUrl(input),
-                status: retriedResponse.status
-            });
-            if (isPublicAuthPath(path)) return retriedResponse;
-            if (!window.__authReady) return retriedResponse;
-            if (window.__sessionReconnectTimer) clearTimeout(window.__sessionReconnectTimer);
-            await sleep(1200);
-            window.__sessionReconnectTimer = setTimeout(() => {
-                sessionStorage.removeItem('user');
-                sessionStorage.removeItem('userId');
-                sessionStorage.removeItem('authUid');
-                sessionStorage.removeItem('authEmail');
-                localStorage.removeItem('authToken');
-                window.__notifySessionExpired('Session expired, please login again');
-            }, 200);
-            return retriedResponse;
-        }
-
-        if (isPublicAuthPath(path)) return response;
-        if (!window.__authReady) return response;
-        await sleep(1200);
-        sessionStorage.removeItem('user');
-        sessionStorage.removeItem('userId');
-        sessionStorage.removeItem('authUid');
-        sessionStorage.removeItem('authEmail');
-        localStorage.removeItem('authToken');
-        window.__notifySessionExpired('Session expired, please login again');
-        return response;
-    };
-
-    if (window.__authBootstrap && typeof window.__authBootstrap.then === 'function') {
-        window.__authBootstrap.then(() => {
-            window.__authReady = true;
-        }).catch(() => {
-            window.__authReady = true;
-        });
-    } else {
-        window.__authReady = true;
-    }
-}
-
 // Menu toggle functionality
 document.getElementById('menu-toggle').addEventListener('click', function() {
     // Check if mobile (screen width <= 768px)
@@ -956,40 +553,16 @@ if ('serviceWorker' in navigator) {
 
 // Load user name when navbar loads
 async function loadUserName() {
-    let userId = sessionStorage.getItem('userId');
+    const userId = sessionStorage.getItem('userId');
     if (!userId) {
-        const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
-        const user = authState && authState.user ? authState.user : null;
-        const uid = user ? user.uid : (sessionStorage.getItem('authUid') || localStorage.getItem('authUid') || '');
-        const email = user ? user.email : (sessionStorage.getItem('authEmail') || localStorage.getItem('authEmail') || '');
-        if (uid || email) {
-            try {
-                const qs = new URLSearchParams();
-                if (uid) qs.set('uid', uid);
-                if (email) qs.set('email', email);
-                const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
-                if (profileRes.ok) {
-                    const profile = await profileRes.json();
-                    userId = profile.id || '';
-                    sessionStorage.setItem('userId', userId);
-                    sessionStorage.setItem('user', JSON.stringify(profile));
-                    if (uid) sessionStorage.setItem('authUid', uid);
-                    if (email) sessionStorage.setItem('authEmail', email);
-                    if (uid) localStorage.setItem('authUid', uid);
-                    if (email) localStorage.setItem('authEmail', email);
-                }
-            } catch (_) {
-                // Page-level auth handlers decide redirect on failure.
-            }
-        }
+        window.location.href = '/';
+        return;
     }
-    if (!userId) return;
 
     try {
         const response = await fetch(`/select?collection=users&id=${userId}`);
-        if (!response.ok) return;
         const user = await response.json();
-        document.getElementById('userName').textContent = user.name || 'Profile';
+        document.getElementById('userName').textContent = user.name;
     } catch (err) {
         console.error('Error loading user:', err);
     }
@@ -1021,14 +594,8 @@ async function performLogout() {
         if (response.ok) {
             // Clear session storage
             sessionStorage.removeItem('userId');
-            sessionStorage.removeItem('user');
-            sessionStorage.removeItem('authUid');
-            sessionStorage.removeItem('authEmail');
             sessionStorage.removeItem('logged_admin_dash_open_v1');
             sessionStorage.removeItem('logged_proctor_dash_open_v1');
-            localStorage.removeItem('authUid');
-            localStorage.removeItem('authEmail');
-            localStorage.removeItem('authToken');
             // Redirect to login page
             window.location.href = '/';
         } else {
