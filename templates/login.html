@@ -199,7 +199,8 @@ import {
   getAuth, 
   signInWithEmailAndPassword, 
   sendPasswordResetEmail,
-  onAuthStateChanged
+  onAuthStateChanged,
+  getIdToken
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -271,6 +272,12 @@ const authInitPromise = new Promise((resolve) => {
 
 authInitPromise.then(() => {
     if (auth.currentUser) {
+        const currentUser = auth.currentUser;
+        if (currentUser.uid) localStorage.setItem('authUid', currentUser.uid);
+        if (currentUser.email) localStorage.setItem('authEmail', currentUser.email);
+        getIdToken(currentUser).then((token) => {
+            if (token) localStorage.setItem('authToken', token);
+        }).catch(() => {});
         console.log('[LOGIN FLOW] Existing session detected; redirecting to dashboard');
         window.location.replace('/dashboard');
     }
@@ -328,6 +335,14 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
         // Store lightweight auth context only; role/profile fetch is moved to dashboard init.
         sessionStorage.setItem('authUid', firebaseUser.uid);
         sessionStorage.setItem('authEmail', firebaseUser.email || email);
+        localStorage.setItem('authUid', firebaseUser.uid);
+        localStorage.setItem('authEmail', firebaseUser.email || email);
+        try {
+            const freshToken = await getIdToken(firebaseUser);
+            if (freshToken) localStorage.setItem('authToken', freshToken);
+        } catch (_) {
+            // Non-fatal; dashboard bootstrap can still restore with uid/email.
+        }
         flowLog('Auth context saved to sessionStorage', startedAt);
 
         // Immediate redirect after login (equivalent to navigate('/dashboard'))
