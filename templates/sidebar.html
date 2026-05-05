@@ -9,17 +9,10 @@
             width: var(--sidebar-width);
             height: 100vh;
             position: fixed;
-            top: 0;
-            left: 0;
             background: linear-gradient(180deg, #0d1f0d 0%, #1a3d1a 100%);
             border-right: 1px solid rgba(0, 200, 83, 0.2);
             transition: all 0.3s;
             box-shadow: 2px 0 20px rgba(0,0,0,0.1);
-            z-index: 1035;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding-top: max(0px, env(safe-area-inset-top));
-            padding-bottom: max(0px, env(safe-area-inset-bottom));
         }
         
         .sidebar .nav-link {
@@ -42,39 +35,6 @@
             margin-left: 0;
         }
 
-        .sidebar-toggle-btn {
-            position: fixed;
-            top: max(10px, env(safe-area-inset-top));
-            left: 10px;
-            z-index: 1045;
-            border: 1px solid rgba(0, 200, 83, 0.3);
-            background: rgba(13, 31, 13, 0.95);
-            color: #e9fff1;
-            border-radius: 10px;
-            width: 42px;
-            height: 42px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-        }
-
-        .sidebar-backdrop {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.35);
-            z-index: 1030;
-            display: none;
-        }
-
-        .sidebar-open .sidebar {
-            margin-left: 0 !important;
-        }
-
-        .sidebar-open .sidebar-backdrop {
-            display: block;
-        }
-
 
 
         @media (max-width: 768px) {
@@ -85,55 +45,8 @@
             .main-content {
                 margin-left: 0;
             }
-
-            .sidebar-toggle-btn {
-                display: inline-flex;
-            }
-        }
-
-        @media (min-width: 768px) and (max-width: 1024px) {
-            :root {
-                --sidebar-width: 220px;
-            }
-
-            .sidebar .d-flex {
-                padding: 0.75rem !important;
-            }
-
-            .sidebar .fs-4 {
-                font-size: 1.1rem !important;
-            }
-
-            .sidebar .nav-link {
-                margin: 0.12rem 0.35rem;
-                padding: 0.48rem 0.6rem;
-                font-size: 0.92rem;
-            }
-
-            .main-content {
-                margin-left: var(--sidebar-width);
-                width: calc(100% - var(--sidebar-width));
-            }
-
-            .sidebar-toggle-btn {
-                display: inline-flex;
-            }
-
-            body:not(.sidebar-open) .sidebar {
-                margin-left: calc(-1 * var(--sidebar-width));
-            }
-
-            body:not(.sidebar-open) .main-content {
-                margin-left: 0;
-                width: 100%;
-            }
         }
     </style>
-
-    <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="Toggle navigation" aria-expanded="false">
-        <i class='bx bx-menu fs-5'></i>
-    </button>
-    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     
     <div class="sidebar" id="sidebar">
     <div class="d-flex flex-column flex-shrink-0 p-3">
@@ -236,47 +149,5 @@
         } catch (err) {
             console.error('Sidebar visibility error', err);
         }
-    })();
-
-    (function initSidebarToggle(){
-        const sidebar = document.getElementById('sidebar');
-        const toggleBtn = document.getElementById('sidebarToggleBtn');
-        const backdrop = document.getElementById('sidebarBackdrop');
-        if (!sidebar || !toggleBtn || !backdrop) return;
-
-        const shouldUseOverlay = () => window.matchMedia('(max-width: 1024px)').matches;
-
-        const setOpenState = (open) => {
-            if (!shouldUseOverlay()) {
-                document.body.classList.remove('sidebar-open');
-                toggleBtn.setAttribute('aria-expanded', 'false');
-                return;
-            }
-            document.body.classList.toggle('sidebar-open', open);
-            toggleBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-        };
-
-        toggleBtn.addEventListener('click', () => {
-            const isOpen = document.body.classList.contains('sidebar-open');
-            setOpenState(!isOpen);
-        });
-
-        backdrop.addEventListener('click', () => setOpenState(false));
-
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') setOpenState(false);
-        });
-
-        sidebar.querySelectorAll('a.nav-link').forEach(link => {
-            link.addEventListener('click', () => setOpenState(false));
-        });
-
-        window.addEventListener('resize', () => {
-            if (!shouldUseOverlay()) {
-                setOpenState(false);
-            }
-        });
-
-        setOpenState(false);
     })();
 </script>
