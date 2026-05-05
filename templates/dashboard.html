@@ -19,13 +19,23 @@
             --bs-secondary: #6c757d;
         }
 
-        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; }
-        .main-content { background: #f0f7f0; }
+        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; overflow-x: hidden; }
+        .main-content { background: #f0f7f0; overflow-x: hidden; }
         .stat-card {
             border-radius: 16px;
             transition: transform 0.2s;
             border: 1px solid rgba(0,200,83,0.15);
             box-shadow: 0 4px 20px rgba(0,200,83,0.08);
+        }
+        .card {
+            border-radius: 16px;
+            border: 1px solid rgba(0,200,83,0.12);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0, 200, 83, 0.14);
         }
         .stat-card:hover {
             transform: translateY(-5px);
@@ -45,6 +55,13 @@
             padding: 8px;
             border-radius: 8px;
             margin-bottom: 8px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table {
+            width: 100%;
         }
 
         .back-btn-mobile {
@@ -66,6 +83,9 @@
         @media (max-width: 768px) {
             .container-fluid {
                 padding: 1rem !important;
+            }
+            h1.h3 {
+                font-size: 1.25rem;
             }
 
             .stat-card {
@@ -94,6 +114,7 @@
 
             .table-responsive {
                 font-size: 0.8rem;
+                overflow-x: auto;
             }
 
             .table th,
@@ -123,11 +144,20 @@
 
             .table-responsive .table {
                 margin-bottom: 0;
+                min-width: 680px;
             }
 
             /* Adjust top lists layout */
             .col-xl-6 {
                 margin-bottom: 1rem;
+            }
+            #scoresFilterArea {
+                width: 100%;
+            }
+            #scoresFilterArea .form-control,
+            #scoresFilterArea .btn {
+                max-width: 100% !important;
+                width: 100%;
             }
         }
 
