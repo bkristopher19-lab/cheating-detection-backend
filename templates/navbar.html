@@ -1,5 +1,5 @@
 <!-- Navbar -->
-        <nav class="navbar navbar-expand-lg navbar-proctor border-bottom dashboard-topbar">
+        <nav class="navbar navbar-expand-lg navbar-proctor border-bottom dashboard-topbar main-header">
             <div class="container-fluid dashboard-topbar-inner">
                 <button class="btn btn-link d-lg-none" id="menu-toggle">
                     <i class='bx bx-menu fs-4'></i>
@@ -116,10 +116,10 @@
             max-width: 100%;
             overflow-x: hidden;
         }
-        .dashboard-topbar {
+        .main-header {
             min-height: 72px;
-            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%) !important;
-            border-bottom: 1px solid rgba(0, 200, 83, 0.2) !important;
+            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%);
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
             box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
         }
         .dashboard-topbar-inner {
@@ -127,14 +127,14 @@
             padding-right: 24px;
         }
         .navbar-proctor {
-            background: transparent !important;
+            background: transparent;
         }
         .navbar-proctor .navbar-brand {
             font-weight: 700;
-            color: white !important;
+            color: #fff;
         }
         .navbar-proctor .nav-link,
-        .navbar-proctor .btn-link { color: rgba(255,255,255,0.9) !important; }
+        .navbar-proctor .btn-link { color: rgba(255,255,255,0.9); }
         .navbar-proctor .dropdown-menu {
             border-radius: 12px;
             border: 1px solid rgba(0,200,83,0.2);
@@ -170,7 +170,7 @@
             border: 1px solid rgba(105, 240, 174, 0.35);
         }
         @media (max-width: 768px) {
-            .dashboard-topbar {
+            .main-header {
                 min-height: 64px;
             }
             .dashboard-topbar-inner {
@@ -285,22 +285,21 @@
             color: #9ca3af;
         }
 
-        body.dark-mode .navbar,
-        body.dark-mode .navbar-proctor {
-            background: transparent !important;
-            border-bottom: 1px solid #333 !important;
+        body.dark-mode .main-header {
+            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%);
+            border-bottom: 1px solid #2f5536;
         }
 
-        body.dark-mode .navbar-brand {
-            color: #ffffff !important;
+        body.dark-mode .main-header .navbar-brand {
+            color: #ffffff;
         }
 
-        body.dark-mode .nav-link {
-            color: #ffffff !important;
+        body.dark-mode .main-header .nav-link {
+            color: #ffffff;
         }
 
-        body.dark-mode .nav-link:hover {
-            color: #cccccc !important;
+        body.dark-mode .main-header .nav-link:hover {
+            color: #cccccc;
         }
 
         /* Install button visibility tweaks */
