@@ -646,6 +646,69 @@
     </style>
 
 <script>
+if (!window.__sessionGuardInitialized) {
+    window.__sessionGuardInitialized = true;
+    window.__sessionExpiryRedirectTimer = null;
+
+    window.__notifySessionExpired = function __notifySessionExpired(message) {
+        const msg = message || 'Session expired, please login again';
+        let banner = document.getElementById('sessionExpiredBanner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'sessionExpiredBanner';
+            banner.style.position = 'fixed';
+            banner.style.top = '12px';
+            banner.style.right = '12px';
+            banner.style.zIndex = '9999';
+            banner.style.maxWidth = '420px';
+            banner.className = 'alert alert-warning shadow';
+            document.body.appendChild(banner);
+        }
+        banner.textContent = `${msg}. Redirecting to login...`;
+        if (window.__sessionExpiryRedirectTimer) clearTimeout(window.__sessionExpiryRedirectTimer);
+        window.__sessionExpiryRedirectTimer = setTimeout(() => {
+            window.location.replace('/');
+        }, 3000);
+    };
+
+    window.__refreshSessionAndRetry = async function __refreshSessionAndRetry() {
+        if (typeof window.__getFreshFirebaseToken === 'function') {
+            try {
+                await window.__getFreshFirebaseToken();
+                return true;
+            } catch (_) {
+                return false;
+            }
+        }
+        return false;
+    };
+
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async function guardedFetch(input, init) {
+        const options = init || {};
+        const skipGuard = Boolean(options.__skipSessionGuard);
+        const alreadyRetried = Boolean(options.__sessionRetried);
+        const response = await nativeFetch(input, options);
+        if (skipGuard || response.status !== 401) {
+            return response;
+        }
+
+        const canRetry = !alreadyRetried && await window.__refreshSessionAndRetry();
+        if (canRetry) {
+            const retryOptions = { ...options, __sessionRetried: true };
+            return nativeFetch(input, retryOptions);
+        }
+
+        sessionStorage.removeItem('user');
+        sessionStorage.removeItem('userId');
+        sessionStorage.removeItem('authUid');
+        sessionStorage.removeItem('authEmail');
+        localStorage.removeItem('authToken');
+        window.__notifySessionExpired('Session expired, please login again');
+        return response;
+    };
+}
+
 // Menu toggle functionality
 document.getElementById('menu-toggle').addEventListener('click', function() {
     // Check if mobile (screen width <= 768px)
@@ -717,8 +780,8 @@ async function loadUserName() {
     if (!userId) {
         const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
         const user = authState && authState.user ? authState.user : null;
-        const uid = user ? user.uid : (sessionStorage.getItem('authUid') || '');
-        const email = user ? user.email : (sessionStorage.getItem('authEmail') || '');
+        const uid = user ? user.uid : (sessionStorage.getItem('authUid') || localStorage.getItem('authUid') || '');
+        const email = user ? user.email : (sessionStorage.getItem('authEmail') || localStorage.getItem('authEmail') || '');
         if (uid || email) {
             try {
                 const qs = new URLSearchParams();
@@ -732,6 +795,8 @@ async function loadUserName() {
                     sessionStorage.setItem('user', JSON.stringify(profile));
                     if (uid) sessionStorage.setItem('authUid', uid);
                     if (email) sessionStorage.setItem('authEmail', email);
+                    if (uid) localStorage.setItem('authUid', uid);
+                    if (email) localStorage.setItem('authEmail', email);
                 }
             } catch (_) {
                 // Page-level auth handlers decide redirect on failure.
@@ -776,8 +841,14 @@ async function performLogout() {
         if (response.ok) {
             // Clear session storage
             sessionStorage.removeItem('userId');
+            sessionStorage.removeItem('user');
+            sessionStorage.removeItem('authUid');
+            sessionStorage.removeItem('authEmail');
             sessionStorage.removeItem('logged_admin_dash_open_v1');
             sessionStorage.removeItem('logged_proctor_dash_open_v1');
+            localStorage.removeItem('authUid');
+            localStorage.removeItem('authEmail');
+            localStorage.removeItem('authToken');
             // Redirect to login page
             window.location.href = '/';
         } else {
