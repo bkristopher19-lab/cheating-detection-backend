@@ -24,9 +24,9 @@
         body { background: var(--bg-page); overflow-x: hidden; }
 
         /* Navbar */
-        .navbar-student {
+        .main-header.navbar-student {
             min-height: 72px;
-            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%) !important;
+            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%);
             border-bottom: 1px solid rgba(0, 200, 83, 0.2);
             box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
         }
@@ -240,9 +240,9 @@
             color: #ffffff;
         }
 
-        body.dark-mode .navbar {
-            background-color: #1e1e1e !important;
-            border-bottom: 1px solid #333;
+        body.dark-mode .main-header {
+            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%);
+            border-bottom: 1px solid #2f5536;
         }
 
         body.dark-mode .navbar-brand,
@@ -342,7 +342,7 @@
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-student border-bottom">
+    <nav class="navbar navbar-expand-lg navbar-student border-bottom main-header">
         <div class="container-fluid px-4">
             <a class="navbar-brand" href="#">Online Proctoring System</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -540,6 +540,35 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let selectedExamId = null;
+        const DEBUG_EXAM_FILTER = true;
+
+        function _normToken(v) {
+            return String(v == null ? '' : v)
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .trim();
+        }
+
+        function _normSectionKey(course, section) {
+            return `${_normToken(course)}|${_normToken(section)}`;
+        }
+
+        function _isExamPublished(exam) {
+            // If a publish flag exists, require it. If absent, treat as published.
+            if (Object.prototype.hasOwnProperty.call(exam || {}, 'published')) {
+                return !!exam.published;
+            }
+            if (Object.prototype.hasOwnProperty.call(exam || {}, 'is_published')) {
+                return !!exam.is_published;
+            }
+            if (Object.prototype.hasOwnProperty.call(exam || {}, 'active')) {
+                return !!exam.active;
+            }
+            if (Object.prototype.hasOwnProperty.call(exam || {}, 'is_active')) {
+                return !!exam.is_active;
+            }
+            return true;
+        }
 
         // Load available exams (filtered by student's section)
         async function loadExams() {
@@ -580,10 +609,61 @@
                 document.getElementById('sectionDisplay').style.color = '#dc3545';
             }
 
-            // Filter exams to only show exams for student's section
-            const exams = studentClassId 
-                ? allExams.filter(exam => exam.class_id === studentClassId)
+            // Normalize student section identity for robust matching.
+            const studentClass = studentClassId ? classMap[studentClassId] : null;
+            const studentSectionKey = studentClass
+                ? _normSectionKey(studentClass.course, studentClass.section)
+                : '';
+
+            // Filter exams for student's section using class_id first, then normalized section fallback.
+            const exams = studentClassId
+                ? (allExams || []).filter((exam) => {
+                    if (!_isExamPublished(exam)) return false;
+                    const classIdMatch = String(exam.class_id || '') === String(studentClassId);
+                    if (classIdMatch) return true;
+
+                    // Fallback matching if some exam docs have section strings instead of class_id.
+                    const examSectionKey = _normSectionKey(
+                        exam.course || exam.class_course || exam.section_course || '',
+                        exam.section || exam.class_section || exam.section_name || ''
+                    );
+                    const sectionMatch = !!studentSectionKey && !!examSectionKey && examSectionKey === studentSectionKey;
+                    return sectionMatch;
+                })
                 : []; // If student has no class_id, show no exams
+
+            if (DEBUG_EXAM_FILTER) {
+                console.log('[StudentDashboard] Exam visibility debug', {
+                    userId,
+                    studentClassId: studentClassId || null,
+                    studentSection: studentClass
+                        ? `${studentClass.course || ''} - ${studentClass.section || ''}`
+                        : 'N/A',
+                    studentSectionKey,
+                    totalExams: Array.isArray(allExams) ? allExams.length : 0,
+                    visibleExams: exams.length,
+                });
+                (allExams || []).forEach((exam) => {
+                    const examSectionRaw = `${exam.course || exam.class_course || exam.section_course || ''} - ${exam.section || exam.class_section || exam.section_name || ''}`;
+                    const examSectionKey = _normSectionKey(
+                        exam.course || exam.class_course || exam.section_course || '',
+                        exam.section || exam.class_section || exam.section_name || ''
+                    );
+                    const classIdMatch = String(exam.class_id || '') === String(studentClassId || '');
+                    const sectionMatch = !!studentSectionKey && !!examSectionKey && examSectionKey === studentSectionKey;
+                    console.log('[StudentDashboard] Exam match check', {
+                        examId: exam.id,
+                        title: exam.title,
+                        published: _isExamPublished(exam),
+                        examClassId: exam.class_id || null,
+                        classIdMatch,
+                        examSection: examSectionRaw,
+                        examSectionKey,
+                        sectionMatch,
+                        visible: _isExamPublished(exam) && (classIdMatch || sectionMatch),
+                    });
+                });
+            }
 
             const examsList = document.getElementById('examsList');
             examsList.innerHTML = '';
@@ -643,7 +723,7 @@
             const now = new Date();
 
             exams.forEach(exam => {
-                // Check if user has already taken this exam
+                // Keep assigned exams visible; only mark completed if already taken.
                 const taken = user.exams_taken && user.exams_taken.includes(exam.id);
 
                 // Check deadline
@@ -974,29 +1054,37 @@
             const userId = sessionStorage.getItem('userId');
             const userResponse = await fetch('/select?collection=users&id=' + userId);
             const user = await userResponse.json();
+            const studentName = (user && user.name && String(user.name).trim()) ? String(user.name).trim() : 'Unknown User';
 
             const tbody = document.getElementById('scoresTable');
             tbody.innerHTML = '';
 
             if (user.exams_taken && user.exams_taken.length > 0) {
                 // Get proctoring sessions for violations
-                const sessionsResponse = await fetch('/select?collection=proctoring_sessions');
+                const [sessionsResponse, resultsResponse] = await Promise.all([
+                    fetch('/select?collection=proctoring_sessions'),
+                    fetch('/select?collection=exam_results')
+                ]);
                 const allSessions = await sessionsResponse.json();
+                const allResults = await resultsResponse.json();
+                const uniqueExamIds = Array.from(new Set((user.exams_taken || []).filter(Boolean)));
 
-                for (const examId of user.exams_taken) {
+                for (const examId of uniqueExamIds) {
                     try {
                         // Get exam details
                         const examResponse = await fetch(`/select?collection=exams&id=${examId}`);
                         const exam = await examResponse.json();
 
-                        // Get exam results to calculate score
-                        const resultsResponse = await fetch('/select?collection=exam_results');
-                        const allResults = await resultsResponse.json();
-
-                        // Find the result for this user and exam
-                        const userResult = allResults.find(result =>
-                            result.user_id === userId && result.exam_id === examId
-                        );
+                        // Find newest valid result for this user+exam (dedupe client-side fallback).
+                        const userResultsForExam = (Array.isArray(allResults) ? allResults : []).filter((result) => {
+                            return result
+                                && result.user_id
+                                && result.exam_id
+                                && String(result.user_id) === String(userId)
+                                && String(result.exam_id) === String(examId);
+                        });
+                        userResultsForExam.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+                        const userResult = userResultsForExam.length ? userResultsForExam[0] : null;
 
                         let scoreDisplay = 'N/A';
                         let dateTaken = 'N/A';
@@ -1035,11 +1123,13 @@
 
                         // Format exam duration
                         const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
+                        const examTitle = (exam && exam.title) ? exam.title : 'Unknown Exam';
+                        const examSubject = (exam && exam.subject) ? exam.subject : 'N/A';
 
                         const row = `
                             <tr>
-                                <td>${user.name || 'Unknown'}</td>
-                                <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
+                                <td>${studentName}</td>
+                                <td>${examTitle} (${examSubject})</td>
                                 <td>${scoreDisplay} ${statusBadge}</td>
                                 <td>${dateTaken}</td>
                                 <td>${durationDisplay} / ${examDurationDisplay}</td>
