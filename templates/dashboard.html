@@ -1194,25 +1194,36 @@
             const loadingEl = document.getElementById('dashboardLoading');
             const errorEl = document.getElementById('dashboardError');
             const contentEl = document.getElementById('dashboardContent');
+            const rootEl = document.getElementById('main-content');
+            const safeReplace = (path) => {
+                if (window.location.pathname !== path) {
+                    window.location.replace(path);
+                }
+            };
+            if (rootEl) rootEl.classList.add('d-none');
+            if (loadingEl) loadingEl.classList.remove('d-none');
+            if (contentEl) contentEl.classList.add('d-none');
             try {
                 const role = await resolveCurrentRole();
                 if (role === 'student') {
-                    window.location.replace('/student_dashboard');
+                    safeReplace('/student_dashboard');
                     return;
                 }
                 if (role === 'proctor' || role === 'teacher') {
-                    window.location.replace('/proctor_dashboard');
+                    safeReplace('/proctor_dashboard');
                     return;
                 }
                 if (role && role !== 'admin') {
-                    window.location.replace('/');
+                    safeReplace('/');
                     return;
                 }
+                await new Promise((resolve) => setTimeout(resolve, 100));
                 loadDashboardData();
                 if (__adminDashboardRefreshTimer) clearInterval(__adminDashboardRefreshTimer);
                 __adminDashboardRefreshTimer = setInterval(() => {
                     if (!document.hidden) loadDashboardData();
                 }, 90000);
+                if (rootEl) rootEl.classList.remove('d-none');
             } catch (err) {
                 console.error('Dashboard auth init failed:', err);
                 loadingEl.classList.add('d-none');
@@ -1223,6 +1234,8 @@
                 if (typeof window.__notifySessionExpired === 'function') {
                     window.__notifySessionExpired(msg);
                 }
+            } finally {
+                if (rootEl) rootEl.classList.remove('d-none');
             }
         }
 
