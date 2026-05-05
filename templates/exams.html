@@ -12,28 +12,12 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
         :root { --accent: #00c853; --accent-dark: #009624; --bg-page: #f0f7f0; }
-        body {
-            background: var(--bg-page);
-            font-family: 'DM Sans', system-ui, sans-serif;
-            overflow-x: hidden;
-            padding-right: max(0px, env(safe-area-inset-right));
-            padding-left: max(0px, env(safe-area-inset-left));
-        }
-        .main-content { background: var(--bg-page); max-width: 100%; overflow-x: hidden; }
+        body { background: var(--bg-page); font-family: 'DM Sans', system-ui, sans-serif; }
+        .main-content { background: var(--bg-page); }
         .page-title { font-family: 'Outfit', sans-serif; font-weight: 700; color: #1b2e1b; }
         .card { border-radius: 16px; border: 1px solid rgba(0,200,83,0.15); box-shadow: 0 4px 20px rgba(0,200,83,0.08); }
         .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 10px !important; }
         .list-group-item { border-radius: 8px !important; margin: 0.2rem 0; }
-        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-        #examsTable { width: 100% !important; }
-        .dataTables_wrapper { width: 100%; max-width: 100%; }
-        .dataTables_wrapper .row { margin-left: 0; margin-right: 0; }
-        .dataTables_wrapper .dataTables_length,
-        .dataTables_wrapper .dataTables_filter { margin-bottom: 0.6rem; }
-        .dataTables_wrapper .dataTables_filter input {
-            width: min(16rem, 100%);
-            margin-left: 0.35rem;
-        }
         /* Exam modal: clean, but with subtle accent */
         #examModal .modal-content { border-radius: 12px; border: 1px solid rgba(0,200,83,0.22); background: #f8fffb; box-shadow: 0 12px 34px rgba(0,200,83,0.12); }
         #examModal .modal-header { background: #f8f9fa; border-bottom: 1px solid #e9ecef; }
@@ -44,63 +28,6 @@
         #examModal .question-item .card-body { padding: 0.95rem 1rem !important; }
         #examModal .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 8px !important; box-shadow: 0 4px 16px rgba(0,200,83,0.25) !important; }
         #examModal .btn-outline-primary { border-radius: 8px !important; }
-
-        @media (max-width: 768px) {
-            .container-fluid {
-                padding: 1rem !important;
-            }
-
-            .d-flex.justify-content-between.align-items-center.mb-4 {
-                flex-direction: column;
-                align-items: stretch !important;
-                gap: 0.75rem;
-                margin-bottom: 1rem !important;
-            }
-
-            #createExamBtn {
-                width: 100%;
-                font-size: 0.95rem;
-                padding: 0.6rem 0.75rem;
-            }
-
-            .page-title {
-                font-size: 1.35rem;
-                margin-bottom: 0;
-            }
-
-            .card {
-                border-radius: 12px;
-            }
-
-            .card-body,
-            .card-header {
-                padding: 0.75rem;
-            }
-
-            #examsTable {
-                font-size: 0.82rem;
-                min-width: 44rem;
-            }
-
-            .dataTables_wrapper .dataTables_length,
-            .dataTables_wrapper .dataTables_filter,
-            .dataTables_wrapper .dataTables_info,
-            .dataTables_wrapper .dataTables_paginate {
-                text-align: left !important;
-                float: none !important;
-                width: 100%;
-            }
-
-            .dataTables_wrapper .dataTables_filter label {
-                width: 100%;
-            }
-
-            .dataTables_wrapper .dataTables_filter input {
-                width: 100%;
-                margin-left: 0 !important;
-                margin-top: 0.35rem;
-            }
-        }
     </style>
 </head>
 <body>
@@ -126,23 +53,21 @@
                     <!-- Exams Table -->
                     <div class="card mb-3">
                         <div class="card-body">
-                            <div class="table-responsive">
-                                <table id="examsTable" class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Exam Title</th>
-                                            <th>Subject</th>
-                                            <th>Exam Type</th>
-                                            <th>Section</th>
-                                            <th>Participants</th>
-                                            <th>Duration</th>
-                                            <th>Questions</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody></tbody>
-                                </table>
-                            </div>
+                            <table id="examsTable" class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Exam Title</th>
+                                        <th>Subject</th>
+                                        <th>Exam Type</th>
+                                        <th>Section</th>
+                                        <th>Participants</th>
+                                        <th>Duration</th>
+                                        <th>Questions</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -293,11 +218,7 @@
         });
 
         // Initialize DataTable
-        let examTable = $('#examsTable').DataTable({
-            autoWidth: false,
-            scrollX: true,
-            responsive: false
-        });
+        let examTable = $('#examsTable').DataTable();
 
         // undefined = not loaded yet; null = admin (all exams); array of ids = proctor scope
         let examScopeForAlerts = undefined;
@@ -429,7 +350,7 @@
                 }
             }
 
-            const response = await fetch('/select?collection=classes&limit=10');
+            const response = await fetch('/select?collection=classes');
             let classes = await response.json() || [];
 
             const role = ((currentUser && (currentUser.role || currentUser.type)) || '').toString().toLowerCase().trim();
@@ -461,9 +382,9 @@
             }
 
             const [examsResponse, classesResponse, resultsResponse] = await Promise.all([
-                fetch('/select?collection=exams&limit=10'),
-                fetch('/select?collection=classes&limit=10'),
-                fetch('/select?collection=exam_results&limit=10')
+                fetch('/select?collection=exams'),
+                fetch('/select?collection=classes'),
+                fetch('/select?collection=exam_results')
             ]);
 
             let exams = await examsResponse.json() || [];
@@ -743,9 +664,7 @@
         (async function initExamsPage() {
             await loadExams();
             refreshAlertDistribution();
-            setInterval(() => {
-                if (!document.hidden) refreshAlertDistribution();
-            }, 30000);
+            setInterval(refreshAlertDistribution, 5000);
         })();
         loadUserName();
 
@@ -1056,12 +975,12 @@
                 return;
             }
             try {
-                const resultsRes = await fetch('/select?collection=exam_results&limit=10');
+                const resultsRes = await fetch('/select?collection=exam_results');
                 let latestResults = await resultsRes.json() || [];
                 if (!Array.isArray(latestResults)) latestResults = [];
                 cachedExamResultsList = latestResults.slice();
 
-                const res = await fetch('/select?collection=proctoring_sessions&limit=10');
+                const res = await fetch('/select?collection=proctoring_sessions');
                 let sessions = await res.json() || [];
                 if (!Array.isArray(sessions)) {
                     sessions = [];
