@@ -10,13 +10,23 @@
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; }
-        .main-content { background: #f0f7f0; }
+        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; overflow-x: hidden; }
+        .main-content { background: #f0f7f0; overflow-x: hidden; }
         .stat-card {
             border-radius: 16px;
             transition: transform 0.2s;
             border: 1px solid rgba(0,200,83,0.15);
             box-shadow: 0 4px 20px rgba(0,200,83,0.08);
+        }
+        .card {
+            border-radius: 16px;
+            border: 1px solid rgba(0,200,83,0.12);
+            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(0, 200, 83, 0.14);
         }
         .stat-card:hover {
             transform: translateY(-5px);
@@ -36,6 +46,13 @@
             padding: 8px;
             border-radius: 8px;
             margin-bottom: 8px;
+        }
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table {
+            width: 100%;
         }
 
         .back-btn-mobile {
@@ -58,6 +75,9 @@
         @media (max-width: 768px) {
             .container-fluid {
                 padding: 1rem !important;
+            }
+            h1.h3 {
+                font-size: 1.25rem;
             }
 
             .stat-card {
@@ -86,6 +106,7 @@
 
             .table-responsive {
                 font-size: 0.8rem;
+                overflow-x: auto;
             }
 
             .table th,
@@ -115,6 +136,7 @@
 
             .table-responsive .table {
                 margin-bottom: 0;
+                min-width: 700px;
             }
 
             /* Adjust top lists layout */
@@ -609,9 +631,14 @@
             <div class="row">
                 <div class="col-lg-12 mb-4">
                     <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">System logs</h6>
-                            <div class="text-muted small mt-1">Shows who acted and when—including your dashboard visits (filtered to your roster and exams).</div>
+                        <div class="card-header py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
+                            <div>
+                                <h6 class="m-0 fw-bold">System logs</h6>
+                                <div class="text-muted small mt-1">Shows who acted and when—including your dashboard visits (filtered to your roster and exams).</div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" id="systemLogsNextBtn" onclick="loadNextSystemLogsPage()" disabled>
+                                Next 20
+                            </button>
                         </div>
                         <div class="card-body">
                             <div class="table-responsive">
@@ -718,6 +745,16 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let systemLogsCursor = null;
+        let systemLogsViewerScope = {
+            isAdmin: false,
+            viewerUserId: '',
+            proctorExamIds: [],
+            filteredSessions: [],
+            filteredExamResults: [],
+            usersById: {}
+        };
+
         function _escapeHtmlLog(s) {
             return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
@@ -784,6 +821,36 @@
             }).join('');
         }
 
+        async function fetchSystemLogsPage(startAfterTs) {
+            const params = new URLSearchParams({
+                collection: 'system_logs',
+                limit: '20',
+            });
+            if (startAfterTs) params.set('start_after', startAfterTs);
+            const res = await fetch('/select?' + params.toString());
+            if (!res.ok) throw new Error('Failed to load system logs');
+            return res.json();
+        }
+
+        async function loadNextSystemLogsPage() {
+            if (!systemLogsCursor) return;
+            try {
+                const logsPayload = await fetchSystemLogsPage(systemLogsCursor);
+                const logsVisible = filterLogsForViewer(logsPayload.data, {
+                    isAdmin: systemLogsViewerScope.isAdmin,
+                    viewerUserId: systemLogsViewerScope.viewerUserId,
+                    proctorExamIds: systemLogsViewerScope.proctorExamIds,
+                    filteredSessions: systemLogsViewerScope.filteredSessions,
+                    filteredExamResults: systemLogsViewerScope.filteredExamResults
+                });
+                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, systemLogsViewerScope.usersById);
+                systemLogsCursor = logsPayload.next_cursor || null;
+                document.getElementById('systemLogsNextBtn').disabled = !logsPayload.has_more;
+            } catch (e) {
+                console.error('Failed loading next system logs page:', e);
+            }
+        }
+
         function filterLogsForViewer(allLogs, { isAdmin, viewerUserId, proctorExamIds, filteredSessions, filteredExamResults }) {
             let rows = Array.isArray(allLogs) ? allLogs.slice() : [];
             if (isAdmin) return rows;
@@ -819,13 +886,13 @@
                 }
 
                 // Fetch all required data (include classes + system_logs)
-                const [users, exams, sessions, classes, examResults, systemLogs] = await Promise.all([
+                const [users, exams, sessions, classes, examResults, systemLogsPayload] = await Promise.all([
                     fetch('/select?collection=users').then(r => r.json()),
                     fetch('/select?collection=exams').then(r => r.json()),
                     fetch('/select?collection=proctoring_sessions').then(r => r.json()),
                     fetch('/select?collection=classes').then(r => r.json()),
                     fetch('/select?collection=exam_results').then(r => r.json()),
-                    fetch('/select?collection=system_logs').then(r => (r.ok ? r.json().catch(() => []) : []))
+                    fetch('/select?collection=system_logs&limit=20').then(r => (r.ok ? r.json().catch(() => ({ data: [], has_more: false })) : ({ data: [], has_more: false })))
                 ]);
 
                 // Determine current user role (normalized) and scope.
@@ -993,16 +1060,26 @@
                 document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
 
                 // System logs (admin: full; proctor/teacher: scoped to exams + roster activity)
-                const logsVisible = filterLogsForViewer(systemLogs, {
+                const logsVisible = filterLogsForViewer(systemLogsPayload.data, {
                     isAdmin,
                     viewerUserId: userId,
                     proctorExamIds,
                     filteredSessions,
                     filteredExamResults
-                }).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0)).slice(0, 80);
+                }).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
                 const usersByIdLogs = {};
                 (users || []).forEach(uu => { if (uu && uu.id) usersByIdLogs[uu.id] = uu; });
                 renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, usersByIdLogs);
+                systemLogsViewerScope = {
+                    isAdmin,
+                    viewerUserId: userId,
+                    proctorExamIds,
+                    filteredSessions,
+                    filteredExamResults,
+                    usersById: usersByIdLogs,
+                };
+                systemLogsCursor = systemLogsPayload.next_cursor || null;
+                document.getElementById('systemLogsNextBtn').disabled = !systemLogsPayload.has_more;
 
                 logProctorDashboardAction('proctor_dashboard_open');
 
