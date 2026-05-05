@@ -1602,6 +1602,122 @@ def _commit_updates_in_batches(db_client, ref_patch_pairs):
         batch.commit()
 
 
+def _commit_deletes_in_batches(db_client, refs):
+    batch = db_client.batch()
+    n = 0
+    for ref in refs:
+        batch.delete(ref)
+        n += 1
+        if n >= 400:
+            batch.commit()
+            batch = db_client.batch()
+            n = 0
+    if n:
+        batch.commit()
+
+
+def _parse_iso_dt(value):
+    s = (str(value or '')).strip()
+    if not s:
+        return datetime.min
+    try:
+        return datetime.fromisoformat(s.replace('Z', '+00:00'))
+    except Exception:
+        return datetime.min
+
+
+@app.route('/cleanup_exam_results', methods=['POST'])
+def cleanup_exam_results():
+    """
+    Admin-only maintenance endpoint:
+    - Removes stale exam_results rows with missing/null user_id or exam_id
+    - Removes rows whose user_id no longer exists in users
+    - Removes duplicates by (user_id, exam_id), keeping the newest row by timestamp
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        admin_uid = (data.get('user_id') or '').strip()
+        ok_ad, err = validate_firestore_id(admin_uid, 'user_id')
+        if not ok_ad:
+            return jsonify({'error': err}), 400
+
+        udoc = db.collection('users').document(admin_uid).get()
+        if not udoc.exists:
+            return jsonify({'error': 'User not found'}), 404
+        role = str((udoc.to_dict() or {}).get('role') or (udoc.to_dict() or {}).get('type') or '').strip().lower()
+        if role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+
+        valid_user_ids = set()
+        for usr_doc in db.collection('users').stream():
+            valid_user_ids.add(str(usr_doc.id))
+
+        to_delete_refs = []
+        best_by_key = {}
+        seen_rows = 0
+        stale_missing = 0
+        stale_orphan = 0
+        dup_removed = 0
+
+        for res_doc in db.collection('exam_results').stream():
+            seen_rows += 1
+            row = res_doc.to_dict() or {}
+            uid = str(row.get('user_id') or '').strip()
+            eid = str(row.get('exam_id') or '').strip()
+            if not uid or not eid:
+                stale_missing += 1
+                to_delete_refs.append(res_doc.reference)
+                continue
+            if uid not in valid_user_ids:
+                stale_orphan += 1
+                to_delete_refs.append(res_doc.reference)
+                continue
+
+            key = (uid, eid)
+            ts = _parse_iso_dt(row.get('timestamp'))
+            if key not in best_by_key:
+                best_by_key[key] = (ts, res_doc.reference)
+                continue
+            prev_ts, prev_ref = best_by_key[key]
+            if ts >= prev_ts:
+                to_delete_refs.append(prev_ref)
+                best_by_key[key] = (ts, res_doc.reference)
+                dup_removed += 1
+            else:
+                to_delete_refs.append(res_doc.reference)
+                dup_removed += 1
+
+        if to_delete_refs:
+            _commit_deletes_in_batches(db, to_delete_refs)
+
+        actor_name = _resolve_user_display_name(admin_uid) or admin_uid[:16]
+        append_system_log(
+            f'{actor_name} cleaned stale exam results ({len(to_delete_refs)} row(s) removed).',
+            event_type='admin.exam_results.cleanup',
+            user_id=admin_uid,
+            meta={
+                'seen_rows': seen_rows,
+                'deleted_total': len(to_delete_refs),
+                'stale_missing': stale_missing,
+                'stale_orphan': stale_orphan,
+                'duplicates_removed': dup_removed,
+            }
+        )
+
+        return jsonify({
+            'success': True,
+            'seen_rows': seen_rows,
+            'deleted_total': len(to_delete_refs),
+            'stale_missing': stale_missing,
+            'stale_orphan': stale_orphan,
+            'duplicates_removed': dup_removed,
+            'message': f'Cleanup done. Removed {len(to_delete_refs)} stale/duplicate exam result row(s).'
+        }), 200
+    except Exception as e:
+        print(f'Error during cleanup_exam_results: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/archive_reports', methods=['POST'])
 @app.route('/delete_old_reports', methods=['POST'])
 def archive_reports():
