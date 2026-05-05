@@ -366,6 +366,11 @@ def append_system_log(message, event_type='info', user_id=None, meta=None):
             who = _resolve_user_display_name(user_id)
             if who:
                 row['actor_name'] = who[:120]
+                row['user_name'] = who[:120]
+            else:
+                row['user_name'] = 'Unknown User'
+        else:
+            row['user_name'] = 'Unknown User'
         if meta and isinstance(meta, dict):
             row['meta'] = meta
         db.collection('system_logs').add(row)
