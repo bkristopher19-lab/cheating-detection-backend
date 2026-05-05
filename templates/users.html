@@ -178,7 +178,7 @@
         // Load classes and populate select + map
         async function loadClasses() {
             try {
-                const response = await fetch('/select?collection=classes&limit=10');
+                const response = await fetch('/select?collection=classes');
                 const classes = await response.json();
                 classMap = {};
                 classes.forEach(cls => { classMap[cls.id] = cls; });
@@ -200,7 +200,7 @@
 
         // Load Users
         async function loadUsers() {
-            const response = await fetch('/select?collection=users&limit=10');
+            const response = await fetch('/select?collection=users');
             const users = await response.json();
             
             // Ensure we have classes loaded
@@ -314,12 +314,12 @@
 
             try {
                 // Get exam results for this user
-                const resultsResponse = await fetch('/select?collection=exam_results&limit=10');
+                const resultsResponse = await fetch('/select?collection=exam_results');
                 const allResults = await resultsResponse.json();
                 const userResults = allResults.filter(r => r.user_id === userId);
 
                 // Get all exams
-                const examsResponse = await fetch('/select?collection=exams&limit=10');
+                const examsResponse = await fetch('/select?collection=exams');
                 const allExams = await examsResponse.json();
                 const examMap = {};
                 allExams.forEach(exam => examMap[exam.id] = exam);
@@ -443,7 +443,7 @@
                 }
 
                 // Delete exam result
-                const resultsResponse = await fetch('/select?collection=exam_results&limit=10');
+                const resultsResponse = await fetch('/select?collection=exam_results');
                 const allResults = await resultsResponse.json();
                 const userResult = allResults.find(r => r.user_id === userId && r.exam_id === examId);
 
