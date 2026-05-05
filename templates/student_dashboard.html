@@ -3,296 +3,214 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Proctoring Dashboard</title>
-    <link rel="manifest" href="/static/manifest.json">
-    <link rel="apple-touch-icon" href="/static/images/192.png">
+    <title>Student Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'DM Sans', system-ui, sans-serif; background: #f0f7f0; }
-        .main-content { background: #f0f7f0; }
-        .stat-card {
-            border-radius: 16px;
-            transition: transform 0.2s;
-            border: 1px solid rgba(0,200,83,0.15);
-            box-shadow: 0 4px 20px rgba(0,200,83,0.08);
+        :root {
+            --accent: #00c853;
+            --accent-dark: #009624;
+            --accent-light: #69f0ae;
+            --bg-page: #f0f7f0;
+            --card-shadow: 0 4px 20px rgba(0, 200, 83, 0.08);
+            --card-shadow-hover: 0 12px 32px rgba(0, 200, 83, 0.15);
+            --text-dark: #1b2e1b;
+            --text-muted: #5a7a5a;
         }
-        .stat-card:hover {
-            transform: translateY(-5px);
+        * { font-family: 'DM Sans', system-ui, sans-serif; }
+        body { background: var(--bg-page); overflow-x: hidden; }
+
+        /* Navbar */
+        .navbar-student {
+            min-height: 72px;
+            background: linear-gradient(120deg, #0d1f0d 0%, #1a3d1a 60%, #235523 100%) !important;
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
+            box-shadow: 0 6px 22px rgba(0, 0, 0, 0.16);
         }
-        .stat-icon {
-            width: 48px;
-            height: 48px;
+        .navbar-student .navbar-brand {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            color: white !important;
+        }
+        .navbar-student .navbar-text,
+        .navbar-student .nav-link { color: rgba(255,255,255,0.9) !important; }
+        .navbar-student .navbar-text small { color: rgba(255,255,255,0.75) !important; }
+        .navbar-student .dropdown-menu {
             border-radius: 12px;
-            display: flex;
+            border: 1px solid #e0e8e0;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        .navbar-student .dropdown-item:hover { background: rgba(0, 200, 83, 0.1); }
+        .navbar-student .dropdown-item i { margin-right: 0.5rem; }
+        .top-action-btn {
+            min-height: 38px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            padding: 0.45rem 0.85rem;
+            transition: transform 0.18s ease, box-shadow 0.18s ease;
+        }
+        .top-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2);
+        }
+        .role-pill {
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-        }
-        .mini-chart {
-            height: 300px;
-        }
-        .alert-type {
-            padding: 8px;
-            border-radius: 8px;
-            margin-bottom: 8px;
-        }
-
-        .back-btn-mobile {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            z-index: 1000;
-            background: rgba(255,255,255,0.9);
-            border: 1px solid #dee2e6;
-            color: #495057;
-            display: none;
+            min-width: 72px;
+            min-height: 24px;
+            padding: 0 10px;
+            border-radius: 999px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+            background: rgba(105, 240, 174, 0.2);
+            color: #d9ffe9;
+            border: 1px solid rgba(105, 240, 174, 0.35);
         }
 
-        .back-btn-mobile:hover {
-            background: #f8f9fa;
-            color: #212529;
+        /* Join section card */
+        .join-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(240,255,244,0.98) 100%);
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 83, 0.2);
+            box-shadow: var(--card-shadow);
+        }
+        .join-card h5 { font-family: 'Outfit', sans-serif; font-weight: 600; color: var(--text-dark); }
+        .join-card .form-control {
+            border-radius: 10px;
+            border: 1.5px solid #e0e8e0;
+        }
+        .join-card .form-control:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(0, 200, 83, 0.15);
+        }
+        .btn-join-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            color: white !important;
+            font-weight: 600;
+            border-radius: 10px;
+            padding: 0.5rem 1.25rem;
+            box-shadow: 0 4px 12px rgba(0, 200, 83, 0.3);
+        }
+        .btn-join-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(0, 200, 83, 0.35);
         }
 
-        /* Mobile responsive improvements */
-        @media (max-width: 768px) {
-            .container-fluid {
-                padding: 1rem !important;
-            }
-
-            .stat-card {
-                margin-bottom: 1rem;
-            }
-
-            .stat-card .card-body {
-                padding: 1rem;
-            }
-
-            .stat-card .h3 {
-                font-size: 1.5rem;
-            }
-
-            .stat-card .text-xs {
-                font-size: 0.75rem;
-            }
-
-            .stat-card .small {
-                font-size: 0.7rem;
-            }
-
-            .card-header h6 {
-                font-size: 0.9rem;
-            }
-
-            .table-responsive {
-                font-size: 0.8rem;
-            }
-
-            .table th,
-            .table td {
-                padding: 0.5rem;
-            }
-
-            .alert-type {
-                padding: 0.5rem;
-                font-size: 0.8rem;
-            }
-
-            .badge {
-                font-size: 0.7rem;
-            }
-
-            /* Stack cards vertically on mobile */
-            .row .col-xl-3,
-            .row .col-md-6 {
-                margin-bottom: 1rem;
-            }
-
-            /* Make tables more mobile-friendly */
-            .table-responsive {
-                border: none;
-            }
-
-            .table-responsive .table {
-                margin-bottom: 0;
-            }
-
-            /* Adjust top lists layout */
-            .col-xl-6 {
-                margin-bottom: 1rem;
-            }
-
-            /* Show back button on mobile */
-            .back-btn-mobile {
-                display: block !important;
-            }
+        /* Section headings */
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 700;
+            color: var(--text-dark);
+            letter-spacing: -0.02em;
         }
-
-        /* Dark mode support - Optimized for all devices */
-        body.dark-mode {
-            background-color: #121212;
-            color: #ffffff;
-        }
-
-        body.dark-mode .stat-card {
-            background-color: #1e1e1e;
-            border: 1px solid #333;
-            color: #ffffff;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.4) !important;
-        }
-
-        body.dark-mode .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.5) !important;
-        }
-
-        body.dark-mode .stat-card .text-muted {
-            color: #cccccc !important;
-        }
-
-        body.dark-mode .stat-card .stat-icon {
-            background-color: rgba(255, 255, 255, 0.1) !important;
-        }
-
-        body.dark-mode .card {
-            background-color: #1e1e1e;
-            border: 1px solid #333;
-            color: #ffffff;
-            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.4) !important;
-        }
-
-        body.dark-mode .card-header {
-            background-color: #2d2d2d;
-            border-bottom: 1px solid #333;
-            color: #ffffff;
-        }
-
-        body.dark-mode .card-header h6 {
-            color: #ffffff;
-        }
-
-        body.dark-mode .table {
-            color: #ffffff;
-        }
-
-        body.dark-mode .table th {
-            background-color: #2d2d2d;
-            border-color: #444;
-            color: #ffffff;
+        .section-badge {
+            background: rgba(0, 200, 83, 0.12);
+            color: var(--accent-dark);
+            padding: 0.35rem 0.85rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
             font-weight: 600;
         }
 
-        body.dark-mode .table td {
-            background-color: #1e1e1e;
-            border-color: #333;
-            color: #ffffff;
+        /* Exam cards */
+        .exam-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 83, 0.15);
+            box-shadow: var(--card-shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+        .exam-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--card-shadow-hover);
+        }
+        .exam-card .card-title {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+        .exam-card .card-text { color: var(--text-muted); }
+        .exam-card .btn-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .exam-card .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 200, 83, 0.4);
         }
 
-        body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
-            background-color: #252525;
+        /* Scores section */
+        .scores-card {
+            background: white;
+            border-radius: 16px;
+            border: 1px solid rgba(0, 200, 83, 0.15);
+            box-shadow: var(--card-shadow);
+        }
+        .scores-card .card-body { padding: 1.5rem; }
+        .scores-card .table thead th {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            color: var(--text-dark);
+            background: rgba(0, 200, 83, 0.06);
+            border-bottom: 2px solid rgba(0, 200, 83, 0.2);
+            padding: 0.85rem 1rem;
+        }
+        .scores-card .table tbody td { padding: 0.85rem 1rem; }
+        .scores-card .table-striped tbody tr:nth-of-type(odd) { background: rgba(0, 200, 83, 0.03); }
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
-        body.dark-mode .table-striped tbody tr:nth-of-type(even) {
-            background-color: #1e1e1e;
-        }
-
-        body.dark-mode .table-hover tbody tr:hover {
-            background-color: #333333;
-            color: #ffffff;
-        }
-
-        body.dark-mode .alert-type {
-            background-color: #2d2d2d !important;
-            border: 1px solid #444;
-            color: #ffffff;
-        }
-
-        body.dark-mode .badge {
-            background-color: #6ee7b7 !important;
-            color: #032;
-            font-weight: 500;
-        }
-
-        body.dark-mode .text-uppercase {
-            color: #ffffff;
-        }
-
-        body.dark-mode h1, body.dark-mode h3, body.dark-mode h4, body.dark-mode h6 {
-            color: #ffffff;
-        }
-
-        body.dark-mode .text-primary { color: #4dabf7 !important; }
-        body.dark-mode .text-success { color: #51cf66 !important; }
-        body.dark-mode .text-info { color: #74c0fc !important; }
-        body.dark-mode .text-warning { color: #ffd43b !important; }
-        body.dark-mode .text-danger { color: #ff6b6b !important; }
-        body.dark-mode .text-secondary { color: #868e96 !important; }
-
-        body.dark-mode .bg-primary { background-color: #4dabf7 !important; }
-        body.dark-mode .bg-success { background-color: #51cf66 !important; }
-        body.dark-mode .bg-info { background-color: #74c0fc !important; }
-        body.dark-mode .bg-warning { background-color: #ffd43b !important; }
-        body.dark-mode .bg-danger { background-color: #ff6b6b !important; }
-        body.dark-mode .bg-secondary { background-color: #868e96 !important; }
-
-        body.dark-mode .border-left-primary { border-left-color: #4dabf7 !important; }
-        body.dark-mode .border-left-success { border-left-color: #51cf66 !important; }
-        body.dark-mode .border-left-info { border-left-color: #74c0fc !important; }
-        body.dark-mode .border-left-warning { border-left-color: #ffd43b !important; }
-        body.dark-mode .border-left-danger { border-left-color: #ff6b6b !important; }
-        body.dark-mode .border-left-secondary { border-left-color: #868e96 !important; }
-
-        /* Enhanced mobile dark mode */
-        @media (max-width: 768px) {
-            body.dark-mode {
-                background-color: #0d0d0d;
-            }
-
-            body.dark-mode .stat-card,
-            body.dark-mode .card {
-                background-color: #1a1a1a;
-                border-color: #404040;
-            }
-
-            body.dark-mode .card-header {
-                background-color: #262626;
-                border-color: #404040;
-            }
-
-            body.dark-mode .table th,
-            body.dark-mode .table td {
-                border-color: #404040;
-            }
-
-            body.dark-mode .table-striped tbody tr:nth-of-type(odd) {
-                background-color: #202020;
-            }
-
-            body.dark-mode .table-striped tbody tr:nth-of-type(even) {
-                background-color: #1a1a1a;
-            }
-        }
-
-        /* User Guide modal (proctor dashboard) */
-        #proctorDashboardUserGuideModal .modal-content {
+        /* Modal */
+        #proctoringModal .modal-content {
             border-radius: 16px;
             border: none;
             box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
         }
-        #proctorDashboardUserGuideModal .modal-header {
+        #proctoringModal .modal-header {
             background: rgba(0, 200, 83, 0.08);
             border-bottom: 1px solid rgba(0, 200, 83, 0.2);
         }
-        #proctorDashboardUserGuideModal .modal-title {
+        #proctoringModal .modal-title { font-family: 'Outfit', sans-serif; font-weight: 600; }
+        #proctoringModal .btn-primary {
+            background: linear-gradient(145deg, var(--accent), var(--accent-dark));
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+
+        /* User Guide modal */
+        #studentUserGuideModal .modal-content {
+            border-radius: 16px;
+            border: none;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+        }
+        #studentUserGuideModal .modal-header {
+            background: rgba(0, 200, 83, 0.08);
+            border-bottom: 1px solid rgba(0, 200, 83, 0.2);
+        }
+        #studentUserGuideModal .modal-title {
             font-family: 'Outfit', sans-serif;
             font-weight: 600;
         }
-        #proctorDashboardUserGuideModal .ug-step-num {
+        #studentUserGuideModal .ug-step-num {
             width: 2rem;
             height: 2rem;
             border-radius: 10px;
             background: rgba(0, 200, 83, 0.12);
-            color: #009624;
+            color: var(--accent-dark);
             font-weight: 700;
             font-size: 0.9rem;
             display: inline-flex;
@@ -301,395 +219,278 @@
             flex-shrink: 0;
             margin-right: 0.75rem;
         }
-        #proctorDashboardUserGuideModal .ug-step-key {
-            border-left: 4px solid #00c853;
+        #studentUserGuideModal .ug-step-key {
+            border-left: 4px solid var(--accent);
             background: linear-gradient(90deg, rgba(0, 200, 83, 0.08), transparent);
         }
-        #proctorDashboardUserGuideModal .ug-badge-key {
+        #studentUserGuideModal .ug-badge-key {
             font-size: 0.65rem;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.04em;
-            color: #009624;
+            color: var(--accent-dark);
             background: rgba(0, 200, 83, 0.18);
             padding: 0.15rem 0.45rem;
             border-radius: 6px;
         }
-        body.dark-mode #proctorDashboardUserGuideModal .list-group-item {
+
+        /* Dark mode styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #ffffff;
+        }
+
+        body.dark-mode .navbar {
+            background-color: #1e1e1e !important;
+            border-bottom: 1px solid #333;
+        }
+
+        body.dark-mode .navbar-brand,
+        body.dark-mode .navbar-text,
+        body.dark-mode .nav-link {
+            color: #ffffff !important;
+        }
+
+        body.dark-mode .card {
+            background-color: #1e1e1e;
+            border-color: #333;
+            color: #ffffff;
+        }
+
+        body.dark-mode .modal-content {
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+
+        body.dark-mode .modal-header,
+        body.dark-mode .modal-footer {
+            border-color: #333;
+        }
+
+        body.dark-mode .dropdown-menu {
+            background-color: #1e1e1e;
+            border-color: #333;
+        }
+
+        body.dark-mode .dropdown-item {
+            color: #ffffff;
+        }
+
+        body.dark-mode .dropdown-item:hover {
+            background-color: #333;
+        }
+
+        body.dark-mode .alert {
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+        }
+        body.dark-mode .join-card {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+        body.dark-mode .join-card h5,
+        body.dark-mode .section-title { color: #ffffff !important; }
+        body.dark-mode .section-badge {
+            background: rgba(0, 200, 83, 0.2);
+            color: var(--accent-light);
+        }
+        body.dark-mode .exam-card {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+        body.dark-mode .exam-card .card-title,
+        body.dark-mode .exam-card .card-text { color: #e0e0e0 !important; }
+        body.dark-mode .scores-card {
+            background: #1e1e1e;
+            border-color: #333;
+        }
+
+        body.dark-mode #studentUserGuideModal .list-group-item {
             background-color: #1e1e1e;
             color: #fff;
             border-color: #333;
         }
-        body.dark-mode #proctorDashboardUserGuideModal .text-muted {
+        body.dark-mode #studentUserGuideModal .text-muted {
             color: #aaa !important;
+        }
+        @media (max-width: 768px) {
+            .container-fluid.p-4 {
+                padding: 1rem !important;
+            }
+            .section-title {
+                font-size: 1.2rem;
+            }
+            .join-card .card-body {
+                padding: 1rem;
+            }
+            .join-card .d-flex.gap-2.w-100.w-md-auto {
+                flex-direction: column;
+                width: 100%;
+            }
+            .join-card #joinCodeInput,
+            .join-card #joinCodeBtn {
+                width: 100%;
+            }
+            .exam-card {
+                margin-bottom: 0.75rem;
+            }
+            .scores-card .table {
+                min-width: 720px;
+            }
         }
     </style>
 </head>
 <body>
-    {% include 'sidebar.html' %}
-
-    <div class="main-content" id="main-content">
-        <button class="btn btn-secondary back-btn-mobile" onclick="window.history.back()"><i class='bx bx-arrow-back'></i> Back</button>
-        {% include 'navbar.html' %}
-
-        <div class="container-fluid p-4">
-            <h1 class="h3 mb-4">Analytics Dashboard</h1>
-            
-            <!-- Main Stats -->
-            <div class="row">
-                <!-- Users Stats -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="stat-card card border-left-primary shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-primary fw-bold">Total Students</div>
-                                    <div class="h3 mb-0 fw-bold" id="totalStudents">0</div>
-                                    <div class="text-muted small">Active Users</div>
-                                </div>
-                                <div class="stat-icon bg-primary bg-opacity-10">
-                                    <i class='bx bxs-graduation text-primary fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Exams Stats -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="stat-card card border-left-success shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-success fw-bold">Active Exams</div>
-                                    <div class="h3 mb-0 fw-bold" id="totalExams">0</div>
-                                    <div class="text-muted small">Available Tests</div>
-                                </div>
-                                <div class="stat-icon bg-success bg-opacity-10">
-                                    <i class='bx bxs-book-open text-success fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Sessions Stats -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="stat-card card border-left-info shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-info fw-bold">Total Sessions</div>
-                                    <div class="h3 mb-0 fw-bold" id="totalSessions">0</div>
-                                    <div class="text-muted small">Exam Attempts</div>
-                                </div>
-                                <div class="stat-icon bg-info bg-opacity-10">
-                                    <i class='bx bxs-time text-info fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Alerts Stats -->
-                <div class="col-xl-3 col-md-6 mb-4">
-                    <div class="stat-card card border-left-warning shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Total Alerts</div>
-                                    <div class="h3 mb-0 fw-bold" id="totalAlerts">0</div>
-                                    <div class="text-muted small">Detected Issues</div>
-                                </div>
-                                <div class="stat-icon bg-warning bg-opacity-10">
-                                    <i class='bx bxs-bell text-warning fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+    <nav class="navbar navbar-expand-lg navbar-student border-bottom">
+        <div class="container-fluid px-4">
+            <a class="navbar-brand" href="#">Online Proctoring System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center gap-2">
+                    <li class="nav-item me-2 d-none" id="installNavItem">
+                        <button class="btn btn-outline-primary btn-sm top-action-btn" id="installBtn" type="button" title="Install app (Chrome or Microsoft Edge)">
+                            <i class='bx bx-download'></i> Install App
+                        </button>
+                    </li>
+                    <li class="nav-item d-none d-sm-flex align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-light top-action-btn" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal" title="Open user guide">
+                            <i class='bx bx-book-open'></i> User Guide
+                        </button>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class='bx bxs-user'></i>
+                            <span class="role-pill" id="roleBadge">student</span>
+                            <span id="userName">Student</span>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li class="d-sm-none"><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal">
+                                <i class='bx bx-book-open'></i> User Guide
+                            </button></li>
+                            <li class="d-sm-none"><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="profileBtn">
+                                <i class='bx bx-user'></i> Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" id="darkModeBtn">
+                                <i class='bx bx-moon'></i> <span id="darkModeText">Dark Mode</span>
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class='bx bx-log-out'></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
             </div>
+        </div>
+    </nav>
 
-            <!-- Detailed Stats -->
-            <div class="row">
-                <!-- Alert Types Distribution -->
-                <div class="col-xl-4 mb-4">
-                    <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Alert Distribution</h6>
-                        </div>
-                        <div class="card-body">
-                            <div id="alertTypes">
-                                <!-- Alert types will be inserted here -->
-                            </div>
-                        </div>
-                    </div>
+    <div class="container-fluid p-4">
+        <!-- Join class by code -->
+        <div class="card join-card mb-4">
+            <div class="card-body d-flex flex-column flex-md-row align-items-md-center gap-3">
+                <div>
+                    <h5 class="mb-1">Join a Section with Code</h5>
+                    <p class="mb-0 text-muted small">Enter the join code shared by your proctor/admin to link to a section.</p>
                 </div>
-
-                <!-- Student Exam Scores & Proctoring Flags -->
-                <div class="col-xl-8 mb-4">
-                    <div class="card shadow h-100">
-                        <div class="card-header py-3">
-                            <h6 class="m-0 fw-bold">Student Exam Participation & Scores</h6>
-                        </div>
-                        <div class="card-body">
-                            <!-- Filters -->
-                            <div class="row mb-3">
-                                <div class="col-md-4">
-                                    <label for="examFilter" class="form-label">Select Exam</label>
-                                    <select class="form-select" id="examFilter">
-                                        <option value="">All Exams</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="sectionFilter" class="form-label">Select Section/Class</label>
-                                    <select class="form-select" id="sectionFilter">
-                                        <option value="">All Sections</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-4">
-                                    <label for="studentSearch" class="form-label">Search Students</label>
-                                    <input type="text" id="studentSearch" class="form-control" placeholder="Search by name...">
-                                </div>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>Student Name</th>
-                                            <th>Section</th>
-                                            <th>Status</th>
-                                            <th>Score</th>
-                                            <th>Date & Time Taken</th>
-                                            <th>Duration</th>
-                                            <th>Proctoring Flags</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="studentScoresTable">
-                                        <!-- Student scores will be loaded here -->
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
+                <div class="ms-md-auto d-flex gap-2 w-100 w-md-auto">
+                    <input type="text" id="joinCodeInput" class="form-control" placeholder="e.g., ABC123" maxlength="10" style="text-transform: uppercase;">
+                    <button class="btn btn-join-primary" id="joinCodeBtn">Join</button>
                 </div>
+                <div id="joinCodeMessage" class="small"></div>
             </div>
+        </div>
 
-            <!-- Additional Stats Row -->
-            <div class="row mb-4">
-                <!-- Teachers Count -->
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card border-left-secondary shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-secondary fw-bold">Teachers</div>
-                                    <div class="h3 mb-0 fw-bold" id="totalTeachers">0</div>
-                                </div>
-                                <div class="stat-icon bg-secondary bg-opacity-10">
-                                    <i class='bx bxs-user text-secondary fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+            <h2 class="section-title mb-0">Available Exams</h2>
+            <span class="section-badge"><i class='bx bx-info-circle'></i> Your section only</span>
+        </div>
 
-                <!-- Archive all reports (admin only on this page) -->
-                <div class="col-xl-6 col-lg-12 col-md-12 mb-4" id="adminControls" style="display: none;">
-                    <div class="stat-card card border-left-danger shadow h-100">
-                        <div class="card-body">
-                            <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
-                            <p class="small text-muted mb-2">Marks every session and score row as archived (hidden from main views). Recordings stay on the server. Your browser will download a PDF summary.</p>
-                            <div class="mt-2">
-                                <button type="button" class="btn btn-danger btn-sm me-2" id="deleteAllBtn" onclick="deleteAllReports()">
-                                    <i class="bx bx-archive"></i> Archive reports
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="row" id="examsList">
+            <!-- Exams will be loaded here dynamically -->
+        </div>
 
-                <!-- Average Session Duration -->
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card border-left-danger shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-danger fw-bold">Avg. Duration</div>
-                                    <div class="h3 mb-0 fw-bold" id="avgDuration">0 min</div>
-                                </div>
-                                <div class="stat-icon bg-danger bg-opacity-10">
-                                    <i class='bx bxs-timer text-danger fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Total Questions -->
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card border-left-primary shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-primary fw-bold">Questions</div>
-                                    <div class="h3 mb-0 fw-bold" id="totalQuestions">0</div>
-                                </div>
-                                <div class="stat-icon bg-primary bg-opacity-10">
-                                    <i class='bx bxs-help-circle text-primary fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Alert Rate -->
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card border-left-warning shadow h-100">
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <div>
-                                    <div class="text-xs text-uppercase mb-1 text-warning fw-bold">Alert Rate</div>
-                                    <div class="h3 mb-0 fw-bold" id="alertRate">0%</div>
-                                </div>
-                                <div class="stat-icon bg-warning bg-opacity-10">
-                                    <i class='bx bxs-error text-warning fs-3'></i>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-    
-            <!-- Additional Statistics -->
-            <div class="row mb-4">
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card shadow h-100">
-                        <div class="card-body">
-                            <div class="text-xs text-uppercase mb-1 fw-bold">Total Classes</div>
-                            <div class="h4 fw-bold" id="totalClasses">0</div>
-                            <div class="text-muted small">Course & Section</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card shadow h-100">
-                        <div class="card-body">
-                            <div class="text-xs text-uppercase mb-1 fw-bold">Avg Exams per Class</div>
-                            <div class="h4 fw-bold" id="avgExamsPerClass">0</div>
-                            <div class="text-muted small">Distribution</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card shadow h-100">
-                        <div class="card-body">
-                            <div class="text-xs text-uppercase mb-1 fw-bold">Completion Rate</div>
-                            <div class="h4 fw-bold" id="completionRate">0%</div>
-                            <div class="text-muted small">Sessions Completed</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-3 col-lg-6 col-md-6 mb-4">
-                    <div class="stat-card card shadow h-100">
-                        <div class="card-body">
-                            <div class="text-xs text-uppercase mb-1 fw-bold">Avg Alerts / Session</div>
-                        <div class="h4 fw-bold" id="avgAlertsPerSession">0</div>
-                            <div class="text-muted small">Alert density</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- System logs -->
-            <div class="row">
-                <div class="col-lg-12 mb-4">
-                    <div class="card shadow h-100">
-                        <div class="card-header py-3 d-flex justify-content-between align-items-start flex-wrap gap-2">
-                            <div>
-                                <h6 class="m-0 fw-bold">System logs</h6>
-                                <div class="text-muted small mt-1">Shows who acted and when—including your dashboard visits (filtered to your roster and exams).</div>
-                            </div>
-                            <button type="button" class="btn btn-sm btn-outline-secondary" id="systemLogsNextBtn" onclick="loadNextSystemLogsPage()" disabled>
-                                Next 20
-                            </button>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-sm table-striped align-middle mb-0">
-                                    <thead>
-                                        <tr>
-                                            <th>User</th>
-                                            <th>Date</th>
-                                            <th>Time</th>
-                                            <th>What happened</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="systemLogsTableBody"></tbody>
-                                </table>
-                            </div>
-                        </div>
+        <!-- Student Scores Section -->
+        <div class="mt-5">
+            <h2 class="section-title mb-4">My Exam Scores</h2>
+            <div class="card scores-card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Student Name</th>
+                                    <th>Exam Type</th>
+                                    <th>Score</th>
+                                    <th>Date Taken</th>
+                                    <th>Time Taken / Exam Duration</th>
+                                    <th>Violations</th>
+                                </tr>
+                            </thead>
+                            <tbody id="scoresTable">
+                                <!-- Scores will be loaded here -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- User Guide (proctor) -->
-    <div class="modal fade" id="proctorDashboardUserGuideModal" tabindex="-1" aria-labelledby="proctorUserGuideTitle" aria-hidden="true">
+    <!-- User Guide (student) -->
+    <div class="modal fade" id="studentUserGuideModal" tabindex="-1" aria-labelledby="studentUserGuideTitle" aria-hidden="true">
         <div class="modal-dialog modal-dialog-scrollable modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title d-flex align-items-center gap-2" id="proctorUserGuideTitle">
-                        <span class="d-inline-flex align-items-center justify-content-center rounded-3 px-2 py-1" style="background: rgba(26, 95, 47, 0.2); color: #69f0ae;"><i class='bx bxs-camera fs-5'></i></span>
-                        Proctor Dashboard Guide
+                    <h5 class="modal-title d-flex align-items-center gap-2" id="studentUserGuideTitle">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-3 px-2 py-1 bg-success bg-opacity-10 text-success"><i class='bx bxs-graduation fs-5'></i></span>
+                        Student Dashboard Guide
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">AI-based proctoring with camera monitoring — supervisory workflow from login through session actions. Students enroll on the <strong>student dashboard</strong> using join codes maintained on each class.</p>
+                    <p class="text-muted small mb-3">AI-based proctoring with camera monitoring — follow these steps to complete your workflow.</p>
                     <ul class="list-group list-group-flush border rounded overflow-hidden">
                         <li class="list-group-item d-flex py-3">
                             <span class="ug-step-num">1</span>
-                            <div><strong class="d-block mb-1">Login to the system</strong><span class="text-muted small">Authenticate with your proctor account through the institutional login gateway.</span></div>
+                            <div><strong class="d-block mb-1">Login to the system</strong><span class="text-muted small">Sign in with your institutional email and password on the login screen.</span></div>
                         </li>
                         <li class="list-group-item d-flex py-3">
                             <span class="ug-step-num">2</span>
-                            <div><strong class="d-block mb-1">Access proctor dashboard</strong><span class="text-muted small">Open the analytics dashboard to see aggregate activity and shortcuts to oversight tools.</span></div>
+                            <div><strong class="d-block mb-1">Access the student dashboard</strong><span class="text-muted small">After authentication, land on your dashboard listing sections and exams for your cohort.</span></div>
                         </li>
                         <li class="list-group-item d-flex py-3">
                             <span class="ug-step-num">3</span>
-                            <div><strong class="d-block mb-1">View active student sessions</strong><span class="text-muted small">Identify learners currently seated for each linked exam or class roster.</span></div>
+                            <div><strong class="d-block mb-1">Start exam session</strong><span class="text-muted small">Open an available assessment and launch it inside the permitted time window.</span></div>
                         </li>
                         <li class="list-group-item d-flex py-3 ug-step-key">
                             <span class="ug-step-num">4</span>
                             <div>
-                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Monitor students via camera feed</strong><span class="ug-badge-key">Camera</span></div>
-                                <span class="text-muted small">Select a session or tile to inspect the live video stream routed through the monitoring service.</span>
-                            </div>
-                        </li>
-                        <li class="list-group-item d-flex py-3 ug-step-key">
-                            <span class="ug-step-num">5</span>
-                            <div>
-                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Receive system-generated alerts</strong><span class="ug-badge-key">Alerts</span></div>
-                                <span class="text-muted small">Watch the alerts queue for model- or rule-based events prioritized for your review.</span>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Enable camera</strong><span class="ug-badge-key">Important</span></div>
+                                <span class="text-muted small">When the browser prompts you, allow camera access so monitoring can stay active for the sitting.</span>
                             </div>
                         </li>
                         <li class="list-group-item d-flex py-3">
+                            <span class="ug-step-num">5</span>
+                            <div><strong class="d-block mb-1">Follow exam rules while being monitored</strong><span class="text-muted small">Stay framed in view, avoid unapproved aids, and keep one focused window unless your instructor permits otherwise.</span></div>
+                        </li>
+                        <li class="list-group-item d-flex py-3 ug-step-key">
                             <span class="ug-step-num">6</span>
-                            <div><strong class="d-block mb-1">Review suspicious activity logs</strong><span class="text-muted small">Open detailed timelines and summaries before deciding on formal follow-up.</span></div>
+                            <div>
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-1"><strong class="mb-0">Receive alerts if suspicious behavior is detected</strong><span class="ug-badge-key">Alerts</span></div>
+                                <span class="text-muted small">Read any on-screen notices and adjust your posture or environment promptly to reduce escalation.</span>
+                            </div>
                         </li>
                         <li class="list-group-item d-flex py-3">
                             <span class="ug-step-num">7</span>
-                            <div><strong class="d-block mb-1">Take action (flag/warning/report)</strong><span class="text-muted small">Document outcomes using warnings, flags, or institutional reporting channels as policy requires.</span></div>
+                            <div><strong class="d-block mb-1">Submit exam</strong><span class="text-muted small">Finish all items, verify your answers if allowed, and submit before the timer ends.</span></div>
                         </li>
                         <li class="list-group-item d-flex py-3">
                             <span class="ug-step-num">8</span>
-                            <div><strong class="d-block mb-1">Logout</strong><span class="text-muted small">End your session from the profile menu when supervisory work is complete.</span></div>
+                            <div><strong class="d-block mb-1">Logout</strong><span class="text-muted small">Use logout from the menu when finished, especially when using a lab or shared computer.</span></div>
                         </li>
                     </ul>
                 </div>
@@ -700,22 +501,37 @@
         </div>
     </div>
 
-    <div class="modal fade" id="proctorNotifyChairModal" tabindex="-1" aria-hidden="true">
+    <!-- Proctoring Consent Modal -->
+    <div class="modal fade" id="proctoringModal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Notify program chair</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <h5 class="modal-title">How This Proctored Exam Works</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p class="text-muted small mb-3">Email summarizes recorded violations for this session (even a single event).</p>
-                    <label class="form-label">Program chair email</label>
-                    <input type="email" class="form-control" id="proctorNotifyChairEmail" placeholder="chair@institution.edu" autocomplete="email">
-                    <div id="proctorNotifyChairError" class="text-danger small mt-2" style="display:none;"></div>
+                    <div class="alert alert-info">
+                        <h6>Before you start, please read these instructions:</h6>
+                        <ul>
+                            <li>You must <strong>allow camera and microphone</strong> access when prompted.</li>
+                            <li>On <strong>computers</strong> (Windows, macOS, Linux, Chrome OS), when the browser asks you must choose <strong>Entire Screen</strong>. Window or tab sharing is not accepted and the exam will not proceed without whole-screen capture. On <strong>phones and tablets (Android/iOS/iPad)</strong>, this full-screen/system capture step is omitted so taking the exam is possible; monitoring still uses your camera and microphone.</li>
+                            <li><strong>Dual monitors (desktop only):</strong> If you have multiple monitors, choose "Entire Screen" so all displays can be reviewed. Avoid moving the exam window between monitors with shortcuts.</li>
+                            <li>Do <strong>not switch tabs/apps</strong>, resize the exam window, or exit fullscreen while taking the exam.</li>
+                            <li><strong>Copy, paste, and cut</strong> (Ctrl+C, Ctrl+V, Ctrl+X) are disabled during the exam. These shortcuts will be blocked and may be flagged as violations.</li>
+                            <li>Keep your <strong>face clearly visible</strong> to the camera at all times and avoid using your phone or other devices.</li>
+                            <li>Camera and microphone are recorded subject to institutional policy (often deleted after retention). On supported desktop browsers, entire-screen recordings may also be collected; typically not collected on phones/tablets.</li>
+                        </ul>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="consentCheck">
+                        <label class="form-check-label" for="consentCheck">
+                            I have read and understand how this proctored exam works
+                        </label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="proctorNotifyChairSubmit" onclick="submitProctorNotifyChair()"><i class='bx bx-send me-1'></i>Send</button>
+                    <button type="button" class="btn btn-primary" id="startExamBtn" disabled>Start Exam</button>
                 </div>
             </div>
         </div>
@@ -723,529 +539,354 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let systemLogsCursor = null;
-        let systemLogsViewerScope = {
-            isAdmin: false,
-            viewerUserId: '',
-            proctorExamIds: [],
-            filteredSessions: [],
-            filteredExamResults: [],
-            usersById: {}
-        };
+        let selectedExamId = null;
 
-        function _escapeHtmlLog(s) {
-            return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-        }
+        // Load available exams (filtered by student's section)
+        async function loadExams() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) return;
 
-        function _formatSystemLogDateTime(ts) {
-            const d = new Date(ts || 0);
-            if (Number.isNaN(d.getTime())) return ['—', '—'];
-            return [
-                d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }),
-                d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-            ];
-        }
+            // Load user, classes, exams, and proctoring sessions in parallel
+            const [userResponse, classesResponse, examsResponse, sessionsResponse] = await Promise.all([
+                fetch('/select?collection=users&id=' + userId),
+                fetch('/select?collection=classes'),
+                fetch('/select?collection=exams'),
+                fetch('/select?collection=proctoring_sessions')
+            ]);
 
-        function resolveLogWhoProctor(r, usersById) {
-            let n = r.actor_name != null ? String(r.actor_name).trim() : '';
-            const uid = r.user_id != null ? String(r.user_id) : '';
-            if (!n && uid && usersById && usersById[uid])
-                n = (usersById[uid].name || usersById[uid].email || '').trim();
-            if (!n && uid)
-                return _escapeHtmlLog('User (' + uid.slice(0, 10) + '…)');
-            return n ? _escapeHtmlLog(n) : '—';
-        }
-
-        let __procUiLogTimers = {};
-
-        async function logProctorDashboardAction(action, detail) {
-            const uid = sessionStorage.getItem('userId');
-            if (!uid) return;
-            if (action === 'proctor_dashboard_open') {
-                if (sessionStorage.getItem('logged_proctor_dash_open_v1')) return;
-                sessionStorage.setItem('logged_proctor_dash_open_v1', '1');
-            }
-            if (action === 'proctor_dashboard_filter') {
-                const t = Date.now();
-                if (__procUiLogTimers[action] && t - __procUiLogTimers[action] < 120000) return;
-                __procUiLogTimers[action] = t;
-            }
-            try {
-                await fetch('/log_dashboard_activity', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        user_id: uid,
-                        action,
-                        detail: (detail || '').slice(0, 280)
-                    })
-                });
-            } catch (_) {}
-        }
-
-        function renderSystemLogsTableBody(tbodyEl, logs, usersById) {
-            if (!tbodyEl) return;
-            usersById = usersById || {};
-            if (!logs || !logs.length) {
-                tbodyEl.innerHTML = '<tr><td colspan="4" class="text-muted">No log entries yet.</td></tr>';
+            if (!userResponse.ok || !classesResponse.ok || !examsResponse.ok || !sessionsResponse.ok) {
+                console.error('Failed to load user, classes, exams, or sessions');
                 return;
             }
-            tbodyEl.innerHTML = logs.map((r) => {
-                const [dateStr, timeStr] = _formatSystemLogDateTime(r.timestamp);
-                const who = resolveLogWhoProctor(r, usersById);
-                const act = _escapeHtmlLog((r.message || '').trim()) ||
-                    `<code class="small">${_escapeHtmlLog((r.event_type || 'activity') + '')}</code>`;
-                return `<tr><td>${who}</td><td>${_escapeHtmlLog(dateStr)}</td><td>${_escapeHtmlLog(timeStr)}</td><td>${act}</td></tr>`;
-            }).join('');
-        }
 
-        async function fetchSystemLogsPage(startAfterTs) {
-            const params = new URLSearchParams({
-                collection: 'system_logs',
-                limit: '20',
-            });
-            if (startAfterTs) params.set('start_after', startAfterTs);
-            const res = await fetch('/select?' + params.toString());
-            if (!res.ok) throw new Error('Failed to load system logs');
-            return res.json();
-        }
+            const user = await userResponse.json();
+            const classes = await classesResponse.json();
+            const allExams = await examsResponse.json();
+            const allSessions = await sessionsResponse.json();
 
-        async function loadNextSystemLogsPage() {
-            if (!systemLogsCursor) return;
-            try {
-                const logsPayload = await fetchSystemLogsPage(systemLogsCursor);
-                const logsVisible = filterLogsForViewer(logsPayload.data, {
-                    isAdmin: systemLogsViewerScope.isAdmin,
-                    viewerUserId: systemLogsViewerScope.viewerUserId,
-                    proctorExamIds: systemLogsViewerScope.proctorExamIds,
-                    filteredSessions: systemLogsViewerScope.filteredSessions,
-                    filteredExamResults: systemLogsViewerScope.filteredExamResults
-                });
-                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, systemLogsViewerScope.usersById);
-                systemLogsCursor = logsPayload.next_cursor || null;
-                document.getElementById('systemLogsNextBtn').disabled = !logsPayload.has_more;
-            } catch (e) {
-                console.error('Failed loading next system logs page:', e);
+            // Get student's class_id
+            const studentClassId = user.class_id;
+            
+            // Build class lookup
+            const classMap = {};
+            classes.forEach(cls => classMap[cls.id] = cls);
+
+            // Display student's section
+            if (studentClassId && classMap[studentClassId]) {
+                const studentClass = classMap[studentClassId];
+                document.getElementById('sectionDisplay').textContent = `${studentClass.course} - ${studentClass.section}`;
+            } else {
+                document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                document.getElementById('sectionDisplay').style.color = '#dc3545';
             }
+
+            // Filter exams to only show exams for student's section
+            const exams = studentClassId 
+                ? allExams.filter(exam => exam.class_id === studentClassId)
+                : []; // If student has no class_id, show no exams
+
+            const examsList = document.getElementById('examsList');
+            examsList.innerHTML = '';
+
+            if (exams.length === 0 && !studentClassId) {
+                examsList.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-warning">
+                            <i class='bx bx-info-circle'></i> You are not assigned to any section. Please contact your administrator or join with a code below.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            if (exams.length === 0) {
+                examsList.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class='bx bx-info-circle'></i> No exams available for your section at this time.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // Build a quick lookup for prior violation info per exam for this user
+            const violationInfoByExam = {};
+            const userSessions = (allSessions || []).filter(s =>
+                s &&
+                (s.student_id === user.id || s.user_id === user.id) &&
+                s.exam_id
+            );
+
+            userSessions.forEach(s => {
+                const examId = s.exam_id;
+                if (!examId) return;
+                const flags = s.flags || {};
+                const hasPhone =
+                    (flags.phone && flags.phone.length > 0) ||
+                    (flags.object_detected_cell_phone && flags.object_detected_cell_phone.length > 0);
+                const terminated = (s.status && s.status.toString().toLowerCase() === 'terminated');
+
+                if (!violationInfoByExam[examId]) {
+                    violationInfoByExam[examId] = {
+                        hasPhone: false,
+                        terminated: false
+                    };
+                }
+
+                violationInfoByExam[examId].hasPhone =
+                    violationInfoByExam[examId].hasPhone || hasPhone;
+                violationInfoByExam[examId].terminated =
+                    violationInfoByExam[examId].terminated || terminated;
+            });
+
+            const now = new Date();
+
+            exams.forEach(exam => {
+                // Check if user has already taken this exam
+                const taken = user.exams_taken && user.exams_taken.includes(exam.id);
+
+                // Check deadline
+                let deadlineStatus = 'available';
+                let deadlineText = '';
+                if (exam.start_date && exam.end_date) {
+                    const startDate = new Date(exam.start_date);
+                    const endDate = new Date(exam.end_date);
+
+                    if (now < startDate) {
+                        deadlineStatus = 'not-started';
+                        deadlineText = `Starts: ${startDate.toLocaleString()}`;
+                    } else if (now > endDate) {
+                        deadlineStatus = 'expired';
+                        deadlineText = `Ended: ${endDate.toLocaleString()}`;
+                    } else {
+                        deadlineText = `Ends: ${endDate.toLocaleString()}`;
+                    }
+                }
+
+                const vInfo = violationInfoByExam[exam.id];
+                const blockedForViolations = vInfo && (vInfo.terminated || vInfo.hasPhone);
+
+                let buttonHtml = '';
+                let violationNoteHtml = '';
+                if (taken) {
+                    buttonHtml = '<button class="btn btn-secondary" disabled>Completed</button>';
+                } else if (blockedForViolations) {
+                    buttonHtml = '<button class="btn btn-danger" disabled>Blocked (prior violations)</button>';
+                    if (vInfo && vInfo.hasPhone) {
+                        violationNoteHtml = '<p class="card-text small text-danger mb-0">Previous attempt blocked: phone detected.</p>';
+                    } else if (vInfo && vInfo.terminated) {
+                        violationNoteHtml = '<p class="card-text small text-danger mb-0">Previous attempt terminated due to violations.</p>';
+                    }
+                } else if (deadlineStatus === 'not-started') {
+                    buttonHtml = '<button class="btn btn-warning" disabled>Not Started</button>';
+                } else if (deadlineStatus === 'expired') {
+                    buttonHtml = '<button class="btn btn-danger" disabled>Expired</button>';
+                } else {
+                    buttonHtml = `<button class="btn btn-primary" onclick="showProctoring('${exam.id}')">Take Exam</button>`;
+                }
+
+                const card = `
+                    <div class="col-md-4 mb-4">
+                        <div class="card exam-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${exam.title}</h5>
+                                <p class="card-text">${exam.subject}</p>
+                                <p class="card-text">Duration: ${Math.floor(exam.duration).toString().padStart(2, '0')}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}</p>
+                                <p class="card-text">Questions: ${exam.questions.length}</p>
+                                <p class="card-text small text-muted">${deadlineText}</p>
+                                ${violationNoteHtml}
+                                ${buttonHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                examsList.innerHTML += card;
+            });
         }
 
-        function filterLogsForViewer(allLogs, { isAdmin, viewerUserId, proctorExamIds, filteredSessions, filteredExamResults }) {
-            let rows = Array.isArray(allLogs) ? allLogs.slice() : [];
-            if (isAdmin) return rows;
-            const examSet = new Set((proctorExamIds || []).map(String));
-            const studentSet = new Set();
-            (filteredSessions || []).forEach((s) => {
-                if (s.student_id) studentSet.add(String(s.student_id));
-                if (s.user_id) studentSet.add(String(s.user_id));
-            });
-            (filteredExamResults || []).forEach((r) => {
-                if (r.user_id) studentSet.add(String(r.user_id));
-            });
-            return rows.filter((r) => {
-                const uid = r.user_id != null ? String(r.user_id) : '';
-                const et = ((r.event_type || '') + '').toLowerCase();
-                if (et.startsWith('ui.dashboard.') && uid && viewerUserId != null && uid === String(viewerUserId)) return true;
-                if (uid && viewerUserId != null && uid === String(viewerUserId)) return true;
-                const mex = r.meta && r.meta.exam_id != null ? String(r.meta.exam_id) : '';
-                if (mex && examSet.has(mex)) return true;
-                if (uid && studentSet.has(uid)) return true;
-                return false;
-            });
+        // Show proctoring consent modal
+        function showProctoring(examId) {
+            selectedExamId = examId;
+            const modal = new bootstrap.Modal(document.getElementById('proctoringModal'));
+            modal.show();
         }
 
-        // Load dashboard data
-        async function loadDashboardData() {
-            try {
-                // Get current proctor user ID
+        // Handle consent checkbox
+        document.getElementById('consentCheck').addEventListener('change', function() {
+            document.getElementById('startExamBtn').disabled = !this.checked;
+        });
+
+        // Handle exam start
+        document.getElementById('startExamBtn').addEventListener('click', function() {
+            if (selectedExamId) {
                 const userId = sessionStorage.getItem('userId');
-                if (!userId) {
-                    console.error('No user ID found');
+                window.location.href = `/take_exam/${selectedExamId}?user_id=${userId}`;
+            }
+        });
+
+        // Join class by code
+        document.getElementById('joinCodeBtn').addEventListener('click', async function() {
+            const codeInput = document.getElementById('joinCodeInput');
+            const msgEl = document.getElementById('joinCodeMessage');
+            msgEl.textContent = '';
+            msgEl.className = 'small';
+
+            const rawCode = (codeInput.value || '').trim().toUpperCase();
+            if (!rawCode) {
+                msgEl.textContent = 'Please enter a join code.';
+                msgEl.classList.add('text-danger');
+                return;
+            }
+
+            try {
+                // Load classes and find by join_code (case-insensitive match)
+                const classesResponse = await fetch('/select?collection=classes');
+                const classes = await classesResponse.json();
+                const targetClass = classes.find(cls => (cls.join_code || '').toUpperCase() === rawCode);
+
+                if (!targetClass) {
+                    msgEl.textContent = 'Invalid join code.';
+                    msgEl.classList.add('text-danger');
                     return;
                 }
 
-                // Fetch all required data (include classes + system_logs)
-                const [users, exams, sessions, classes, examResults, systemLogsPayload] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json()),
-                    fetch('/select?collection=system_logs&limit=20').then(r => (r.ok ? r.json().catch(() => ({ data: [], has_more: false })) : ({ data: [], has_more: false })))
-                ]);
-
-                // Determine current user role (normalized) and scope.
-                // Safety-first: only admin sees global data on this page.
-                const normalizeRole = (usr) => ((usr?.role || usr?.type || '') + '').trim().toLowerCase();
-                const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
-                const currentRole = normalizeRole(currentUser);
-                const isAdmin = currentRole === 'admin';
-                const adminCard = document.getElementById('adminControls');
-                if (adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
-                const isProctorScopedView = !isAdmin;
-
-                // Check if proctor has classes assigned
-                const allClassesArr = classes || [];
-                const proctorClasses = isProctorScopedView
-                    ? allClassesArr.filter(c => String(c.proctor_id) === String(userId))
-                    : allClassesArr;
-                const proctorClassIds = proctorClasses.map(c => String(c.id));
-
-                // If proctor has classes, filter by classes; otherwise (admin) show all exams
-                let proctorExams, proctorExamIds;
-                if (isProctorScopedView) {
-                    if (proctorClassIds.length > 0) {
-                        // Filter exams to those in proctor's classes
-                        proctorExams = (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)));
-                        proctorExamIds = proctorExams.map(e => e.id);
-                    } else {
-                        // Proctor with no assigned classes sees no exams
-                        proctorExams = [];
-                        proctorExamIds = [];
-                    }
-                } else {
-                    // Filter exams to those in proctor's classes
-                    proctorExams = exams || [];
-                    proctorExamIds = proctorExams.map(e => e.id);
-                }
-
-                // Filter sessions to those for proctor's exams
-                const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
-
-                // Filter exam results to those for proctor's exams
-                const proctorExamResults = (examResults || []).filter(r => proctorExamIds.includes(r.exam_id));
-
-                // Use filtered data
-                const filteredUsers = users;
-                const filteredExams = proctorExams;
-                const filteredSessions = proctorSessions;
-                const filteredClasses = proctorClasses;
-                const filteredExamResults = proctorExamResults;
-
-                // Load filters (proctors are locked to their assigned sections)
-                loadFilters(filteredExams, filteredClasses, isProctorScopedView);
-
-                // Normalize role/type accessor
-                const userRole = u => ((u.role || u.type || '')).toString().toLowerCase();
-
-                // Students: prefer explicit user records, otherwise infer from results/sessions
-                let studentUsers = users.filter(u => userRole(u) === 'student');
-                if (isProctorScopedView) {
-                    const visibleClassIds = new Set((filteredClasses || []).map(cls => String(cls.id)));
-                    studentUsers = studentUsers.filter(u => u.class_id && visibleClassIds.has(String(u.class_id)));
-                }
-                if (studentUsers.length === 0) {
-                    // Admin: infer students from all activity. Proctor/teacher: only from scoped exams/sessions.
-                    if (isProctorScopedView) {
-                        const idsFromResults = (proctorExamResults || []).flatMap(r => [r.user_id, r.student_id]).filter(Boolean);
-                        const idsFromSessions = (proctorSessions || []).flatMap(s => [s.user_id, s.student_id]).filter(Boolean);
-                        const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions].map(String)));
-                        studentUsers = uniqueIds.map(id => users.find(u => String(u.id) === id)).filter(Boolean);
-                    } else {
-                        const idsFromResults = (examResults || []).map(r => r.user_id).filter(Boolean);
-                        const idsFromSessions = (sessions || []).map(s => s.user_id).filter(Boolean);
-                        const uniqueIds = Array.from(new Set([...idsFromResults, ...idsFromSessions]));
-                        studentUsers = uniqueIds.map(id => users.find(u => u.id === id)).filter(Boolean);
-                    }
-                }
-
-                // Proctors / teachers: combine explicit staff users and any proctor_id referenced in classes
-                const proctorUsers = users.filter(u => {
-                    const r = userRole(u);
-                    return r === 'proctor' || r === 'teacher';
-                });
-                const proctorIdsFromClasses = Array.from(new Set((classes || []).map(c => c.proctor_id ? String(c.proctor_id) : null).filter(Boolean)));
-                const combinedProctorIds = new Set(proctorUsers.map(p => p.id).concat(proctorIdsFromClasses));
-                const teachersCount = combinedProctorIds.size;
-
-                // Alerts aggregation - using same types as reports page, but only for filtered sessions
-                let totalAlerts = 0;
-                let alertTypes = {
-                    twofaces: 0,
-                    loud_sound: 0,
-                    phone: 0,
-                    fullscreen_exit: 0,
-                    keyboard_shortcut: 0,
-                    right_click: 0,
-                    tab_switch: 0
-                };
-                (filteredSessions || []).forEach(session => {
-                    if (session.flags) {
-                        Object.entries(session.flags).forEach(([type, alerts]) => {
-                            if (Array.isArray(alerts)) {
-                                alertTypes[type] = (alertTypes[type] || 0) + alerts.length;
-                                totalAlerts += alerts.length;
-                            }
-                        });
-                    }
-                });
-
-                // Total questions (defensive) for exams visible to this user
-                const totalQuestions = (filteredExams || []).reduce((sum, exam) => {
-                    const qlen = Array.isArray(exam.questions) ? exam.questions.length : 0;
-                    return sum + qlen;
-                }, 0);
-
-                // Avg session duration (defensive) for visible sessions
-                const durations = (filteredSessions || []).map(s => {
-                    const start = new Date(s.start_time);
-                    const end = new Date(s.end_time);
-                    if (isNaN(start) || isNaN(end)) return 0;
-                    return (end - start) / (1000 * 60); // minutes
-                }).filter(d => d > 0);
-                const avgDuration = durations.length ? Math.round(durations.reduce((a, b) => a + b) / durations.length) : 0;
-
-                // Update UI
-                document.getElementById('totalStudents').textContent = studentUsers.length;
-                document.getElementById('totalTeachers').textContent = teachersCount;
-                document.getElementById('totalExams').textContent = (filteredExams || []).length;
-                document.getElementById('totalSessions').textContent = (filteredSessions || []).length;
-                document.getElementById('totalAlerts').textContent = totalAlerts;
-                document.getElementById('totalQuestions').textContent = totalQuestions;
-                document.getElementById('avgDuration').textContent = `${avgDuration} min`;
-                document.getElementById('alertRate').textContent = `${Math.round(totalAlerts / Math.max(1, (filteredSessions || []).length))} per exam`;
-
-                // Update alert types distribution
-                const alertTypesHtml = Object.entries(alertTypes)
-                    .map(([type, count]) => `
-                        <div class="alert-type bg-light">
-                            <div class="d-flex justify-content-between align-items-center">
-                                <span class="text-capitalize">${type.replace(/_/g, ' ')}</span>
-                                <span class="badge bg-primary">${count}</span>
-                            </div>
-                        </div>
-                    `).join('');
-                document.getElementById('alertTypes').innerHTML = alertTypesHtml || '<div class="text-muted">No alerts detected</div>';
-
-
-
-                // --- NEW metrics calculations ---
-
-                // Total classes (sections) visible to this user
-                const totalClasses = (filteredClasses || []).length;
-                document.getElementById('totalClasses').textContent = totalClasses;
-
-                // Avg exams per class (only for classes visible to this user)
-                const avgExamsPerClass = totalClasses ? ((filteredExams || []).length / totalClasses) : 0;
-                document.getElementById('avgExamsPerClass').textContent = avgExamsPerClass.toFixed(2);
-
-                // Completion rate: sessions with status === 'completed' (visible only)
-                const completed = (filteredSessions || []).filter(s => (s.status || '').toString().toLowerCase() === 'completed').length;
-                const completionRate = (filteredSessions && filteredSessions.length) ? Math.round((completed / filteredSessions.length) * 100) : 0;
-                document.getElementById('completionRate').textContent = `${completionRate}%`;
-
-                // Avg alerts per session (visible only)
-                const avgAlertsPerSession = filteredSessions && filteredSessions.length ? (totalAlerts / filteredSessions.length).toFixed(2) : 0;
-                document.getElementById('avgAlertsPerSession').textContent = avgAlertsPerSession;
-
-                // System logs (admin: full; proctor/teacher: scoped to exams + roster activity)
-                const logsVisible = filterLogsForViewer(systemLogsPayload.data, {
-                    isAdmin,
-                    viewerUserId: userId,
-                    proctorExamIds,
-                    filteredSessions,
-                    filteredExamResults
-                }).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-                const usersByIdLogs = {};
-                (users || []).forEach(uu => { if (uu && uu.id) usersByIdLogs[uu.id] = uu; });
-                renderSystemLogsTableBody(document.getElementById('systemLogsTableBody'), logsVisible, usersByIdLogs);
-                systemLogsViewerScope = {
-                    isAdmin,
-                    viewerUserId: userId,
-                    proctorExamIds,
-                    filteredSessions,
-                    filteredExamResults,
-                    usersById: usersByIdLogs,
-                };
-                systemLogsCursor = systemLogsPayload.next_cursor || null;
-                document.getElementById('systemLogsNextBtn').disabled = !systemLogsPayload.has_more;
-
-                logProctorDashboardAction('proctor_dashboard_open');
-
-                // (optional) Participation rate: users who appear in exam_results vs known students (visible exams)
-                const resultUserIds = new Set((filteredExamResults || []).map(r => r.user_id).filter(Boolean));
-                const participationRate = studentUsers.length ? Math.round((resultUserIds.size / studentUsers.length) * 100) : 0;
-                // set a tooltip or reuse element (here we set 'totalStudents' title)
-                document.getElementById('totalStudents').title = `Participation: ${participationRate}%`;
-
-                // Fetch classes for section display
-                const classesResponse = await fetch('/select?collection=classes');
-                const allClasses = await classesResponse.json() || [];
-                const classMap = {};
-                allClasses.forEach(cls => classMap[cls.id] = cls);
-
-                // Load student scores with proctoring flags, locked to assigned classes for proctors
-                if (isProctorScopedView && filteredClasses.length === 1) {
-                    const onlyClassId = String(filteredClasses[0].id);
-                    await loadStudentScoresWithFlags(
-                        users,
-                        filteredExams,
-                        filteredSessions,
-                        filteredExamResults,
-                        classMap,
-                        filteredClasses,
-                        null,
-                        onlyClassId
-                    );
-                } else {
-                    await loadStudentScoresWithFlags(
-                        users,
-                        filteredExams,
-                        filteredSessions,
-                        filteredExamResults,
-                        classMap,
-                        filteredClasses
-                    );
-                }
-
-                // done
-            } catch (err) {
-                console.error('Error loading dashboard data:', err);
-            }
-        }
-
-        // Load data when page loads
-        loadDashboardData();
-
-        // Real-time data updates every 30 seconds
-        setInterval(loadDashboardData, 30000);
-
-        // Filter change handlers
-        document.getElementById('examFilter').addEventListener('change', async function() {
-            const selectedExamId = this.value;
-            const selectedClassId = document.getElementById('sectionFilter').value;
-            await applyFilters(selectedExamId, selectedClassId);
-        });
-
-        document.getElementById('sectionFilter').addEventListener('change', async function() {
-            const selectedExamId = document.getElementById('examFilter').value;
-            const selectedClassId = this.value;
-            await applyFilters(selectedExamId, selectedClassId);
-        });
-
-        // Search functionality
-        document.getElementById('studentSearch').addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const rows = document.querySelectorAll('#studentScoresTable tr');
-
-            rows.forEach(row => {
-                const studentName = row.getAttribute('data-student-name') || '';
-                if (studentName.toLowerCase().includes(searchTerm)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-        });
-
-        // Apply filters function
-        async function applyFilters(selectedExamId, selectedClassId) {
-            try {
-                // Get current proctor user ID
+                // Update user with class_id
                 const userId = sessionStorage.getItem('userId');
-                if (!userId) return;
+                if (!userId) {
+                    msgEl.textContent = 'You must be logged in to join a section.';
+                    msgEl.classList.add('text-danger');
+                    return;
+                }
 
-                // Fetch data
-                const [users, exams, sessions, classes, examResults] = await Promise.all([
-                    fetch('/select?collection=users').then(r => r.json()),
-                    fetch('/select?collection=exams').then(r => r.json()),
-                    fetch('/select?collection=proctoring_sessions').then(r => r.json()),
-                    fetch('/select?collection=classes').then(r => r.json()),
-                    fetch('/select?collection=exam_results').then(r => r.json())
-                ]);
-
-                // Determine current user role (normalized) and scope.
-                // Safety-first: only admin sees global data on this page.
-                const normalizeRole = (usr) => ((usr?.role || usr?.type || '') + '').trim().toLowerCase();
-                const currentUser = (users || []).find(u => String(u.id) === String(userId)) || {};
-                const currentRole = normalizeRole(currentUser);
-                const isAdmin = currentRole === 'admin';
-                const adminCard = document.getElementById('adminControls');
-                if (adminCard) adminCard.style.display = isAdmin ? 'block' : 'none';
-                const isProctorScopedView = !isAdmin;
-
-                // Filter data based on proctor permissions
-                const allClassesArr = classes || [];
-                const proctorClasses = isProctorScopedView
-                    ? allClassesArr.filter(c => String(c.proctor_id) === String(userId))
-                    : allClassesArr;
-                const proctorClassIds = proctorClasses.map(c => String(c.id));
-                const proctorExams = isProctorScopedView
-                    ? (exams || []).filter(e => proctorClassIds.includes(String(e.class_id)))
-                    : (exams || []);
-                const proctorExamIds = proctorExams.map(e => e.id);
-                const proctorSessions = (sessions || []).filter(s => proctorExamIds.includes(s.exam_id));
-                const proctorExamResults = (examResults || []).filter(r => proctorExamIds.includes(r.exam_id));
-
-                const classMap = {};
-                classes.forEach(cls => classMap[cls.id] = cls);
-
-                // Load filtered student scores
-                await loadStudentScoresWithFlags(users, proctorExams, proctorSessions, proctorExamResults, classMap, proctorClasses, selectedExamId, selectedClassId);
-
-                const exPick = selectedExamId ? (proctorExams || []).find(e => String(e.id) === String(selectedExamId)) : null;
-                const clsPick = selectedClassId ? (proctorClasses || []).find(c => String(c.id) === String(selectedClassId)) : null;
-                const detailParts = [];
-                detailParts.push('exam:' + (exPick && exPick.title ? exPick.title : (selectedExamId || 'All')));
-                detailParts.push('section:' + (clsPick ? `${clsPick.course}-${clsPick.section}` : (selectedClassId || 'All')));
-                logProctorDashboardAction('proctor_dashboard_filter', detailParts.join(', '));
-
-            } catch (err) {
-                console.error('Error applying filters:', err);
-            }
-        }
-
-        // Load filters for exam and section
-        // When isProctor is true, we lock the section filter to the proctor's assigned class(es)
-        // and do not expose an "All Sections" option.
-        function loadFilters(exams, classes, isProctor) {
-            const examFilter = document.getElementById('examFilter');
-            const sectionFilter = document.getElementById('sectionFilter');
-
-            // Clear existing options
-            examFilter.innerHTML = '<option value="">All Exams</option>';
-            sectionFilter.innerHTML = '';
-
-            // Add exam options (same for admin/proctor; already class-filtered for proctors)
-            exams.forEach(exam => {
-                const option = document.createElement('option');
-                option.value = exam.id;
-                option.textContent = `${exam.title} (${exam.subject})`;
-                examFilter.appendChild(option);
-            });
-
-            // Add section options
-            if (isProctor) {
-                // Proctor: only their assigned classes, no "All Sections"
-                classes.forEach(cls => {
-                    const option = document.createElement('option');
-                    option.value = cls.id;
-                    option.textContent = `${cls.course} - ${cls.section}`;
-                    sectionFilter.appendChild(option);
+                const updateRes = await fetch(`/edit/${userId}?collection=users`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ class_id: targetClass.id })
                 });
 
-                // If exactly one class, preselect it and hide the dropdown UI
-                if (classes.length === 1) {
-                    sectionFilter.value = classes[0].id;
-                    const wrapper = sectionFilter.closest('.col-md-4');
-                    if (wrapper) wrapper.style.display = 'none';
+                if (!updateRes.ok) {
+                    let errText = 'Failed to join section. Please try again.';
+                    try {
+                        const errJson = await updateRes.json();
+                        if (errJson && errJson.error) {
+                            errText = `Failed to join section: ${errJson.error}`;
+                        }
+                    } catch (_) {}
+                    msgEl.textContent = errText;
+                    msgEl.classList.add('text-danger');
+                    return;
+                }
+
+                msgEl.textContent = `Joined section: ${targetClass.course} - ${targetClass.section}`;
+                msgEl.classList.add('text-success');
+
+                // Refresh UI
+                loadExams();
+                loadUserInfo();
+            } catch (err) {
+                console.error('Join code error:', err);
+                msgEl.textContent = 'Error joining section. Please try again.';
+                msgEl.classList.add('text-danger');
+            }
+        });
+
+        // Add logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const uidLo = sessionStorage.getItem('userId');
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: uidLo || '' })
+                });
+                
+                if (response.ok) {
+                    sessionStorage.removeItem('logged_admin_dash_open_v1');
+                    sessionStorage.removeItem('logged_proctor_dash_open_v1');
+                    // Clear session storage
+                    sessionStorage.clear();
+                    // Redirect to login page
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (err) {
+                console.error('Error during logout:', err);
+                alert('Error during logout');
+            }
+        });
+
+        // Check if user is logged in when page loads
+        function checkAuth() {
+            const userId = sessionStorage.getItem('userId');
+            if (!userId) {
+                window.location.href = '/';
+                return false;
+            }
+
+            // Check if user is a student
+            const user = JSON.parse(sessionStorage.getItem('user') || '{}');
+            if (user.type !== 'student') {
+                window.location.href = '/';
+                return false;
+            }
+
+            // Load user info
+            loadUserInfo();
+
+            return true;
+        }
+
+        // Load user information
+        async function loadUserInfo() {
+            const userId = sessionStorage.getItem('userId');
+            const userResponse = await fetch('/select?collection=users&id=' + userId);
+            const user = await userResponse.json();
+            
+            document.getElementById('userName').textContent = user.name || 'Student';
+            const roleBadge = document.getElementById('roleBadge');
+            if (roleBadge) roleBadge.textContent = (user.role || user.type || 'student');
+
+            // Load student's section
+            if (user.class_id) {
+                const classesResponse = await fetch('/select?collection=classes');
+                const classes = await classesResponse.json();
+                const studentClass = classes.find(cls => cls.id === user.class_id);
+                if (studentClass) {
+                    document.getElementById('sectionDisplay').textContent = `${studentClass.course} - ${studentClass.section}`;
+                } else {
+                    document.getElementById('sectionDisplay').textContent = 'Not assigned';
                 }
             } else {
-                // Admin: can see all sections, including "All Sections"
-                const allOpt = document.createElement('option');
-                allOpt.value = '';
-                allOpt.textContent = 'All Sections';
-                sectionFilter.appendChild(allOpt);
+                document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                document.getElementById('sectionDisplay').style.color = '#dc3545';
+            }
 
-                classes.forEach(cls => {
-                    const option = document.createElement('option');
-                    option.value = cls.id;
-                    option.textContent = `${cls.course} - ${cls.section}`;
-                    sectionFilter.appendChild(option);
-                });
+            // Load dark mode preference
+            const darkMode = localStorage.getItem('darkMode') === 'true';
+            if (darkMode) {
+                document.body.classList.add('dark-mode');
+                document.getElementById('darkModeText').textContent = 'Light Mode';
             }
         }
 
-        // Load student scores with proctoring flags
+        // Profile button handler
+        document.getElementById('profileBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = '/profile';
+        });
+
+        // Dark mode toggle
+        document.getElementById('darkModeBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            document.getElementById('darkModeText').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+        });
+
         // Unified utility functions for consistent display across all dashboards
         
         // Format proctoring flags with readable names
@@ -1328,303 +969,148 @@
             return 'N/A';
         }
 
-        function countViolationEventsForChair(flags) {
-            if (!flags || typeof flags !== 'object') return 0;
-            return Object.values(flags).reduce((s, arr) => s + (Array.isArray(arr) ? arr.length : 0), 0);
-        }
+        // Load student scores
+        async function loadStudentScores() {
+            const userId = sessionStorage.getItem('userId');
+            const userResponse = await fetch('/select?collection=users&id=' + userId);
+            const user = await userResponse.json();
 
-        let proctorNotifyChairSessionId = '';
+            const tbody = document.getElementById('scoresTable');
+            tbody.innerHTML = '';
 
-        function openProctorNotifyChairModal(sessionId) {
-            proctorNotifyChairSessionId = (sessionId || '').trim();
-            const em = document.getElementById('proctorNotifyChairEmail');
-            const err = document.getElementById('proctorNotifyChairError');
-            if (em) em.value = '';
-            if (err) { err.style.display = 'none'; err.textContent = ''; }
-            const el = document.getElementById('proctorNotifyChairModal');
-            if (el) bootstrap.Modal.getOrCreateInstance(el).show();
-        }
+            if (user.exams_taken && user.exams_taken.length > 0) {
+                // Get proctoring sessions for violations
+                const sessionsResponse = await fetch('/select?collection=proctoring_sessions');
+                const allSessions = await sessionsResponse.json();
 
-        async function submitProctorNotifyChair() {
-            const emailInput = document.getElementById('proctorNotifyChairEmail');
-            const errorEl = document.getElementById('proctorNotifyChairError');
-            const submitBtn = document.getElementById('proctorNotifyChairSubmit');
-            const email = (emailInput?.value || '').trim();
-            if (!proctorNotifyChairSessionId) {
-                errorEl.textContent = 'Missing session.';
-                errorEl.style.display = 'block';
-                return;
-            }
-            if (!email) {
-                errorEl.textContent = 'Enter the program chair email address.';
-                errorEl.style.display = 'block';
-                return;
-            }
-            errorEl.style.display = 'none';
-            if (submitBtn) submitBtn.disabled = true;
-            try {
-                const res = await fetch('/notify_program_chair', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: proctorNotifyChairSessionId,
-                        program_chair_email: email,
-                        acting_user_id: sessionStorage.getItem('userId') || ''
-                    })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (res.ok && data.status === 'ok') {
-                    const inst = bootstrap.Modal.getInstance(document.getElementById('proctorNotifyChairModal'));
-                    if (inst) inst.hide();
-                    alert('Email sent to the program chair.');
-                } else {
-                    errorEl.textContent = data.error || 'Failed to send email.';
-                    errorEl.style.display = 'block';
-                }
-            } catch (e) {
-                errorEl.textContent = 'Network error. Try again.';
-                errorEl.style.display = 'block';
-            } finally {
-                if (submitBtn) submitBtn.disabled = false;
-            }
-        }
+                for (const examId of user.exams_taken) {
+                    try {
+                        // Get exam details
+                        const examResponse = await fetch(`/select?collection=exams&id=${examId}`);
+                        const exam = await examResponse.json();
 
-        (function initProctorChairNotifyDelegation() {
-            const tb = document.getElementById('studentScoresTable');
-            if (!tb || tb._proctorChairBound) return;
-            tb._proctorChairBound = true;
-            tb.addEventListener('click', (e) => {
-                const btn = e.target.closest('.btn-chair-notify-proctor');
-                if (!btn || !btn.dataset.chairSid) return;
-                openProctorNotifyChairModal(btn.dataset.chairSid);
-            });
-        })();
+                        // Get exam results to calculate score
+                        const resultsResponse = await fetch('/select?collection=exam_results');
+                        const allResults = await resultsResponse.json();
 
-        async function loadStudentScoresWithFlags(users, exams, sessions, examResults, classMap, allClasses, selectedExamId = null, selectedClassId = null) {
-            try {
-                const tbody = document.getElementById('studentScoresTable');
-                tbody.innerHTML = '';
+                        // Find the result for this user and exam
+                        const userResult = allResults.find(result =>
+                            result.user_id === userId && result.exam_id === examId
+                        );
 
-                // Get students in selected class (year/section) or, if none selected, in any of the visible classes.
-                // Students from other years/sections will not appear.
-                const allStudentUsers = users.filter(u => (u.role === 'student' || u.type === 'student'));
-                let studentsToShow = [];
+                        let scoreDisplay = 'N/A';
+                        let dateTaken = 'N/A';
+                        let statusBadge = '';
 
-                if (selectedClassId) {
-                    const selectedIdStr = String(selectedClassId);
-                    studentsToShow = allStudentUsers.filter(u => String(u.class_id || '') === selectedIdStr);
-                } else if (allClasses && allClasses.length > 0) {
-                    const visibleClassIds = new Set(allClasses.map(cls => String(cls.id)));
-                    studentsToShow = allStudentUsers.filter(u => u.class_id && visibleClassIds.has(String(u.class_id)));
-                } else {
-                    // Fallback: if no classes context is provided, show none to avoid leaking other sections
-                    studentsToShow = [];
-                }
-
-                // If no students, show message
-                if (studentsToShow.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center">No students found in selected section.</td></tr>';
-                    return;
-                }
-
-                // Display results for each student
-                for (const student of studentsToShow) {
-                    const userId = student.id;
-
-                    // Get section display
-                    let sectionDisplay = 'Not Assigned';
-                    if (student.class_id && classMap[student.class_id]) {
-                        const cls = classMap[student.class_id];
-                        sectionDisplay = `${cls.course} - ${cls.section}`;
-                    } else if (selectedClassId && classMap[selectedClassId]) {
-                        const cls = classMap[selectedClassId];
-                        sectionDisplay = `${cls.course} - ${cls.section}`;
-                    } else if (allClasses && allClasses.length > 0) {
-                        // Find student's class
-                        const studentClass = allClasses.find(cls => cls.id === student.class_id);
-                        if (studentClass) {
-                            sectionDisplay = `${studentClass.course} - ${studentClass.section}`;
-                        }
-                    }
-
-                    // Check if student has taken the selected exam
-                    let examResult = null;
-                    let exam = null;
-                    let session = null;
-
-                    if (selectedExamId) {
-                        exam = exams.find(e => e.id === selectedExamId);
-                        examResult = examResults.find(r => r.user_id === userId && r.exam_id === selectedExamId);
-                        // Find session - check both student_id and user_id, prioritize student_id
-                        session = sessions.find(s => {
-                            const matchesUser = (s.student_id === userId || s.user_id === userId);
-                            return matchesUser && s.exam_id === selectedExamId;
-                        });
-                    } else {
-                        // If no exam selected, show latest exam taken by student
-                        const studentResults = examResults.filter(r => r.user_id === userId);
-                        if (studentResults.length > 0) {
-                            // Sort by timestamp, get latest
-                            studentResults.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-                            examResult = studentResults[0];
-                            exam = exams.find(e => e.id === examResult.exam_id);
-                            // Find session - check both student_id and user_id, prioritize student_id
-                            session = sessions.find(s => {
-                                const matchesUser = (s.student_id === userId || s.user_id === userId);
-                                return matchesUser && s.exam_id === examResult.exam_id;
-                            });
-                        }
-                    }
-
-                    // Determine status
-                    const status = examResult ? 'Taken' : 'Not Taken';
-                    const statusBadge = status === 'Taken' ? 'bg-success' : 'bg-warning';
-
-                    // Calculate score
-                    let scoreDisplay = 'N/A';
-                    if (examResult && exam && exam.questions && examResult.answers) {
-                        const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
-                        let correctAnswers = 0;
-                        exam.questions.forEach((question, index) => {
-                            if (examResult.answers && normalizeAnswer(examResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
-                                correctAnswers++;
+                        if (userResult) {
+                            // Show forced/terminated as 0
+                            if (userResult.forced_score === 0 || userResult.terminated) {
+                                scoreDisplay = '0 (terminated)';
+                                statusBadge = '<span class="badge bg-danger">Terminated</span>';
+                            } else if (exam.questions) {
+                                const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
+                                let correctAnswers = 0;
+                                exam.questions.forEach((question, index) => {
+                                    if (userResult.answers && normalizeAnswer(userResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
+                                        correctAnswers++;
+                                    }
+                                });
+                                scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                                statusBadge = '<span class="badge bg-success">Completed</span>';
                             }
-                        });
-                        scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
-                    }
-
-                    // Use unified formatting functions
-                    const dateTimeTaken = formatDateTime(examResult ? examResult.timestamp : null);
-                    const durationDisplay = formatDuration(examResult, session);
-                    const flagsDisplay = formatProctoringFlags(session ? session.flags : null);
-                    const vChair = countViolationEventsForChair(session ? session.flags : null);
-                    const sidChair = session && session.id ? String(session.id) : '';
-                    const actionChair = vChair > 0 && sidChair
-                        ? `<button type="button" class="btn btn-sm btn-outline-danger btn-chair-notify-proctor" title="Notify program chair" data-chair-sid="${_escapeHtmlLog(sidChair)}"><i class='bx bx-envelope'></i></button>`
-                        : '<span class="text-muted small">—</span>';
-
-                    const row = `
-                        <tr data-student-name="${student.name || 'Unknown'}">
-                            <td><strong>${student.name || 'Unknown'}</strong><br><small class="text-muted">${student.email || ''}</small></td>
-                            <td>${sectionDisplay}</td>
-                            <td><span class="badge ${statusBadge}">${status}</span></td>
-                            <td><strong>${scoreDisplay}</strong></td>
-                            <td>${dateTimeTaken}</td>
-                            <td>${durationDisplay}</td>
-                            <td><span class="badge ${flagsDisplay !== 'None' ? 'bg-warning' : 'bg-success'}">${flagsDisplay}</span></td>
-                            <td>${actionChair}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                }
-
-                // Sort by status (Not Taken first), then by name
-                if (tbody.children.length > 1) {
-                    const rows = Array.from(tbody.children);
-                    rows.sort((a, b) => {
-                        const statusA = a.cells[2].textContent;
-                        const statusB = b.cells[2].textContent;
-                        if (statusA !== statusB) {
-                            return statusA === 'Not Taken' ? -1 : 1;
+                            dateTaken = formatDateTime(userResult.timestamp);
                         }
-                        const nameA = a.cells[0].textContent.toLowerCase();
-                        const nameB = b.cells[0].textContent.toLowerCase();
-                        return nameA.localeCompare(nameB);
-                    });
-                    // Clear and re-append sorted rows
-                    tbody.innerHTML = '';
-                    rows.forEach(row => tbody.appendChild(row));
-                }
 
-                if (tbody.innerHTML === '') {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center">No students found</td></tr>';
-                }
+                        // Find violations for this exam and user
+                        const userSession = allSessions.find(session =>
+                            (session.student_id === userId || session.user_id === userId) &&
+                            session.exam_id === examId
+                        );
 
-            } catch (err) {
-                console.error('Error loading student scores:', err);
-                document.getElementById('studentScoresTable').innerHTML =
-                    '<tr><td colspan="8" class="text-center text-danger">Error loading scores</td></tr>';
+                        // Use unified flag formatting function
+                        const violationsDisplay = formatProctoringFlags(userSession ? userSession.flags : null);
+
+                        // Use unified duration formatting function
+                        const durationDisplay = formatDuration(userResult, userSession);
+
+                        // Format exam duration
+                        const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
+
+                        const row = `
+                            <tr>
+                                <td>${user.name || 'Unknown'}</td>
+                                <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
+                                <td>${scoreDisplay} ${statusBadge}</td>
+                                <td>${dateTaken}</td>
+                                <td>${durationDisplay} / ${examDurationDisplay}</td>
+                                <td>${violationsDisplay}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    } catch (err) {
+                        console.warn('Error loading score for exam:', examId, err);
+                    }
+                }
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No exams taken yet</td></tr>';
             }
         }
 
-        async function downloadArchivePdfResponse(response) {
-            const ct = (response.headers.get('content-type') || '').toLowerCase();
-            if (response.ok && ct.includes('application/pdf')) {
-                const blob = await response.blob();
-                const dispo = response.headers.get('Content-Disposition') || '';
-                let fname = 'proctoring_archive.pdf';
-                const m = /filename="([^"]+)"/i.exec(dispo);
-                if (m) fname = m[1];
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fname;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-                return { ok: true, pdf: true };
+        // Show success message if just joined via invite link
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('joined') === '1') {
+            const msgEl = document.getElementById('joinCodeMessage');
+            if (msgEl) {
+                msgEl.textContent = 'You successfully joined the section!';
+                msgEl.className = 'small text-success';
             }
-            let data;
-            try {
-                data = await response.json();
-            } catch (e) {
-                data = { error: 'Invalid response' };
-            }
-            return { ok: response.ok, data };
+            // Remove ?joined=1 from URL without reload
+            window.history.replaceState({}, '', window.location.pathname);
         }
 
-        async function deleteAllReports() {
-            const confirmationText = prompt('Type ARCHIVE ALL to archive every session and all exam results (data kept; hidden from dashboards):');
-            if (confirmationText !== 'ARCHIVE ALL') {
-                alert('Cancelled. Type ARCHIVE ALL exactly to confirm.');
-                return;
-            }
-
-            if (!confirm('This will mark all reports as archived, hide them from the main views, and download a PDF summary. Recordings are not deleted from the server. Continue?')) {
-                return;
-            }
-
-            try {
-                const btn = document.getElementById('deleteAllBtn');
-                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Archiving...';
-                btn.disabled = true;
-
-                const response = await fetch('/archive_reports', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        delete_all: true,
-                        user_id: sessionStorage.getItem('userId') || ''
-                    })
-                });
-
-                const handled = await downloadArchivePdfResponse(response);
-                if (handled.pdf && handled.ok) {
-                    const ns = response.headers.get('X-Archived-Sessions');
-                    const nr = response.headers.get('X-Archived-Results');
-                    alert(`Archive complete. Sessions archived: ${ns || '—'}, exam results archived: ${nr || '—'}. If no PDF appeared, check your Downloads folder or browser settings.`);
-                    sessionStorage.removeItem('logged_proctor_dash_open_v1');
-                    loadDashboardData();
-                } else if (handled.data && handled.data.success) {
-                    alert(handled.data.message || 'Done.');
-                    loadDashboardData();
-                } else {
-                    const err = (handled.data && (handled.data.error || handled.data.message)) || 'Unknown error';
-                    alert('Error: ' + err);
-                }
-            } catch (error) {
-                console.error('Archive all reports error:', error);
-                alert('Failed to archive reports. Please try again.');
-            } finally {
-                const btn = document.getElementById('deleteAllBtn');
-                btn.innerHTML = '<i class="bx bx-archive"></i> Archive reports';
-                btn.disabled = false;
-            }
+        // PWA install prompt handling
+        let deferredPrompt = null;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            const navItem = document.getElementById('installNavItem');
+            if (navItem) navItem.classList.remove('d-none');
+        });
+        window.addEventListener('appinstalled', () => {
+            deferredPrompt = null;
+            const navItem = document.getElementById('installNavItem');
+            if (navItem) navItem.classList.add('d-none');
+        });
+        const installBtnEl = document.getElementById('installBtn');
+        if (installBtnEl) {
+            installBtnEl.addEventListener('click', async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                try { await deferredPrompt.userChoice; } catch (_) {}
+                deferredPrompt = null;
+                const navItem = document.getElementById('installNavItem');
+                if (navItem) navItem.classList.add('d-none');
+            });
         }
 
+        // Load exams when page loads
+        loadExams();
+        loadStudentScores();
+        
+        // Refresh exams when page becomes visible (user returns from exam)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                // Page is now visible, refresh exams to show updated completion status
+                loadExams();
+                loadStudentScores();
+            }
+        });
+        
+        // Also refresh on focus (when user switches back to tab)
+        window.addEventListener('focus', () => {
+            loadExams();
+            loadStudentScores();
+        });
     </script>
-
 </body>
-
 </html>
