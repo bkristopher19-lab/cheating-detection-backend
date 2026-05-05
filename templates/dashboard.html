@@ -538,6 +538,9 @@
                                 <button type="button" class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
                                     <i class="bx bx-archive"></i> Archive reports
                                 </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm ms-2" id="cleanupResultsBtn" onclick="cleanupStaleResults()">
+                                    <i class="bx bx-brush"></i> Clean stale results
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1432,6 +1435,42 @@
                 const btn = document.getElementById('deleteAllBtn');
                 btn.innerHTML = '<i class="bx bx-archive"></i> Archive reports';
                 btn.disabled = false;
+            }
+        }
+
+        async function cleanupStaleResults() {
+            if (!confirm('Clean stale/duplicate exam results now? This removes invalid or repeated rows.')) return;
+            const btn = document.getElementById('cleanupResultsBtn');
+            const previous = btn.innerHTML;
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Cleaning...';
+                const response = await fetch('/cleanup_exam_results', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: sessionStorage.getItem('userId') || ''
+                    })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok || !data.success) {
+                    alert('Error: ' + (data.error || data.message || 'Cleanup failed.'));
+                    return;
+                }
+                alert(
+                    `Cleanup complete.\n` +
+                    `Removed: ${data.deleted_total || 0}\n` +
+                    `Missing refs: ${data.stale_missing || 0}\n` +
+                    `Missing users: ${data.stale_orphan || 0}\n` +
+                    `Duplicates: ${data.duplicates_removed || 0}`
+                );
+                loadDashboardData();
+            } catch (error) {
+                console.error('Cleanup stale results error:', error);
+                alert('Failed to clean stale results. Please try again.');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = previous;
             }
         }
 
