@@ -1210,20 +1210,27 @@
         }
 
         async function bootstrapProctorDashboard() {
+            const rootEl = document.getElementById('main-content');
+            const safeReplace = (path) => {
+                if (window.location.pathname !== path) {
+                    window.location.replace(path);
+                }
+            };
+            if (rootEl) rootEl.classList.add('d-none');
             try {
                 const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
-                if (!authState.user) {
-                    window.location.replace('/');
-                    return;
-                }
                 const uid = (authState.user && authState.user.uid) || sessionStorage.getItem('authUid') || localStorage.getItem('authUid') || '';
                 const email = (authState.user && authState.user.email) || sessionStorage.getItem('authEmail') || localStorage.getItem('authEmail') || '';
+                if (!authState.user && !uid && !email) {
+                    safeReplace('/');
+                    return;
+                }
                 const qs = new URLSearchParams();
                 if (uid) qs.set('uid', uid);
                 if (email) qs.set('email', email);
                 const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
                 if (!profileRes.ok) {
-                    window.location.replace('/');
+                    safeReplace('/');
                     return;
                 }
                 const profile = await profileRes.json();
@@ -1234,25 +1241,29 @@
                 if (email) sessionStorage.setItem('authEmail', email);
 
                 if (role === 'student') {
-                    window.location.replace('/student_dashboard');
+                    safeReplace('/student_dashboard');
                     return;
                 }
                 if (role !== 'admin' && role !== 'proctor' && role !== 'teacher') {
-                    window.location.replace('/');
+                    safeReplace('/');
                     return;
                 }
 
+                await new Promise((resolve) => setTimeout(resolve, 100));
                 loadDashboardData();
                 if (__proctorRefreshTimer) clearInterval(__proctorRefreshTimer);
                 __proctorRefreshTimer = setInterval(() => {
                     if (!document.hidden) loadDashboardData();
                 }, 90000);
+                if (rootEl) rootEl.classList.remove('d-none');
             } catch (err) {
                 console.error('Proctor dashboard auth init failed:', err);
                 if (typeof window.__notifySessionExpired === 'function') {
                     window.__notifySessionExpired('Session expired, please login again.');
                 }
-                window.location.replace('/');
+                safeReplace('/');
+            } finally {
+                if (rootEl) rootEl.classList.remove('d-none');
             }
         }
 
