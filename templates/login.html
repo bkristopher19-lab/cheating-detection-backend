@@ -149,7 +149,6 @@
                     <div class="card-body">
                         <h3 class="text-center mb-4">Login</h3>
                         <form id="loginForm">
-                            <div id="loginError" class="alert alert-danger d-none" role="alert"></div>
                             <div class="mb-3">
                                 <label class="form-label">Email</label>
                                 <input type="email" class="form-control" id="email" required maxlength="254" placeholder="name@gmail.com or name@yahoo.com">
@@ -198,10 +197,17 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebas
 import { 
   getAuth, 
   signInWithEmailAndPassword, 
-  sendPasswordResetEmail,
-  onAuthStateChanged,
-  getIdToken
+  sendPasswordResetEmail 
 } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+import { 
+  getFirestore, 
+  doc, 
+  getDoc, 
+  collection, 
+  query, 
+  where, 
+  getDocs 
+} from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyBCXjpscninjBMMiEth3faD4LsVolWYEjA",
@@ -214,74 +220,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-
-const loginError = document.getElementById('loginError');
-const loginFlowStart = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-function flowLog(step, startedAt) {
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const elapsedMs = Math.round(now - startedAt);
-    console.log(`[LOGIN FLOW] ${step} (+${elapsedMs}ms)`);
-}
-function showLoginError(message) {
-    if (!loginError) return;
-    loginError.textContent = message;
-    loginError.classList.remove('d-none');
-}
-function hideLoginError() {
-    if (!loginError) return;
-    loginError.textContent = '';
-    loginError.classList.add('d-none');
-}
-function mapFirebaseAuthError(errorCode) {
-    const code = (errorCode || '').toString();
-    const messages = {
-        'auth/invalid-credential': 'Invalid email or password.',
-        'auth/user-not-found': 'No account found for this email.',
-        'auth/wrong-password': 'Invalid email or password.',
-        'auth/invalid-email': 'The email address format is invalid.',
-        'auth/too-many-requests': 'Too many attempts. Please try again in a few minutes.',
-        'auth/network-request-failed': 'Network error. Please check your internet connection.'
-    };
-    return messages[code] || 'Login failed. Please try again.';
-}
-const authInitPromise = new Promise((resolve) => {
-    let settled = false;
-    const finish = (source) => {
-        if (settled) return;
-        settled = true;
-        console.log(`[LOGIN FLOW] Firebase auth initialized via ${source}`);
-        resolve();
-    };
-    const timeoutId = setTimeout(() => finish('timeout'), 4000);
-    const unsub = onAuthStateChanged(
-        auth,
-        (user) => {
-            clearTimeout(timeoutId);
-            unsub();
-            console.log('[LOGIN FLOW] Initial auth state user:', user ? user.uid : 'none');
-            finish('onAuthStateChanged');
-        },
-        (error) => {
-            clearTimeout(timeoutId);
-            unsub();
-            console.warn('[LOGIN FLOW] Auth state init error:', error);
-            finish('onAuthStateChanged-error');
-        }
-    );
-});
-
-authInitPromise.then(() => {
-    if (auth.currentUser) {
-        const currentUser = auth.currentUser;
-        if (currentUser.uid) localStorage.setItem('authUid', currentUser.uid);
-        if (currentUser.email) localStorage.setItem('authEmail', currentUser.email);
-        getIdToken(currentUser).then((token) => {
-            if (token) localStorage.setItem('authToken', token);
-        }).catch(() => {});
-        console.log('[LOGIN FLOW] Existing session detected; redirecting to dashboard');
-        window.location.replace('/dashboard');
-    }
-});
+const db = getFirestore(app);
 
 // Client-side validation
 const emailRe = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
@@ -297,14 +236,10 @@ function validateLogin() {
 // 🔐 LOGIN with Firebase + get role from Firestore
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const startedAt = loginFlowStart();
-    flowLog('Submit clicked', startedAt);
-    hideLoginError();
 
     const validation = validateLogin();
     if (!validation.ok) {
-        showLoginError(validation.msg);
-        flowLog('Client validation failed', startedAt);
+        alert(validation.msg);
         return;
     }
 
@@ -316,44 +251,79 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
     const loginSpinner = document.getElementById('loginSpinner');
 
     try {
-        flowLog('Waiting for Firebase auth initialization', startedAt);
-        await authInitPromise;
-        flowLog('Firebase auth initialized', startedAt);
-
         if (loginBtn && loginText && loginSpinner) {
             loginBtn.disabled = true;
             loginText.textContent = 'Signing in...';
             loginSpinner.classList.remove('d-none');
         }
 
-        // 1) Authenticate only (no dashboard/user data fetch in login flow)
-        flowLog('Calling signInWithEmailAndPassword', startedAt);
+        // 1) Verify credentials with Firebase Authentication
         const cred = await signInWithEmailAndPassword(auth, email, password);
         const firebaseUser = cred.user;
-        flowLog(`Firebase auth success for uid=${firebaseUser.uid}`, startedAt);
+        const uid = firebaseUser.uid;
 
-        // Store lightweight auth context only; role/profile fetch is moved to dashboard init.
-        sessionStorage.setItem('authUid', firebaseUser.uid);
-        sessionStorage.setItem('authEmail', firebaseUser.email || email);
-        localStorage.setItem('authUid', firebaseUser.uid);
-        localStorage.setItem('authEmail', firebaseUser.email || email);
-        try {
-            const freshToken = await getIdToken(firebaseUser);
-            if (freshToken) localStorage.setItem('authToken', freshToken);
-        } catch (_) {
-            // Non-fatal; dashboard bootstrap can still restore with uid/email.
+        // 2) Try to get Firestore user document by UID (your screenshot shows doc IDs look like UIDs)
+        let role = 'student';
+        let name = firebaseUser.email;
+        let userDocId = uid; // Default to UID, but will update if found
+        let userDocSnap = await getDoc(doc(db, "users", uid));
+
+        // If not found by UID, fallback to search by email
+        if (!userDocSnap.exists()) {
+            const q = query(
+                collection(db, "users"),
+                where("email", "==", email)
+            );
+            const querySnap = await getDocs(q);
+            if (!querySnap.empty) {
+                userDocSnap = querySnap.docs[0];
+                userDocId = userDocSnap.id; // Use the actual document ID
+            }
+        } else {
+            userDocId = userDocSnap.id; // Use the actual document ID
         }
-        flowLog('Auth context saved to sessionStorage', startedAt);
 
-        // Immediate redirect after login (equivalent to navigate('/dashboard'))
-        flowLog('Redirecting to /dashboard', startedAt);
-        window.location.href = '/dashboard';
-        return;
+        if (userDocSnap.exists()) {
+            const data = userDocSnap.data();
+            role = data.role || role;    // admin / proctor / student
+            name = data.name || name;
+        } else {
+            console.warn("No Firestore user doc found, defaulting to student.");
+        }
+
+        // 3) Build user object like before
+        const userObj = {
+            id: userDocId, // Use the Firestore document ID
+            uid: uid,
+            email: firebaseUser.email,
+            name: name,
+            role: role
+        };
+
+        // 4) Store in sessionStorage
+        sessionStorage.setItem('user', JSON.stringify(userObj));
+        sessionStorage.setItem('userId', userObj.id);
+
+        // 5) Redirect based on role (same logic as your old JS)
+        // If student came from an invite link, send them back to complete the join
+        const redirectUrl = new URLSearchParams(window.location.search).get('redirect') || sessionStorage.getItem('redirectAfterLogin');
+        if (role === 'student' && redirectUrl && redirectUrl.startsWith('/join/')) {
+            window.location.href = redirectUrl;
+            return;
+        }
+        const normalizedRole = (role || '').toString().trim().toLowerCase();
+        if (normalizedRole === 'student') {
+            window.location.href = '/student_dashboard';
+        } else if (normalizedRole === 'proctor' || normalizedRole === 'teacher') {
+            window.location.href = '/proctor_dashboard';
+        } else {
+            // admin fallback
+            window.location.href = '/dashboard';
+        }
 
     } catch (err) {
-        console.error('[LOGIN FLOW] Login failed:', err);
-        showLoginError(mapFirebaseAuthError(err.code) + (err?.message ? ` (${err.message})` : ''));
-        flowLog(`Login error: ${err.code || 'unknown'}`, startedAt);
+        alert('Login failed: ' + err.message);
+        console.error(err);
     } finally {
         if (loginBtn && loginText && loginSpinner) {
             loginBtn.disabled = false;
