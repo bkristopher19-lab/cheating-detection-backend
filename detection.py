@@ -291,6 +291,11 @@ UI_DASHBOARD_ACTION_MESSAGES = {
     'proctor_dashboard_filter': 'Changed exam or section filters',
 }
 
+SYSTEM_LOGS_MAX_QUERY_LIMIT = 20
+SYSTEM_LOGS_RETENTION_DAYS = 7
+SYSTEM_LOGS_WRITE_DEDUP_SECONDS = 60
+_system_log_recent_keys = {}
+
 
 @app.route('/log_dashboard_activity', methods=['POST'])
 def log_dashboard_activity():
@@ -336,12 +341,25 @@ def append_system_log(message, event_type='info', user_id=None, meta=None):
     try:
         msg = '' if message is None else str(message).strip()
         msg = msg[:4000]
+        if not msg:
+            return
         et = '' if event_type is None else str(event_type).strip().lower()
         et = et[:96] if et else 'info'
+        now_dt = datetime.utcnow()
+        dedup_key = f'{et}|{user_id or ""}|{msg[:240]}'
+        last_seen = _system_log_recent_keys.get(dedup_key)
+        if last_seen and (now_dt - last_seen).total_seconds() < SYSTEM_LOGS_WRITE_DEDUP_SECONDS:
+            # Reduce repeated writes from frequent UI polling/actions.
+            return
+        _system_log_recent_keys[dedup_key] = now_dt
+        stale_before = now_dt - timedelta(seconds=SYSTEM_LOGS_WRITE_DEDUP_SECONDS * 10)
+        for key, ts in list(_system_log_recent_keys.items()):
+            if ts < stale_before:
+                _system_log_recent_keys.pop(key, None)
         row = {
             'message': msg or '(no message)',
             'event_type': et,
-            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'timestamp': now_dt.isoformat() + 'Z',
             'user_id': user_id,
         }
         if user_id:
@@ -892,6 +910,34 @@ def select():
                 data['id'] = doc.id
                 return jsonify(data), 200
             return jsonify({'error': 'Document not found'}), 404
+
+        if collection == 'system_logs':
+            raw_limit = request.args.get('limit', SYSTEM_LOGS_MAX_QUERY_LIMIT)
+            try:
+                req_limit = int(raw_limit)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'limit must be an integer'}), 400
+            if req_limit < 1:
+                req_limit = 1
+            query_limit = min(req_limit, SYSTEM_LOGS_MAX_QUERY_LIMIT)
+
+            # Cursor is the previous page's last timestamp (ISO string).
+            cursor = (request.args.get('start_after') or '').strip()
+            query = db.collection('system_logs').order_by('timestamp', direction=firestore.Query.DESCENDING)
+            if cursor:
+                query = query.start_after({'timestamp': cursor})
+            docs = []
+            for doc in query.limit(query_limit).stream():
+                data = doc.to_dict() or {}
+                data['id'] = doc.id
+                docs.append(data)
+            next_cursor = docs[-1].get('timestamp') if docs else None
+            return jsonify({
+                'data': docs,
+                'next_cursor': next_cursor,
+                'limit': query_limit,
+                'has_more': len(docs) == query_limit,
+            }), 200
 
         # Get all documents (hide soft-archived sessions/results unless requested)
         include_archived = str(request.args.get('include_archived', '')).lower() in (
@@ -2253,6 +2299,24 @@ def cleanup_old_reports():
             expired_count += 1
 
         print(f'Deleted {expired_count} expired shared reports')
+
+        # Keep system_logs bounded by retention to control read/query costs.
+        logs_cutoff_iso = (datetime.utcnow() - timedelta(days=SYSTEM_LOGS_RETENTION_DAYS)).isoformat() + 'Z'
+        old_logs = db.collection('system_logs').where('timestamp', '<', logs_cutoff_iso).stream()
+        old_log_refs = [(log_doc.reference, None) for log_doc in old_logs]
+        if old_log_refs:
+            batch = db.batch()
+            n = 0
+            for ref, _ in old_log_refs:
+                batch.delete(ref)
+                n += 1
+                if n >= 400:
+                    batch.commit()
+                    batch = db.batch()
+                    n = 0
+            if n:
+                batch.commit()
+        print(f'Deleted {len(old_log_refs)} system log(s) older than {SYSTEM_LOGS_RETENTION_DAYS} day(s)')
 
     except Exception as e:
         print(f'Error during cleanup: {e}')
