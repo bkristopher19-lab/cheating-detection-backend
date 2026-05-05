@@ -21,13 +21,7 @@
             --text-muted: #5a7a5a;
         }
         * { font-family: 'DM Sans', system-ui, sans-serif; }
-        body {
-            background: var(--bg-page);
-            padding-top: max(0px, env(safe-area-inset-top));
-            padding-right: max(0px, env(safe-area-inset-right));
-            padding-bottom: max(0px, env(safe-area-inset-bottom));
-            padding-left: max(0px, env(safe-area-inset-left));
-        }
+        body { background: var(--bg-page); }
 
         /* Navbar */
         .navbar-student {
@@ -39,68 +33,6 @@
             font-family: 'Outfit', sans-serif;
             font-weight: 700;
             color: white !important;
-        }
-        .dashboard-header-shell {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            min-height: 64px;
-            padding-top: 0.35rem;
-            padding-bottom: 0.35rem;
-            max-width: 100%;
-        }
-        .dashboard-header-left {
-            font-size: 1.05rem;
-            font-weight: 600;
-            letter-spacing: 0.01em;
-            margin: 0;
-            line-height: 1;
-            max-width: 60vw;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .dashboard-header-right {
-            display: flex;
-            align-items: center;
-            gap: 0.4rem;
-        }
-        .dashboard-header-right > * {
-            margin: 0 !important;
-        }
-        .dashboard-header-right .btn,
-        .dashboard-header-right .nav-link,
-        .dashboard-header-right button,
-        .dashboard-header-right .dropdown-toggle {
-            height: 40px;
-            min-height: 40px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0 14px;
-            font-size: 14px;
-            border-radius: 6px;
-            line-height: 1;
-        }
-        .dashboard-header-right .dropdown-toggle {
-            gap: 0.35rem;
-        }
-        .dashboard-header-right button i,
-        .dashboard-header-right .btn i,
-        .dashboard-header-right .nav-link i {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-        }
-        .navbar-student .navbar-toggler {
-            border-color: rgba(255,255,255,0.35);
-        }
-        .navbar-student .navbar-toggler:focus {
-            box-shadow: 0 0 0 3px rgba(105, 240, 174, 0.25);
-        }
-        .navbar-student .navbar-toggler-icon {
-            filter: invert(1) brightness(1.2);
         }
         .navbar-student .navbar-text,
         .navbar-student .nav-link { color: rgba(255,255,255,0.9) !important; }
@@ -207,91 +139,6 @@
         }
         .scores-card .table tbody td { padding: 0.85rem 1rem; }
         .scores-card .table-striped tbody tr:nth-of-type(odd) { background: rgba(0, 200, 83, 0.03); }
-
-        /* Student header cleanup for phones/tablets */
-        @media (max-width: 991px) {
-            .dashboard-header-shell {
-                min-height: 56px;
-                padding-left: 0.85rem;
-                padding-right: 0.85rem;
-            }
-
-            .dashboard-header-left {
-                font-size: 1rem;
-                line-height: 1.2;
-                max-width: calc(100% - 56px);
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-            }
-
-            #navbarNav {
-                background: rgba(9, 24, 9, 0.98);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 12px;
-                margin-top: 0.6rem;
-                padding: 0.65rem 0.75rem;
-            }
-
-            .navbar-student .navbar-nav {
-                align-items: stretch !important;
-                gap: 0.4rem;
-            }
-            .dashboard-header-right {
-                width: 100%;
-                margin-top: 0.5rem;
-                gap: 0.25rem;
-            }
-            .dashboard-header-right .btn,
-            .dashboard-header-right .nav-link,
-            .dashboard-header-right button,
-            .dashboard-header-right .dropdown-toggle {
-                height: 38px;
-                min-height: 38px;
-            }
-
-            .navbar-student .navbar-text {
-                display: block;
-                width: 100%;
-                background: rgba(255,255,255,0.06);
-                border: 1px solid rgba(255,255,255,0.12);
-                border-radius: 10px;
-                padding: 0.55rem 0.7rem;
-                margin: 0 !important;
-                line-height: 1.35;
-            }
-
-            .navbar-student .navbar-text strong {
-                display: block;
-                font-size: 0.93rem;
-                word-break: break-word;
-            }
-
-            .navbar-student .navbar-text small {
-                display: block;
-                word-break: break-word;
-            }
-
-            .navbar-student .dropdown-menu {
-                min-width: 100%;
-                margin-top: 0.35rem;
-            }
-
-            .navbar-student .dropdown-toggle {
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                width: 40px;
-                height: 40px;
-                border-radius: 10px;
-                background: rgba(255,255,255,0.08);
-                border: 1px solid rgba(255,255,255,0.14);
-            }
-
-            .join-card .card-body {
-                padding: 1rem;
-            }
-        }
 
         /* Modal */
         #proctoringModal .modal-content {
@@ -437,7 +284,53 @@
     </style>
 </head>
 <body>
-    {% include 'navbar.html' %}
+    <nav class="navbar navbar-expand-lg navbar-student border-bottom">
+        <div class="container">
+            <a class="navbar-brand" href="#">Online Proctoring System</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto align-items-center">
+                    <li class="nav-item me-2 d-none d-sm-flex align-items-center">
+                        <button type="button" class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal" title="Open user guide">
+                            <i class='bx bx-book-open'></i> User Guide
+                        </button>
+                    </li>
+                    <li class="nav-item me-3">
+                        <span class="navbar-text" id="userInfo">
+                            <strong id="userName"></strong><br>
+                            <small id="userEmail"></small><br>
+                            <small class="text-muted" id="userSection" style="font-size: 0.85rem;">
+                                <i class='bx bx-group'></i> <span id="sectionDisplay">Loading section...</span>
+                            </small>
+                        </span>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown">
+                            <i class='bx bx-menu'></i>
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li class="d-sm-none"><button type="button" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#studentUserGuideModal">
+                                <i class='bx bx-book-open'></i> User Guide
+                            </button></li>
+                            <li class="d-sm-none"><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="profileBtn">
+                                <i class='bx bx-user'></i> Profile
+                            </a></li>
+                            <li><a class="dropdown-item" href="#" id="darkModeBtn">
+                                <i class='bx bx-moon'></i> <span id="darkModeText">Dark Mode</span>
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" id="logoutBtn">
+                                <i class='bx bx-log-out'></i> Logout
+                            </a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
     <div class="container py-4">
         <!-- Join class by code -->
@@ -589,96 +482,31 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-        import { getAuth, onAuthStateChanged, getIdToken } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBCXjpscninjBMMiEth3faD4LsVolWYEjA",
-            authDomain: "myapplication-0405566f.firebaseapp.com",
-            projectId: "myapplication-0405566f",
-            storageBucket: "myapplication-0405566f.firebasestorage.app",
-            messagingSenderId: "929555638825",
-            appId: "1:929555638825:web:d3fe5c1421f0ae1fa24a38"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        window.__authBootstrap = new Promise((resolve) => {
-            const timeoutId = setTimeout(() => resolve({ user: auth.currentUser, timedOut: true }), 5000);
-            const unsub = onAuthStateChanged(auth, (user) => {
-                clearTimeout(timeoutId);
-                unsub();
-                resolve({ user, timedOut: false });
-            }, () => {
-                clearTimeout(timeoutId);
-                unsub();
-                resolve({ user: auth.currentUser, timedOut: false });
-            });
-        });
-        window.__getFreshFirebaseToken = async function __getFreshFirebaseToken() {
-            const user = auth.currentUser;
-            if (!user) return null;
-            const token = await getIdToken(user, true);
-            if (token) localStorage.setItem('authToken', token);
-            if (user.uid) localStorage.setItem('authUid', user.uid);
-            if (user.email) localStorage.setItem('authEmail', user.email);
-            return token;
-        };
-        window.__authBootstrap.then(({ user }) => {
-            if (!user) return;
-            if (user.uid) {
-                sessionStorage.setItem('authUid', user.uid);
-                localStorage.setItem('authUid', user.uid);
-            }
-            if (user.email) {
-                sessionStorage.setItem('authEmail', user.email);
-                localStorage.setItem('authEmail', user.email);
-            }
-            getIdToken(user).then((token) => {
-                if (token) localStorage.setItem('authToken', token);
-            }).catch(() => {});
-        });
-    </script>
     <script>
         let selectedExamId = null;
-        const __studentFetchCache = new Map();
-        let __studentLastRefreshAt = 0;
-
-        async function fetchJsonCached(url, ttlMs = 45000) {
-            const now = Date.now();
-            const hit = __studentFetchCache.get(url);
-            if (hit && hit.expiresAt > now) return hit.data;
-            const res = await fetch(url);
-            if (!res.ok) throw new Error(`Request failed: ${url}`);
-            const data = await res.json();
-            __studentFetchCache.set(url, { data, expiresAt: now + ttlMs });
-            return data;
-        }
-
-        function invalidateStudentCache(prefix) {
-            for (const key of __studentFetchCache.keys()) {
-                if (!prefix || key.includes(prefix)) __studentFetchCache.delete(key);
-            }
-        }
 
         // Load available exams (filtered by student's section)
         async function loadExams() {
             const userId = sessionStorage.getItem('userId');
             if (!userId) return;
 
-            let user, classes, allExams, allSessions;
-            try {
-                [user, classes, allExams, allSessions] = await Promise.all([
-                    fetchJsonCached('/select?collection=users&id=' + userId, 15000),
-                    fetchJsonCached('/select?collection=classes', 60000),
-                    fetchJsonCached('/select?collection=exams', 45000),
-                    fetchJsonCached('/select?collection=proctoring_sessions&limit=300', 30000)
-                ]);
-            } catch (err) {
-                console.error('Failed to load user, classes, exams, or sessions', err);
+            // Load user, classes, exams, and proctoring sessions in parallel
+            const [userResponse, classesResponse, examsResponse, sessionsResponse] = await Promise.all([
+                fetch('/select?collection=users&id=' + userId),
+                fetch('/select?collection=classes'),
+                fetch('/select?collection=exams'),
+                fetch('/select?collection=proctoring_sessions')
+            ]);
+
+            if (!userResponse.ok || !classesResponse.ok || !examsResponse.ok || !sessionsResponse.ok) {
+                console.error('Failed to load user, classes, exams, or sessions');
                 return;
             }
+
+            const user = await userResponse.json();
+            const classes = await classesResponse.json();
+            const allExams = await examsResponse.json();
+            const allSessions = await sessionsResponse.json();
 
             // Get student's class_id
             const studentClassId = user.class_id;
@@ -688,15 +516,12 @@
             classes.forEach(cls => classMap[cls.id] = cls);
 
             // Display student's section
-            const sectionDisplayEl = document.getElementById('sectionDisplay');
-            if (sectionDisplayEl) {
-                if (studentClassId && classMap[studentClassId]) {
-                    const studentClass = classMap[studentClassId];
-                    sectionDisplayEl.textContent = `${studentClass.course} - ${studentClass.section}`;
-                } else {
-                    sectionDisplayEl.textContent = 'Not assigned';
-                    sectionDisplayEl.style.color = '#dc3545';
-                }
+            if (studentClassId && classMap[studentClassId]) {
+                const studentClass = classMap[studentClassId];
+                document.getElementById('sectionDisplay').textContent = `${studentClass.course} - ${studentClass.section}`;
+            } else {
+                document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                document.getElementById('sectionDisplay').style.color = '#dc3545';
             }
 
             // Filter exams to only show exams for student's section
@@ -860,7 +685,8 @@
 
             try {
                 // Load classes and find by join_code (case-insensitive match)
-                const classes = await fetchJsonCached('/select?collection=classes', 60000);
+                const classesResponse = await fetch('/select?collection=classes');
+                const classes = await classesResponse.json();
                 const targetClass = classes.find(cls => (cls.join_code || '').toUpperCase() === rawCode);
 
                 if (!targetClass) {
@@ -898,7 +724,6 @@
 
                 msgEl.textContent = `Joined section: ${targetClass.course} - ${targetClass.section}`;
                 msgEl.classList.add('text-success');
-                invalidateStudentCache('/select?collection=users&id=');
 
                 // Refresh UI
                 loadExams();
@@ -907,6 +732,34 @@
                 console.error('Join code error:', err);
                 msgEl.textContent = 'Error joining section. Please try again.';
                 msgEl.classList.add('text-danger');
+            }
+        });
+
+        // Add logout functionality
+        document.getElementById('logoutBtn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            try {
+                const uidLo = sessionStorage.getItem('userId');
+                const response = await fetch('/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: uidLo || '' })
+                });
+                
+                if (response.ok) {
+                    sessionStorage.removeItem('logged_admin_dash_open_v1');
+                    sessionStorage.removeItem('logged_proctor_dash_open_v1');
+                    // Clear session storage
+                    sessionStorage.clear();
+                    // Redirect to login page
+                    window.location.href = '/';
+                } else {
+                    alert('Logout failed');
+                }
+            } catch (err) {
+                console.error('Error during logout:', err);
+                alert('Error during logout');
             }
         });
 
@@ -934,39 +787,48 @@
         // Load user information
         async function loadUserInfo() {
             const userId = sessionStorage.getItem('userId');
-            const user = await fetchJsonCached('/select?collection=users&id=' + userId, 15000);
+            const userResponse = await fetch('/select?collection=users&id=' + userId);
+            const user = await userResponse.json();
             
-            const userNameEl = document.getElementById('userName');
-            if (userNameEl) userNameEl.textContent = user.name || 'Student';
-
-            const userEmailEl = document.getElementById('userEmail');
-            if (userEmailEl) userEmailEl.textContent = user.email || '';
+            document.getElementById('userName').textContent = user.name || 'Student';
+            document.getElementById('userEmail').textContent = user.email || '';
 
             // Load student's section
-            const sectionDisplayEl = document.getElementById('sectionDisplay');
             if (user.class_id) {
-                const classes = await fetchJsonCached('/select?collection=classes', 60000);
+                const classesResponse = await fetch('/select?collection=classes');
+                const classes = await classesResponse.json();
                 const studentClass = classes.find(cls => cls.id === user.class_id);
-                if (sectionDisplayEl) {
-                    if (studentClass) {
-                        sectionDisplayEl.textContent = `${studentClass.course} - ${studentClass.section}`;
-                    } else {
-                        sectionDisplayEl.textContent = 'Not assigned';
-                    }
+                if (studentClass) {
+                    document.getElementById('sectionDisplay').textContent = `${studentClass.course} - ${studentClass.section}`;
+                } else {
+                    document.getElementById('sectionDisplay').textContent = 'Not assigned';
                 }
             } else {
-                if (sectionDisplayEl) {
-                    sectionDisplayEl.textContent = 'Not assigned';
-                    sectionDisplayEl.style.color = '#dc3545';
-                }
+                document.getElementById('sectionDisplay').textContent = 'Not assigned';
+                document.getElementById('sectionDisplay').style.color = '#dc3545';
             }
 
             // Load dark mode preference
             const darkMode = localStorage.getItem('darkMode') === 'true';
             if (darkMode) {
                 document.body.classList.add('dark-mode');
+                document.getElementById('darkModeText').textContent = 'Light Mode';
             }
         }
+
+        // Profile button handler
+        document.getElementById('profileBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = '/profile';
+        });
+
+        // Dark mode toggle
+        document.getElementById('darkModeBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            const isDark = document.body.classList.toggle('dark-mode');
+            localStorage.setItem('darkMode', isDark);
+            document.getElementById('darkModeText').textContent = isDark ? 'Light Mode' : 'Dark Mode';
+        });
 
         // Unified utility functions for consistent display across all dashboards
         
@@ -1053,108 +915,87 @@
         // Load student scores
         async function loadStudentScores() {
             const userId = sessionStorage.getItem('userId');
-            if (!userId) return;
+            const userResponse = await fetch('/select?collection=users&id=' + userId);
+            const user = await userResponse.json();
 
             const tbody = document.getElementById('scoresTable');
             tbody.innerHTML = '';
 
-            try {
-                const [user, exams, allResults, allSessions] = await Promise.all([
-                    fetchJsonCached('/select?collection=users&id=' + userId, 15000),
-                    fetchJsonCached('/select?collection=exams', 45000),
-                    fetchJsonCached('/select?collection=exam_results&limit=300', 30000),
-                    fetchJsonCached('/select?collection=proctoring_sessions&limit=300', 30000)
-                ]);
+            if (user.exams_taken && user.exams_taken.length > 0) {
+                // Get proctoring sessions for violations
+                const sessionsResponse = await fetch('/select?collection=proctoring_sessions');
+                const allSessions = await sessionsResponse.json();
 
-                const toKey = (v) => String(v ?? '').trim();
-                const examById = {};
-                (exams || []).forEach(ex => {
-                    if (ex && ex.id != null) examById[toKey(ex.id)] = ex;
-                });
+                for (const examId of user.exams_taken) {
+                    try {
+                        // Get exam details
+                        const examResponse = await fetch(`/select?collection=exams&id=${examId}`);
+                        const exam = await examResponse.json();
 
-                // Prefer canonical data from exam_results, then supplement with valid exams_taken entries.
-                const userResults = (allResults || []).filter(result => toKey(result.user_id) === toKey(userId));
-                const examIdSet = new Set();
-                userResults.forEach(r => {
-                    const id = toKey(r.exam_id);
-                    if (id) examIdSet.add(id);
-                });
-                (user.exams_taken || []).forEach(id => {
-                    const key = toKey(id);
-                    if (key && examById[key]) examIdSet.add(key);
-                });
+                        // Get exam results to calculate score
+                        const resultsResponse = await fetch('/select?collection=exam_results');
+                        const allResults = await resultsResponse.json();
 
-                const sortedExamIds = Array.from(examIdSet).sort((a, b) => {
-                    const ra = userResults.find(r => toKey(r.exam_id) === a);
-                    const rb = userResults.find(r => toKey(r.exam_id) === b);
-                    return new Date(rb?.timestamp || 0) - new Date(ra?.timestamp || 0);
-                });
+                        // Find the result for this user and exam
+                        const userResult = allResults.find(result =>
+                            result.user_id === userId && result.exam_id === examId
+                        );
 
-                if (sortedExamIds.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No exams taken yet</td></tr>';
-                    return;
-                }
+                        let scoreDisplay = 'N/A';
+                        let dateTaken = 'N/A';
+                        let statusBadge = '';
 
-                for (const examId of sortedExamIds) {
-                    const exam = examById[examId];
-                    // Skip stale IDs that no longer exist to avoid "Unknown" ghost rows.
-                    if (!exam) continue;
-
-                    const userResult = userResults.find(result => toKey(result.exam_id) === examId) || null;
-
-                    let scoreDisplay = 'N/A';
-                    let dateTaken = 'N/A';
-                    let statusBadge = '';
-
-                    if (userResult) {
-                        // Show forced/terminated as 0
-                        if (userResult.forced_score === 0 || userResult.terminated) {
-                            scoreDisplay = '0 (terminated)';
-                            statusBadge = '<span class="badge bg-danger">Terminated</span>';
-                        } else if (Array.isArray(exam.questions) && exam.questions.length > 0) {
-                            const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
-                            let correctAnswers = 0;
-                            exam.questions.forEach((question, index) => {
-                                if (userResult.answers && normalizeAnswer(userResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
-                                    correctAnswers++;
-                                }
-                            });
-                            scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
-                            statusBadge = '<span class="badge bg-success">Completed</span>';
+                        if (userResult) {
+                            // Show forced/terminated as 0
+                            if (userResult.forced_score === 0 || userResult.terminated) {
+                                scoreDisplay = '0 (terminated)';
+                                statusBadge = '<span class="badge bg-danger">Terminated</span>';
+                            } else if (exam.questions) {
+                                const normalizeAnswer = (value) => String(value ?? '').trim().toLowerCase();
+                                let correctAnswers = 0;
+                                exam.questions.forEach((question, index) => {
+                                    if (userResult.answers && normalizeAnswer(userResult.answers[index]) === normalizeAnswer(question.correctAnswer)) {
+                                        correctAnswers++;
+                                    }
+                                });
+                                scoreDisplay = `${correctAnswers}/${exam.questions.length}`;
+                                statusBadge = '<span class="badge bg-success">Completed</span>';
+                            }
+                            dateTaken = formatDateTime(userResult.timestamp);
                         }
-                        dateTaken = formatDateTime(userResult.timestamp);
+
+                        // Find violations for this exam and user
+                        const userSession = allSessions.find(session =>
+                            (session.student_id === userId || session.user_id === userId) &&
+                            session.exam_id === examId
+                        );
+
+                        // Use unified flag formatting function
+                        const violationsDisplay = formatProctoringFlags(userSession ? userSession.flags : null);
+
+                        // Use unified duration formatting function
+                        const durationDisplay = formatDuration(userResult, userSession);
+
+                        // Format exam duration
+                        const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
+
+                        const row = `
+                            <tr>
+                                <td>${user.name || 'Unknown'}</td>
+                                <td>${exam.title || 'Unknown'} (${exam.subject || ''})</td>
+                                <td>${scoreDisplay} ${statusBadge}</td>
+                                <td>${dateTaken}</td>
+                                <td>${durationDisplay} / ${examDurationDisplay}</td>
+                                <td>${violationsDisplay}</td>
+                            </tr>
+                        `;
+                        tbody.innerHTML += row;
+                    } catch (err) {
+                        console.warn('Error loading score for exam:', examId, err);
                     }
-
-                    // Find violations for this exam and user
-                    const userSession = (allSessions || []).find(session =>
-                        (toKey(session.student_id) === toKey(userId) || toKey(session.user_id) === toKey(userId)) &&
-                        toKey(session.exam_id) === examId
-                    );
-
-                    const violationsDisplay = formatProctoringFlags(userSession ? userSession.flags : null);
-                    const durationDisplay = formatDuration(userResult, userSession);
-                    const examDurationDisplay = exam.duration ? `${Math.floor(exam.duration)}:${Math.round((exam.duration % 1) * 60).toString().padStart(2, '0')}` : 'N/A';
-
-                    const row = `
-                        <tr>
-                            <td>${user.name || 'Student'}</td>
-                            <td>${exam.title || 'Untitled Exam'} (${exam.subject || 'No Subject'})</td>
-                            <td>${scoreDisplay} ${statusBadge}</td>
-                            <td>${dateTaken}</td>
-                            <td>${durationDisplay} / ${examDurationDisplay}</td>
-                            <td>${violationsDisplay}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
                 }
-
-                // If all IDs were stale and got skipped.
-                if (!tbody.innerHTML.trim()) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="text-center">No exams taken yet</td></tr>';
-                }
-            } catch (err) {
-                console.error('Error loading student scores:', err);
-                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error loading scores</td></tr>';
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center">No exams taken yet</td></tr>';
             }
         }
 
@@ -1170,86 +1011,23 @@
             window.history.replaceState({}, '', window.location.pathname);
         }
 
-        async function bootstrapStudentDashboard() {
-            const rootEl = document.getElementById('main-content');
-            const safeReplace = (path) => {
-                if (window.location.pathname !== path) {
-                    window.location.replace(path);
-                }
-            };
-            if (rootEl) rootEl.classList.add('d-none');
-            try {
-                const authState = window.__authBootstrap ? await window.__authBootstrap : { user: null };
-                const uid = (authState.user && authState.user.uid) || sessionStorage.getItem('authUid') || localStorage.getItem('authUid') || '';
-                const email = (authState.user && authState.user.email) || sessionStorage.getItem('authEmail') || localStorage.getItem('authEmail') || '';
-                if (!authState.user && !uid && !email) {
-                    safeReplace('/');
-                    return;
-                }
-                const qs = new URLSearchParams();
-                if (uid) qs.set('uid', uid);
-                if (email) qs.set('email', email);
-                const profileRes = await fetch(`/resolve_user?${qs.toString()}`);
-                if (!profileRes.ok) {
-                    safeReplace('/');
-                    return;
-                }
-                const profile = await profileRes.json();
-                const role = (profile.role || profile.type || '').toString().trim().toLowerCase();
-                sessionStorage.setItem('userId', profile.id || '');
-                sessionStorage.setItem('user', JSON.stringify(profile));
-                if (uid) sessionStorage.setItem('authUid', uid);
-                if (email) sessionStorage.setItem('authEmail', email);
-
-                if (role !== 'student') {
-                    if (role === 'admin') {
-                        safeReplace('/dashboard');
-                    } else if (role === 'proctor' || role === 'teacher') {
-                        safeReplace('/proctor_dashboard');
-                    } else {
-                        safeReplace('/');
-                    }
-                    return;
-                }
-
-                await new Promise((resolve) => setTimeout(resolve, 100));
-                loadExams();
-                loadStudentScores();
-                if (rootEl) rootEl.classList.remove('d-none');
-            } catch (err) {
-                console.error('Student dashboard auth init failed:', err);
-                if (typeof window.__notifySessionExpired === 'function') {
-                    window.__notifySessionExpired('Session expired, please login again.');
-                }
-                safeReplace('/');
-            } finally {
-                if (rootEl) rootEl.classList.remove('d-none');
-            }
-        }
-
-        bootstrapStudentDashboard();
-
-        function refreshStudentData() {
-            const now = Date.now();
-            if (now - __studentLastRefreshAt < 12000) return;
-            __studentLastRefreshAt = now;
-            invalidateStudentCache('/select?collection=users&id=');
-            invalidateStudentCache('/select?collection=exam_results');
-            invalidateStudentCache('/select?collection=proctoring_sessions');
-            loadExams();
-            loadStudentScores();
-        }
+        // Load exams when page loads
+        loadExams();
+        loadStudentScores();
         
         // Refresh exams when page becomes visible (user returns from exam)
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
-                refreshStudentData();
+                // Page is now visible, refresh exams to show updated completion status
+                loadExams();
+                loadStudentScores();
             }
         });
         
         // Also refresh on focus (when user switches back to tab)
         window.addEventListener('focus', () => {
-            refreshStudentData();
+            loadExams();
+            loadStudentScores();
         });
     </script>
 </body>
