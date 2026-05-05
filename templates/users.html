@@ -17,6 +17,25 @@
         .page-title { font-family: 'Outfit', sans-serif; font-weight: 700; color: #1b2e1b; }
         .card { border-radius: 16px; border: 1px solid rgba(0,200,83,0.15); box-shadow: 0 4px 20px rgba(0,200,83,0.08); }
         .btn-primary { background: linear-gradient(145deg, var(--accent), var(--accent-dark)) !important; border: none !important; border-radius: 10px !important; }
+        /* Keep table semantics intact on desktop/tablet */
+        table, .table {
+            display: table;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        thead { display: table-header-group; }
+        tbody { display: table-row-group; }
+        tr { display: table-row; }
+        th, td {
+            display: table-cell;
+            padding: 10px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
     </style>
 </head>
 <body>
@@ -40,18 +59,20 @@
             <!-- Users Table -->
             <div class="card">
                 <div class="card-body">
-                    <table id="usersTable" class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Email</th>
-                                <th>Role</th>
-                                <th>Section</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table id="usersTable" class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Role</th>
+                                    <th>Section</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -66,19 +87,21 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Exam Title</th>
-                                <th>Subject</th>
-                                <th>Status</th>
-                                <th>Score</th>
-                                <th>Date Taken</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="userExamsTableBody"></tbody>
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Exam Title</th>
+                                    <th>Subject</th>
+                                    <th>Status</th>
+                                    <th>Score</th>
+                                    <th>Date Taken</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="userExamsTableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -172,7 +195,9 @@
     
     <script>
         // Initialize DataTable
-        let userTable = $('#usersTable').DataTable();
+        let userTable = $('#usersTable').DataTable({
+            responsive: false
+        });
         let classMap = {};
         
         // Load classes and populate select + map
