@@ -977,7 +977,13 @@ def edit(id):
             valid, err = validate_exam_data(data, require_all_fields=False)
             if not valid:
                 return jsonify({'error': err}), 400
-        db.collection(collection).document(id).update(data)
+        doc_ref = db.collection(collection).document(id)
+        if collection == 'users':
+            # Upsert for users so section join/profile updates don't fail
+            # when the user doc is missing (e.g., stale client UID state).
+            doc_ref.set(data, merge=True)
+        else:
+            doc_ref.update(data)
         return jsonify({'message': 'Updated'}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1014,6 +1020,13 @@ def login():
     if user:
         user_data = user.to_dict()
         user_data['id'] = user.id  # Add document ID to user data
+        # Ensure the user document exists/has baseline fields for later profile updates.
+        # This prevents "No document to update" errors in downstream edit flows.
+        db.collection('users').document(user.id).set({
+            'email': user_data.get('email') or email,
+            'name': user_data.get('name') or '',
+            'role': user_data.get('role') or user_data.get('type') or 'student',
+        }, merge=True)
         utype = (
             ((user_data.get('role') or user_data.get('type')) or '')
         ).strip().lower() or 'user'
