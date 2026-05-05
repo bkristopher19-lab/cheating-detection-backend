@@ -56,6 +56,20 @@
             border-radius: 8px;
             margin-bottom: 8px;
         }
+        .admin-actions-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 0.5rem;
+        }
+        .admin-actions-group .btn {
+            width: 100%;
+            min-height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 10px;
+        }
         .table-responsive {
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -534,11 +548,11 @@
                         <div class="card-body">
                             <div class="text-xs text-uppercase mb-3 text-danger fw-bold">Admin Controls</div>
                             <p class="small text-muted mb-2">Marks every session and score row as archived (hidden from main views). Recordings stay on the server. Your browser will download a PDF summary.</p>
-                            <div class="mt-2">
+                            <div class="admin-actions-group">
                                 <button type="button" class="btn btn-danger btn-sm" id="deleteAllBtn" onclick="deleteAllReports()">
                                     <i class="bx bx-archive"></i> Archive reports
                                 </button>
-                                <button type="button" class="btn btn-outline-danger btn-sm ms-2" id="cleanupResultsBtn" onclick="cleanupStaleResults()">
+                                <button type="button" class="btn btn-outline-danger btn-sm" id="cleanupResultsBtn" onclick="cleanupStaleResults()">
                                     <i class="bx bx-brush"></i> Clean stale results
                                 </button>
                             </div>
@@ -788,13 +802,14 @@
         }
 
         function resolveLogWho(r, usersById) {
-            let n = r.actor_name != null ? String(r.actor_name).trim() : '';
+            let n = r.user_name != null ? String(r.user_name).trim() : '';
+            if (!n || n.toLowerCase() === 'unknown user') {
+                n = r.actor_name != null ? String(r.actor_name).trim() : '';
+            }
             const uid = r.user_id != null ? String(r.user_id) : '';
             if (!n && uid && usersById && usersById[uid])
                 n = (usersById[uid].name || usersById[uid].email || '').trim();
-            if (!n && uid)
-                return _escapeHtml('User (' + uid.slice(0, 10) + '…)');
-            return n ? _escapeHtml(n) : '—';
+            return n ? _escapeHtml(n) : 'Unknown User';
         }
 
         let __dashUiLogTimers = {};
