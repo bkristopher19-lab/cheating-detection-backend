@@ -1731,6 +1731,56 @@ def cleanup_exam_results():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/delete_system_logs', methods=['POST'])
+def delete_system_logs():
+    """
+    Admin-only maintenance endpoint to delete all rows from system_logs.
+    Uses batched deletes (100 docs per iteration) to avoid oversized commits.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        admin_uid = (data.get('user_id') or '').strip()
+        ok_ad, err = validate_firestore_id(admin_uid, 'user_id')
+        if not ok_ad:
+            return jsonify({'error': err}), 400
+
+        udoc = db.collection('users').document(admin_uid).get()
+        if not udoc.exists:
+            return jsonify({'error': 'User not found'}), 404
+        role = str((udoc.to_dict() or {}).get('role') or (udoc.to_dict() or {}).get('type') or '').strip().lower()
+        if role != 'admin':
+            return jsonify({'error': 'Admin access required'}), 403
+
+        deleted_total = 0
+        while True:
+            batch_docs = list(db.collection('system_logs').limit(100).stream())
+            if not batch_docs:
+                break
+            batch = db.batch()
+            for doc in batch_docs:
+                batch.delete(doc.reference)
+            batch.commit()
+            deleted_total += len(batch_docs)
+            if len(batch_docs) < 100:
+                break
+
+        actor_name = _resolve_user_display_name(admin_uid) or admin_uid[:16]
+        append_system_log(
+            f'{actor_name} manually cleared system logs ({deleted_total} row(s) deleted).',
+            event_type='admin.system_logs.delete_all',
+            user_id=admin_uid,
+            meta={'deleted_total': deleted_total}
+        )
+        return jsonify({
+            'success': True,
+            'deleted_total': deleted_total,
+            'message': f'Deleted {deleted_total} system log row(s).'
+        }), 200
+    except Exception as e:
+        print(f'Error during delete_system_logs: {e}')
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/archive_reports', methods=['POST'])
 @app.route('/delete_old_reports', methods=['POST'])
 def archive_reports():
